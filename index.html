@@ -317,6 +317,23 @@ function renderFiles(parent,names){
   parent.appendChild(f)
 }
 
+function renderCitations(parent,annotations){
+  if(!Array.isArray(annotations)||!annotations.length)return;
+  var seen={},links=[];
+  annotations.forEach(function(a){
+    var u=a&&a.url_citation?a.url_citation:(a&&a.type==="url_citation"?a.url_citation:null);
+    var url=u&&u.url?u.url:(a&&a.url?a.url:"");
+    if(!url||seen[url])return;seen[url]=true;
+    links.push({url:url,title:(u&&u.title)||(a&&a.title)||url})
+  });
+  if(!links.length)return;
+  var row=document.createElement("div");row.className="files";
+  links.slice(0,8).forEach(function(x){
+    var a=document.createElement("a");a.className="filechip";a.href=x.url;a.target="_blank";a.rel="noopener";a.style.textDecoration="none";a.textContent=x.title;row.appendChild(a)
+  });
+  parent.appendChild(row)
+}
+
 function renderChat(){
   var c=ensure(),box=q("#chat");box.innerHTML="";
   if(!c.messages.length){
@@ -330,6 +347,7 @@ function renderChat(){
         if(m.reasoning){var rb=document.createElement("div");rb.className="reasonbox";rb.textContent=m.reasoning;a.appendChild(rb)}
         var t=document.createElement("div");t.className="md";t.innerHTML=renderMarkdown(m.content||"");a.appendChild(t);
         if(m.images&&m.images.length)m.images.forEach(function(src){var im=document.createElement("img");im.className="generated";im.src=src;a.appendChild(im)});
+        renderCitations(a,m.annotations);
         var tools=document.createElement("div");tools.className="msgtools";
         var cp=document.createElement("button");cp.textContent="Copy";cp.onclick=function(){navigator.clipboard.writeText(m.content||"").then(function(){toast("Copied")})};
         var rd=document.createElement("button");rd.textContent="Read";rd.onclick=function(){speak(m.content||"")};
@@ -454,7 +472,28 @@ function addDelta(d,a){
   if(Array.isArray(d.content))d.content.forEach(function(p){if(p.text)a.content+=p.text;if(p.image_url&&p.image_url.url){a.images=a.images||[];a.images.push(p.image_url.url)}});
   if(Array.isArray(d.images))d.images.forEach(function(img){var src=img&&img.image_url&&img.image_url.url?img.image_url.url:(img&&img.url?img.url:"");if(src){a.images=a.images||[];a.images.push(src)}});
   if(typeof d.reasoning==="string")a.reasoning=(a.reasoning||"")+d.reasoning;
-  if(d.reasoning_details)a.reasoning_details=d.reasoning_details
+  if(d.reasoning_details)a.reasoning_details=d.reasoning_details;
+  if(d.annotations)a.annotations=d.annotations
+}
+
+async function fetchChatWithFallback(body,headers,signal){
+  try{
+    var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body),signal:signal});
+    if(r.ok)return r;
+    var raw=await r.text();
+    if(r.status!==400&&r.status!==422)throw new Error(errorRaw(raw,"HTTP "+r.status));
+    var simpler=Object.assign({},body);
+    delete simpler.reasoning;delete simpler.tools;delete simpler.provider;delete simpler.session_id;
+    if(simpler.models){delete simpler.models;simpler.model=settings.model}
+    if(simpler.plugins&&simpler.plugins.length===0)delete simpler.plugins;
+    toast("Retrying with compatibility mode…");
+    var retry=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(simpler),signal:signal});
+    if(!retry.ok)throw new Error(errorRaw(await retry.text(),"HTTP "+retry.status));
+    return retry
+  }catch(e){
+    if(e&&e.name==="TypeError"&&String(e.message).toLowerCase().indexOf("fetch")>=0)throw new Error("Could not reach OpenRouter. Make sure you are using the HTTPS GitHub Pages site and that your connection is online.");
+    throw e
+  }
 }
 
 async function send(){
@@ -477,8 +516,7 @@ async function send(){
     if(hasPDF(c))body.plugins=[{id:"file-parser",pdf:{engine:"cloudflare-ai"}}];
     var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"};
     if(settings.cache)headers["X-OpenRouter-Cache"]="true";
-    var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body),signal:controller.signal});
-    if(!r.ok)throw new Error(errorRaw(await r.text(),"HTTP "+r.status));
+    var r=await fetchChatWithFallback(body,headers,controller.signal);
     var reader=r.body&&r.body.getReader?r.body.getReader():null;
     if(!reader){var j=await r.json();finishBuffered(j,a);save();render();return}
     var dec=new TextDecoder(),buf="";
