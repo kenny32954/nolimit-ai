@@ -397,11 +397,11 @@ async function send(){
   c.messages.push(m);if(c.title==="New chat")c.title=(text||(files[0]&&files[0].name)||"New chat").replace(/\s+/g," ").slice(0,48);c.updated=Date.now();
   var a={role:"assistant",content:"",model:settings.model};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";render();
   try{
-    var body={model:settings.model,messages:apiMessages(c).slice(0,-1),temperature:Number(settings.temperature),stream:true,usage:{include:true}};
+    var body={model:settings.model,messages:apiMessages(c).slice(0,-1),temperature:Number(settings.temperature),stream:true,usage:{include:true},session_id:"nolimit-"+c.id};
     if(settings.reasoning!=="none")body.reasoning={effort:settings.reasoning,summary:"auto"};
     var tools=toolList();if(tools.length)body.tools=tools;
     if(hasPDF(c))body.plugins=[{id:"file-parser",pdf:{engine:"cloudflare-ai"}}];
-    var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"};
+    var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"};
     if(settings.cache)headers["X-OpenRouter-Cache"]="true";
     var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body),signal:controller.signal});
     if(!r.ok)throw new Error(errorRaw(await r.text(),"HTTP "+r.status));
@@ -412,7 +412,7 @@ async function send(){
       var z=await reader.read();if(z.done)break;buf+=dec.decode(z.value,{stream:true});var lines=buf.split("\n");buf=lines.pop();
       lines.forEach(function(line){
         line=line.trim();if(line.indexOf("data:")!==0)return;var raw=line.slice(5).trim();if(!raw||raw==="[DONE]")return;
-        try{var j=JSON.parse(raw),ch=j.choices&&j.choices[0];if(ch&&ch.delta)addDelta(ch.delta,a);if(j.usage)a.usage=j.usage;if(j.cost!=null)a.cost=j.cost;if(j.model)a.model=j.model;render()}catch(e){}
+        try{var j=JSON.parse(raw),ch=j.choices&&j.choices[0];if(ch&&ch.delta)addDelta(ch.delta,a);if(j.usage){a.usage=j.usage;if(j.usage.cost!=null)a.cost=j.usage.cost}if(j.cost!=null)a.cost=j.cost;if(j.model)a.model=j.model;render()}catch(e){}
       })
     }
     save()
@@ -427,7 +427,7 @@ async function send(){
 
 function finishBuffered(j,a){
   var m=j.choices&&j.choices[0]&&j.choices[0].message;if(m){a.content=m.content||"";a.reasoning=m.reasoning||"";a.reasoning_details=m.reasoning_details;a.annotations=m.annotations;if(Array.isArray(m.images))a.images=m.images.map(function(x){return x.image_url&&x.image_url.url?x.image_url.url:x.url||x}).filter(Boolean)}
-  a.usage=j.usage;a.cost=j.cost;if(j.model)a.model=j.model
+  a.usage=j.usage;if(j.usage&&j.usage.cost!=null)a.cost=j.usage.cost;if(j.cost!=null)a.cost=j.cost;if(j.model)a.model=j.model
 }
 
 function regenerate(idx){
@@ -474,7 +474,7 @@ async function generateImage(){
   var prompt=q("#imagePrompt").value.trim();if(!prompt)return toast("Enter an image prompt");
   q("#generateImage").disabled=true;q("#imageProgress").classList.remove("hidden");q("#imageOutput").innerHTML="";
   try{
-    var r=await fetch(BASE+"/images",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},body:JSON.stringify({model:q("#imageModel").value,prompt:prompt,n:1,aspect_ratio:q("#imageRatio").value,output_format:q("#imageFormat").value})});
+    var chosen=imageModels.find(function(m){return m.id===q("#imageModel").value});var params=chosen&&chosen.supported_parameters?chosen.supported_parameters:{};var imageBody={model:q("#imageModel").value,prompt:prompt,n:1};if(params.aspect_ratio||!chosen)imageBody.aspect_ratio=q("#imageRatio").value;if(params.output_format||!chosen)imageBody.output_format=q("#imageFormat").value;var r=await fetch(BASE+"/images",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify(imageBody)});
     var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Image generation failed"));var d=j.data&&j.data[0];var src=d&&(d.b64_json?("data:image/"+q("#imageFormat").value+";base64,"+d.b64_json):(d.url||""));if(!src)throw new Error("No image was returned");
     var img=document.createElement("img");img.src=src;img.className="imgresult";q("#imageOutput").appendChild(img);
     var add=document.createElement("button");add.className="secondary";add.style.marginTop="8px";add.textContent="Add to current chat";add.onclick=function(){var c=ensure();c.messages.push({role:"assistant",content:"Generated image: "+prompt,model:q("#imageModel").value,images:[src]});c.updated=Date.now();save();closeModals();render()};q("#imageOutput").appendChild(add)
@@ -485,7 +485,7 @@ async function generateImage(){
 async function transcribe(blob){
   var type=blob.type||"audio/webm",format="webm";if(type.indexOf("wav")>=0)format="wav";else if(type.indexOf("mpeg")>=0||type.indexOf("mp3")>=0)format="mp3";else if(type.indexOf("ogg")>=0)format="ogg";else if(type.indexOf("mp4")>=0||type.indexOf("m4a")>=0)format="mp4";
   var data=await readDataURL(blob),b64=String(data).split(",")[1]||"";
-  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},body:JSON.stringify({model:"openai/whisper-1",input_audio:{data:b64,format:format}})});
+  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify({model:"openai/whisper-1",input_audio:{data:b64,format:format}})});
   var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Transcription failed"));return j.text||""
 }
 
@@ -550,9 +550,8 @@ q("#micBtn").onclick=toggleMic;
 q("#artifactCopy").onclick=function(){if(!artifactCode)return;navigator.clipboard.writeText(artifactCode).then(function(){toast("Artifact HTML copied")})};
 q("#artifactOpen").onclick=function(){
   if(!artifactCode)return;
-  var url=URL.createObjectURL(new Blob([artifactCode],{type:"text/html"}));
-  window.open(url,"_blank","noopener");
-  setTimeout(function(){URL.revokeObjectURL(url)},60000)
+  var url="data:text/html;charset=utf-8,"+encodeURIComponent(artifactCode);
+  window.open(url,"_blank","noopener")
 };
 
 // Paste and drag/drop attachments.
