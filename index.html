@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171716">
+<title>NoLimit AI</title>
+<style>
+:root{--bg:#171716;--panel:#20201e;--panel2:#2a2927;--line:#3a3935;--text:#f1efe9;--muted:#85827c;--accent:#d87858}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}button,input,textarea{font:inherit;color:inherit}button{border:0;background:none}.app{height:100dvh;display:grid;grid-template-columns:1fr}.side{position:fixed;inset:0 auto 0 0;width:min(88vw,340px);background:#20201f;border-right:1px solid var(--line);z-index:30;transform:translateX(-102%);transition:.22s;padding:14px 11px;display:flex;flex-direction:column}.side.open{transform:none}.shade{position:fixed;inset:0;background:#0009;z-index:29;display:none}.shade.show{display:block}.shead{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 5px;font-size:18px}.new,.sbtn{height:44px;border-radius:11px;text-align:left;padding:0 12px}.new{background:#2d2c29;margin:8px 0}.search{height:40px;border:1px solid var(--line);border-radius:10px;background:#191918;padding:0 11px;outline:0}.hist{flex:1;overflow:auto;margin-top:8px}.hrow{width:100%;height:42px;border-radius:9px;text-align:left;padding:0 10px;color:#c8c5be;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hrow.on{background:#302f2c;color:#fff}.sfoot{border-top:1px solid #302f2d;padding-top:8px;display:grid}.main{height:100dvh;min-width:0;display:flex;flex-direction:column}.top{height:62px;display:grid;grid-template-columns:48px 1fr auto;align-items:center;padding:calc(env(safe-area-inset-top) + 4px) 12px 4px;border-top:2px solid #414146}.icon{width:40px;height:40px;border-radius:12px;color:#ddd}.title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px}.connect{height:38px;padding:0 12px;border-radius:12px;background:#2c2c2a}.connect.ok{color:#bce0c9}.chat{flex:1;overflow:auto;padding:12px 22px 235px;scrollbar-width:none}.welcome{min-height:62vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.logo{width:50px;height:50px;border-radius:16px;background:radial-gradient(circle at 30% 30%,#f0a088,#c96143)}.welcome h1{font:400 31px/1.1 Georgia,serif;margin:20px 0 8px}.welcome p{max-width:420px;color:var(--muted);font-size:14px;line-height:1.5}.user{display:flex;justify-content:flex-end;margin:8px 0 22px}.ub{max-width:88%;background:#2a2927;border:1px solid #393733;border-radius:20px 20px 6px 20px;padding:11px 14px;white-space:pre-wrap;line-height:1.45}.assistant{margin:0 0 28px}.answer{font:400 18px/1.5 Georgia,serif;white-space:pre-wrap;overflow-wrap:anywhere}.meta{font-size:12px;color:#6e6b65;margin-top:8px}.thinking{font:16px Georgia,serif;color:#aaa;padding-bottom:20px}.files{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chip{font-size:12px;background:#363431;border:1px solid #44413c;border-radius:9px;padding:7px 9px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.composeWrap{position:absolute;left:0;right:0;bottom:0;padding:8px 13px calc(env(safe-area-inset-bottom) + 10px);background:linear-gradient(to top,var(--bg) 82%,transparent)}.pending{max-width:860px;margin:0 auto 7px;display:flex;gap:6px;overflow:auto}.pending:empty{display:none}.composer{max-width:860px;margin:auto;min-height:142px;border:1px solid #3c3a36;background:#20201e;border-radius:24px;padding:15px 14px 8px;display:grid;grid-template-rows:1fr 42px}.composer textarea{width:100%;min-height:65px;max-height:140px;resize:none;border:0;outline:0;background:none;font-size:17px;line-height:1.4}.crow{display:flex;align-items:center;justify-content:space-between}.tool,.send{width:38px;height:38px;border-radius:11px}.send{border-radius:50%;background:#eeeae4;color:#171716}.foot{max-width:860px;margin:8px auto 0;padding:0 8px;display:flex;justify-content:space-between;color:#77746e;font-size:12px}.model{max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd}.modalShade{position:fixed;inset:0;background:#0009;z-index:60;display:none}.modalShade.show{display:block}.modal{position:fixed;z-index:61;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,660px);max-height:82dvh;overflow:auto;background:#242422;border:1px solid var(--line);border-radius:22px;padding:18px;display:none}.modal.show{display:block}.modal h2{margin:0 0 14px}.notice{font-size:13px;color:#9a9790;line-height:1.45;background:#1c1c1b;border:1px solid #383631;border-radius:12px;padding:10px;margin-bottom:12px}.field{margin-bottom:12px}.field label{display:block;font-size:12px;color:#8d8a84;margin-bottom:6px}.field input,.field textarea{width:100%;border:1px solid #3b3935;background:#1c1c1b;border-radius:11px;outline:0;padding:10px 11px}.field textarea{min-height:100px;resize:vertical}.primary,.secondary{height:43px;border-radius:11px;padding:0 14px}.primary{background:var(--accent);color:#fff}.secondary{background:#34322f}.row{display:flex;gap:8px;flex-wrap:wrap}.models{display:grid;gap:6px}.mrow{padding:10px;border-radius:10px;text-align:left;background:#1d1d1c;border:1px solid #33322f}.mrow small{display:block;color:#777;margin-top:3px}
+@media(min-width:900px){.app{grid-template-columns:300px 1fr}.side{position:relative;transform:none;width:auto;z-index:1}.shade{display:none!important}.main{grid-column:2}.top{grid-template-columns:1fr auto}.menu{display:none}.chat{padding-left:max(50px,calc((100vw - 300px - 860px)/2));padding-right:max(50px,calc((100vw - 300px - 860px)/2))}.composeWrap{left:300px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side" id="side">
+<div class="shead"><span>NoLimit AI</span><button class="icon" id="closeSide">✕</button></div>
+<button class="new" id="newChat">＋ New chat</button>
+<input class="search" id="chatSearch" placeholder="Search chats">
+<div class="hist" id="history"></div>
+<div class="sfoot">
+<button class="sbtn" id="modelsBtn">Models</button>
+<button class="sbtn" id="settingsBtn">Settings</button>
+<button class="sbtn" id="sideAuth">Connect OpenRouter</button>
+</div>
+</aside>
+<div class="shade" id="shade"></div>
+<main class="main">
+<header class="top">
+<button class="icon menu" id="menuBtn">☰</button>
+<div class="title" id="title">New chat</div>
+<button class="connect" id="topAuth">Connect</button>
+</header>
+<section class="chat" id="chat"></section>
+<div class="composeWrap">
+<div class="pending" id="pending"></div>
+<div class="composer">
+<textarea id="prompt" placeholder="Message NoLimit AI"></textarea>
+<div class="crow"><div><button class="tool" id="attach">＋</button><input id="files" type="file" hidden multiple accept="image/*,.txt,.md,.json,.csv,.js,.html,.css,.py"></div><button class="send" id="send">↑</button></div>
+</div>
+<div class="foot"><button class="model" id="modelBottom">openrouter/auto</button><span id="status">Not connected</span></div>
+</div>
+</main>
+</div>
+<div class="modalShade" id="modalShade"></div>
+<section class="modal" id="settingsModal">
+<h2>Settings</h2>
+<div class="notice" id="authNotice"></div>
+<div class="row" style="margin-bottom:14px"><button class="primary" id="connectNow">Connect OpenRouter</button><button class="secondary" id="disconnectNow">Disconnect</button></div>
+<div class="field"><label>System instructions</label><textarea id="systemPrompt"></textarea></div>
+<div class="field"><label>Temperature</label><input id="temperature" type="number" min="0" max="2" step="0.1"></div>
+<button class="primary" id="saveSettings">Save</button>
+</section>
+<section class="modal" id="modelsModal">
+<h2>Choose model</h2>
+<div class="field"><input id="modelSearch" placeholder="Search models"></div>
+<div class="models" id="models"></div>
+</section>
+<script>
+(function(){
+"use strict";
+var BASE="https://openrouter.ai/api/v1";
+var STORE="nolimit_chats_v1";
+var SETSTORE="nolimit_settings_v1";
+var KEYSTORE="nolimit_openrouter_oauth_key";
+var chats=JSON.parse(localStorage.getItem(STORE)||"[]");
+var settings=Object.assign({model:"openrouter/auto",temperature:0.7,system:"You are NoLimit AI, a capable general-purpose assistant. Be accurate, helpful, and concise by default."},JSON.parse(localStorage.getItem(SETSTORE)||"{}"));
+var active=localStorage.getItem("nolimit_active")||"";
+var pending=[];
+var models=[];
+var busy=false;
+var controller=null;
+function q(s){return document.querySelector(s)}
+function uid(){return Math.random().toString(36).slice(2)+Date.now().toString(36)}
+function getKey(){return localStorage.getItem(KEYSTORE)||""}
+function isConnected(){return !!getKey()}
+function save(){localStorage.setItem(STORE,JSON.stringify(chats));localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem("nolimit_active",active)}
+function current(){return chats.find(function(c){return c.id===active})}
+function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",messages:[]};chats.unshift(c);active=c.id;save()}return c}
+function closeSide(){q("#side").classList.remove("open");q("#shade").classList.remove("show")}
+function openModal(id){q("#modalShade").classList.add("show");q(id).classList.add("show")}
+function closeModals(){q("#modalShade").classList.remove("show");document.querySelectorAll(".modal").forEach(function(m){m.classList.remove("show")})}
+function toast(t){var d=document.createElement("div");d.textContent=t;d.style.cssText="position:fixed;left:50%;bottom:210px;transform:translateX(-50%);z-index:100;background:#34322f;color:#fff;padding:9px 12px;border-radius:10px;font-size:13px";document.body.appendChild(d);setTimeout(function(){d.remove()},2200)}
+function render(){
+var c=ensure();
+q("#title").textContent=c.title;
+q("#modelBottom").textContent=settings.model;
+q("#status").textContent=isConnected()?"Connected":"Not connected";
+q("#topAuth").textContent=isConnected()?"Connected":"Connect";
+q("#topAuth").classList.toggle("ok",isConnected());
+q("#sideAuth").textContent=isConnected()?"OpenRouter connected":"Connect OpenRouter";
+var term=(q("#chatSearch").value||"").toLowerCase();
+var h=q("#history");h.innerHTML="";
+chats.filter(function(x){return !term||x.title.toLowerCase().includes(term)}).forEach(function(x){var b=document.createElement("button");b.className="hrow"+(x.id===active?" on":"");b.textContent=x.title;b.onclick=function(){active=x.id;save();closeSide();render()};h.appendChild(b)});
+var box=q("#chat");box.innerHTML="";
+if(!c.messages.length){box.innerHTML='<div class="welcome"><div class="logo"></div><h1>How can I help?</h1><p>One responsive NoLimit AI client for phone and PC, powered by OpenRouter.</p></div>'}
+else c.messages.forEach(function(m){if(m.role==="user"){var w=document.createElement("div");w.className="user";var b=document.createElement("div");b.className="ub";b.textContent=m.content||"";if(m.fileNames&&m.fileNames.length){var fs=document.createElement("div");fs.className="files";m.fileNames.forEach(function(n){var ch=document.createElement("div");ch.className="chip";ch.textContent=n;fs.appendChild(ch)});b.appendChild(fs)}w.appendChild(b);box.appendChild(w)}else{var a=document.createElement("div");a.className="assistant";var t=document.createElement("div");t.className="answer";t.textContent=m.content||"";a.appendChild(t);if(m.model){var meta=document.createElement("div");meta.className="meta";meta.textContent=m.model;a.appendChild(meta)}box.appendChild(a)}});
+if(busy){var th=document.createElement("div");th.className="thinking";th.textContent="Thinking…";box.appendChild(th)}
+requestAnimationFrame(function(){box.scrollTop=box.scrollHeight});
+renderPending()
+}
+function renderPending(){var p=q("#pending");p.innerHTML="";pending.forEach(function(f){var c=document.createElement("div");c.className="chip";c.textContent=f.name;p.appendChild(c)})}
+function callbackUrl(){return location.origin+location.pathname}
+function base64url(bytes){var s="";bytes.forEach(function(b){s+=String.fromCharCode(b)});return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
+async function sha(v){var h=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return base64url(new Uint8Array(h))}
+async function connect(){
+if(location.protocol==="file:"){alert("Open the GitHub Pages HTTPS version before connecting.");return}
+var a=new Uint8Array(48);crypto.getRandomValues(a);var verifier=base64url(a);
+var b=new Uint8Array(24);crypto.getRandomValues(b);var state=base64url(b);
+sessionStorage.setItem("nl_verifier",verifier);sessionStorage.setItem("nl_state",state);
+var challenge=await sha(verifier);
+location.href="https://openrouter.ai/auth?callback_url="+encodeURIComponent(callbackUrl())+"&code_challenge="+encodeURIComponent(challenge)+"&code_challenge_method=S256&key_label="+encodeURIComponent("NoLimit AI")+"&state="+encodeURIComponent(state)
+}
+async function finishAuth(){
+var u=new URL(location.href);var code=u.searchParams.get("code");if(!code)return;
+var verifier=sessionStorage.getItem("nl_verifier");var expected=sessionStorage.getItem("nl_state");var got=u.searchParams.get("state");
+if(expected&&got&&expected!==got){alert("Sign-in state mismatch. Connect again.");return}
+if(!verifier){alert("Sign-in session expired. Connect again.");return}
+try{var r=await fetch(BASE+"/auth/keys",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:code,code_verifier:verifier,code_challenge_method:"S256"})});var j=await r.json();if(!r.ok||!j.key)throw new Error((j.error&&j.error.message)||"Could not finish authorization");localStorage.setItem(KEYSTORE,j.key);sessionStorage.removeItem("nl_verifier");sessionStorage.removeItem("nl_state");history.replaceState({},document.title,u.pathname);toast("OpenRouter connected")}catch(e){alert("OpenRouter connection failed: "+e.message)}
+}
+function openSettings(){q("#authNotice").textContent=isConnected()?"Connected. Your OAuth-created key is stored only in this browser for this site.":"Connect with OpenRouter. No API key is hard-coded in this public GitHub repo.";q("#connectNow").style.display=isConnected()?"none":"inline-block";q("#disconnectNow").style.display=isConnected()?"inline-block":"none";q("#systemPrompt").value=settings.system;q("#temperature").value=settings.temperature;openModal("#settingsModal")}
+async function addFiles(list){for(var i=0;i<list.length;i++){var f=list[i];if(f.size>8*1024*1024){toast(f.name+" is too large");continue}if((f.type||"").startsWith("image/")){var data=await new Promise(function(res,rej){var rd=new FileReader();rd.onload=function(){res(rd.result)};rd.onerror=rej;rd.readAsDataURL(f)});pending.push({name:f.name,kind:"image",data:data})}else{pending.push({name:f.name,kind:"text",text:await f.text()})}}renderPending()}
+function apiMessages(c){
+var out=[];if(settings.system)out.push({role:"system",content:settings.system});
+c.messages.forEach(function(m){if(m.role==="assistant"){out.push({role:"assistant",content:m.content||""});return}var text=m.content||"";if(m.textFiles)m.textFiles.forEach(function(f){text+="\n\n[File: "+f.name+"]\n"+f.text});var parts=[{type:"text",text:text}];if(m.images)m.images.forEach(function(x){parts.push({type:"image_url",image_url:{url:x}})});out.push({role:"user",content:parts})});return out
+}
+async function send(){
+if(busy){if(controller)controller.abort();return}
+if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
+var text=q("#prompt").value.trim();if(!text&&!pending.length)return;
+var c=ensure();var f=pending.slice();pending=[];q("#prompt").value="";
+var m={role:"user",content:text||"Please analyze the attached file.",fileNames:f.map(function(x){return x.name}),images:f.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),textFiles:f.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
+c.messages.push(m);if(c.title==="New chat")c.title=(text||(f[0]&&f[0].name)||"New chat").slice(0,42);
+var am={role:"assistant",content:"",model:settings.model};c.messages.push(am);save();busy=true;controller=new AbortController();q("#send").textContent="■";render();
+try{var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},body:JSON.stringify({model:settings.model,messages:apiMessages(c).slice(0,-1),temperature:Number(settings.temperature),stream:true}),signal:controller.signal});if(!r.ok)throw new Error(await r.text());var reader=r.body.getReader(),dec=new TextDecoder(),buf="";while(true){var z=await reader.read();if(z.done)break;buf+=dec.decode(z.value,{stream:true});var lines=buf.split("\n");buf=lines.pop();lines.forEach(function(line){line=line.trim();if(!line.startsWith("data:"))return;var raw=line.slice(5).trim();if(raw==="[DONE]")return;try{var j=JSON.parse(raw);var d=j.choices&&j.choices[0]&&j.choices[0].delta;if(d&&typeof d.content==="string"){am.content+=d.content;render()}}catch(e){}})}save()}catch(e){if(e.name!=="AbortError")am.content="Request failed: "+e.message;if(!am.content&&e.name==="AbortError")c.messages.pop();save()}finally{busy=false;controller=null;q("#send").textContent="↑";render()}
+}
+async function loadModels(){openModal("#modelsModal");if(models.length){showModels();return}q("#models").innerHTML='<div class="notice">Loading models…</div>';try{var r=await fetch(BASE+"/models");var j=await r.json();models=(j.data||[]).sort(function(a,b){return(a.name||a.id).localeCompare(b.name||b.id)});showModels()}catch(e){q("#models").innerHTML='<div class="notice">Could not load models. Auto Router still works.</div>'}}
+function showModels(){var term=(q("#modelSearch").value||"").toLowerCase();var box=q("#models");box.innerHTML="";var list=[{id:"openrouter/auto",name:"Auto Router"}].concat(models).filter(function(m){return !term||(m.id||"").toLowerCase().includes(term)||(m.name||"").toLowerCase().includes(term)}).slice(0,140);list.forEach(function(m){var b=document.createElement("button");b.className="mrow";var strong=document.createElement("strong");strong.textContent=m.name||m.id;var small=document.createElement("small");small.textContent=m.id;b.appendChild(strong);b.appendChild(small);b.onclick=function(){settings.model=m.id;save();closeModals();render();toast("Model changed")};box.appendChild(b)})}
+q("#menuBtn").onclick=function(){q("#side").classList.add("open");q("#shade").classList.add("show")};
+q("#closeSide").onclick=q("#shade").onclick=closeSide;
+q("#newChat").onclick=function(){var c={id:uid(),title:"New chat",messages:[]};chats.unshift(c);active=c.id;save();closeSide();render()};
+q("#chatSearch").oninput=render;
+q("#attach").onclick=function(){q("#files").click()};
+q("#files").onchange=function(e){addFiles([].slice.call(e.target.files));e.target.value=""};
+q("#send").onclick=send;
+q("#prompt").onkeydown=function(e){if(e.key==="Enter"&&!e.shiftKey&&innerWidth>700){e.preventDefault();send()}};
+q("#topAuth").onclick=q("#sideAuth").onclick=q("#settingsBtn").onclick=openSettings;
+q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
+q("#modalShade").onclick=closeModals;
+q("#connectNow").onclick=connect;
+q("#disconnectNow").onclick=function(){localStorage.removeItem(KEYSTORE);closeModals();render();toast("Disconnected")};
+q("#saveSettings").onclick=function(){settings.system=q("#systemPrompt").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));save();closeModals();render();toast("Settings saved")};
+q("#modelSearch").oninput=showModels;
+finishAuth().then(render)
+})();
+</script>
+</body>
+</html>
