@@ -545,6 +545,77 @@ async function toggleMic(){
   }catch(e){toast("Microphone permission was not available")}
 }
 
+
+async function loadSpeechModels(){
+  if(speechModels.length)return;
+  try{
+    var r=await fetch(BASE+"/models?output_modalities=speech");
+    var j=await r.json();
+    speechModels=j.data||[]
+  }catch(e){speechModels=[]}
+}
+
+function defaultVoiceFor(model){
+  var id=String(model||"").toLowerCase();
+  if(id.indexOf("voxtral")>=0)return "en_paul_neutral";
+  if(id.indexOf("grok-voice")>=0)return "eve";
+  if(id.indexOf("mai-voice")>=0)return "en-US-Harper:MAI-Voice-2";
+  return "alloy"
+}
+
+function fillSpeechModels(){
+  var s=q("#voiceModel");s.innerHTML="";
+  speechModels.forEach(function(m){
+    var o=document.createElement("option");o.value=m.id;o.textContent=m.name||m.id;s.appendChild(o)
+  });
+  if(!s.options.length){
+    var o=document.createElement("option");o.value="mistralai/voxtral-mini-tts-2603";o.textContent=o.value;s.appendChild(o)
+  }
+  q("#voiceName").value=defaultVoiceFor(s.value)
+}
+
+async function openVoice(text){
+  if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
+  q("#voiceText").value=String(text||"");
+  q("#voiceOutput").innerHTML="";
+  openModal("#voiceModal");
+  await loadSpeechModels();
+  fillSpeechModels()
+}
+
+async function generateVoice(){
+  var text=q("#voiceText").value.trim();
+  if(!text)return toast("Enter text to speak");
+  q("#generateVoice").disabled=true;
+  q("#voiceProgress").classList.remove("hidden");
+  q("#voiceOutput").innerHTML="";
+  try{
+    var body={
+      model:q("#voiceModel").value,
+      input:text,
+      voice:q("#voiceName").value.trim()||defaultVoiceFor(q("#voiceModel").value),
+      response_format:"mp3",
+      speed:Number(q("#voiceSpeed").value)||1
+    };
+    var r=await fetch(BASE+"/audio/speech",{
+      method:"POST",
+      headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},
+      body:JSON.stringify(body)
+    });
+    if(!r.ok)throw new Error(errorRaw(await r.text(),"Speech generation failed"));
+    var blob=await r.blob();
+    var url=URL.createObjectURL(blob);
+    var audio=document.createElement("audio");audio.controls=true;audio.autoplay=true;audio.className="audioresult";audio.src=url;
+    q("#voiceOutput").appendChild(audio);
+    var dl=document.createElement("a");dl.href=url;dl.download="nolimit-ai-speech.mp3";dl.textContent="Download MP3";dl.className="secondary";dl.style.display="inline-grid";dl.style.placeItems="center";dl.style.marginTop="8px";dl.style.textDecoration="none";
+    q("#voiceOutput").appendChild(dl)
+  }catch(e){
+    q("#voiceOutput").innerHTML='<div class="notice">'+escapeHTML(e.message)+'</div>'
+  }
+  q("#generateVoice").disabled=false;
+  q("#voiceProgress").classList.add("hidden")
+}
+
 function speak(text){
   if(!("speechSynthesis" in window))return toast("Text-to-speech is not supported here");
   speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(String(text||"").replace(/[\x60*_#>\[\]()]/g," "));speechSynthesis.speak(u)
@@ -591,6 +662,8 @@ q("#saveSettings").onclick=function(){
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
 q("#generateImage").onclick=generateImage;
+q("#generateVoice").onclick=generateVoice;
+q("#voiceModel").onchange=function(){q("#voiceName").value=defaultVoiceFor(q("#voiceModel").value)};
 q("#micBtn").onclick=toggleMic;
 q("#artifactCopy").onclick=function(){if(!artifactCode)return;navigator.clipboard.writeText(artifactCode).then(function(){toast("Artifact HTML copied")})};
 q("#artifactOpen").onclick=function(){
