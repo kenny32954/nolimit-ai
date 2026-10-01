@@ -616,6 +616,94 @@ async function generateVoice(){
   q("#voiceProgress").classList.add("hidden")
 }
 
+
+async function openVideo(){
+  if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
+  q("#videoOutput").innerHTML="";
+  q("#videoStatus").textContent="";
+  openModal("#videoModal");
+  if(videoModels.length){fillVideoModels();return}
+  q("#videoModel").innerHTML="<option>Loading video models…</option>";
+  try{
+    var r=await fetch(BASE+"/videos/models");
+    var j=await r.json();
+    videoModels=j.data||[];
+    fillVideoModels()
+  }catch(e){
+    q("#videoModel").innerHTML='<option value="bytedance/seedance-2.0">bytedance/seedance-2.0</option>'
+  }
+}
+
+function fillVideoModels(){
+  var s=q("#videoModel");s.innerHTML="";
+  videoModels.forEach(function(m){
+    var o=document.createElement("option");o.value=m.id;o.textContent=m.name||m.id;s.appendChild(o)
+  });
+  if(!s.options.length){
+    var o=document.createElement("option");o.value="bytedance/seedance-2.0";o.textContent=o.value;s.appendChild(o)
+  }
+}
+
+function wait(ms){return new Promise(function(resolve){setTimeout(resolve,ms)})}
+
+async function generateVideo(){
+  var prompt=q("#videoPrompt").value.trim();
+  if(!prompt)return toast("Enter a video prompt");
+  q("#generateVideo").disabled=true;
+  q("#videoProgress").classList.remove("hidden");
+  q("#videoOutput").innerHTML="";
+  q("#videoStatus").textContent="Submitting video job…";
+  try{
+    var body={
+      model:q("#videoModel").value,
+      prompt:prompt,
+      duration:Number(q("#videoDuration").value),
+      resolution:q("#videoResolution").value,
+      aspect_ratio:q("#videoRatio").value,
+      generate_audio:q("#videoAudio").checked
+    };
+    var r=await fetch(BASE+"/videos",{
+      method:"POST",
+      headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},
+      body:JSON.stringify(body)
+    });
+    var job=await r.json();
+    if(!r.ok)throw new Error(errorText(job,"Video request failed"));
+    if(!job.id)throw new Error("No video job ID was returned");
+    var done=false;
+    for(var i=0;i<40;i++){
+      if(i>0)await wait(15000);
+      q("#videoStatus").textContent="Video status: "+(i===0?"pending":"processing")+" · check "+(i+1);
+      var pr=await fetch(BASE+"/videos/"+encodeURIComponent(job.id),{
+        headers:{Authorization:"Bearer "+getKey(),"HTTP-Referer":location.href,"X-Title":"NoLimit AI"}
+      });
+      var state=await pr.json();
+      if(!pr.ok)throw new Error(errorText(state,"Could not check video status"));
+      q("#videoStatus").textContent="Video status: "+(state.status||"processing");
+      if(state.status==="completed"){job=state;done=true;break}
+      if(["failed","cancelled","expired"].indexOf(state.status)>=0)throw new Error("Video generation "+state.status)
+    }
+    if(!done)throw new Error("Video is still processing. Wait before submitting another copy.");
+    q("#videoStatus").textContent="Downloading finished video…";
+    var vr=await fetch(BASE+"/videos/"+encodeURIComponent(job.id)+"/content?index=0",{
+      headers:{Authorization:"Bearer "+getKey(),"HTTP-Referer":location.href,"X-Title":"NoLimit AI"}
+    });
+    if(!vr.ok)throw new Error(errorRaw(await vr.text(),"Could not download the generated video"));
+    var blob=await vr.blob();
+    var url=URL.createObjectURL(blob);
+    var video=document.createElement("video");video.className="videoresult";video.controls=true;video.playsInline=true;video.src=url;
+    q("#videoOutput").appendChild(video);
+    var dl=document.createElement("a");dl.href=url;dl.download="nolimit-ai-video.mp4";dl.textContent="Download video";dl.className="secondary";dl.style.display="inline-grid";dl.style.placeItems="center";dl.style.marginTop="8px";dl.style.textDecoration="none";
+    q("#videoOutput").appendChild(dl);
+    q("#videoStatus").textContent="Video complete"
+  }catch(e){
+    q("#videoStatus").textContent="";
+    q("#videoOutput").innerHTML='<div class="notice">'+escapeHTML(e.message)+'</div>'
+  }
+  q("#generateVideo").disabled=false;
+  q("#videoProgress").classList.add("hidden")
+}
+
 function speak(text){
   if(!("speechSynthesis" in window))return toast("Text-to-speech is not supported here");
   speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(String(text||"").replace(/[\x60*_#>\[\]()]/g," "));speechSynthesis.speak(u)
@@ -641,6 +729,7 @@ q("#prompt").onkeydown=function(e){if(e.key==="Enter"&&!e.shiftKey&&innerWidth>7
 q("#topAuth").onclick=q("#sideAuth").onclick=q("#settingsBtn").onclick=openSettings;
 q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
 q("#imageSide").onclick=q("#imageBtn").onclick=openImage;
+q("#videoSide").onclick=openVideo;
 q("#exportSide").onclick=exportChat;
 q("#webToggle").onclick=function(){settings.web=!settings.web;save();render()};
 q("#fetchToggle").onclick=function(){settings.fetch=!settings.fetch;save();render()};
@@ -664,6 +753,7 @@ qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribut
 q("#generateImage").onclick=generateImage;
 q("#generateVoice").onclick=generateVoice;
 q("#voiceModel").onchange=function(){q("#voiceName").value=defaultVoiceFor(q("#voiceModel").value)};
+q("#generateVideo").onclick=generateVideo;
 q("#micBtn").onclick=toggleMic;
 q("#artifactCopy").onclick=function(){if(!artifactCode)return;navigator.clipboard.writeText(artifactCode).then(function(){toast("Artifact HTML copied")})};
 q("#artifactOpen").onclick=function(){
