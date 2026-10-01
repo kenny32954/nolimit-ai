@@ -618,7 +618,7 @@ async function generateImage(){
 async function transcribe(blob){
   var type=blob.type||"audio/webm",format="webm";if(type.indexOf("wav")>=0)format="wav";else if(type.indexOf("mpeg")>=0||type.indexOf("mp3")>=0)format="mp3";else if(type.indexOf("ogg")>=0)format="ogg";else if(type.indexOf("mp4")>=0||type.indexOf("m4a")>=0)format="mp4";
   var data=await readDataURL(blob),b64=String(data).split(",")[1]||"";
-  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},body:JSON.stringify({model:"openai/whisper-1",input_audio:{data:b64,format:format}})});
+  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},body:JSON.stringify({model:"openai/whisper-large-v3",input_audio:{data:b64,format:format}})});
   var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Transcription failed"));return j.text||""
 }
 
