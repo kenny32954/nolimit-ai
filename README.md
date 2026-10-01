@@ -35,8 +35,14 @@ Everything else in this repository is project support such as documentation and 
 ### Web and research
 - OpenRouter server-side web search
 - OpenRouter server-side web fetch
-- One-tap Research mode that enables both
+- Reliable server-side datetime context
+- One-tap Research mode that enables search and page reading
 - Optional image-generation server tool inside normal chat
+
+### Agent orchestration
+- Subagent mode so a capable model can delegate focused work
+- Fusion mode for multi-model deliberation on harder tasks
+- Fusion is deliberately opt-in because it can use more model calls, take longer, and cost more
 
 ### Files and multimodal input
 - Image attachments for vision-capable models
@@ -49,6 +55,12 @@ Everything else in this repository is project support such as documentation and 
 - Transcribe recordings through OpenRouter speech-to-text
 - Browser text-to-speech for replies
 - Optional automatic read-aloud
+
+### Code and artifacts
+- Rich Markdown rendering
+- Copyable code blocks
+- Sandboxed preview button for HTML artifacts
+- Paste and drag/drop file support
 
 ### Image generation
 - Dedicated image-generation panel
@@ -141,6 +153,8 @@ v1.0 foundation:
 - research tools
 - reasoning controls
 - image generation
+- agent subcalls and Fusion
+- sandboxed HTML artifact previews
 - speech-to-text
 - text-to-speech
 - model browser
