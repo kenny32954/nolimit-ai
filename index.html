@@ -744,6 +744,48 @@ function exportChat(){
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/markdown"}));a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".md";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 
+function backupChat(){
+  var c=ensure();
+  var data={type:"nolimit-ai-chat",version:1,exported_at:new Date().toISOString(),chat:c};
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+  a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".nolimit.json";
+  a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
+}
+
+async function importBackup(file){
+  try{
+    var raw=await file.text(),data=JSON.parse(raw),chat=data&&data.chat?data.chat:data;
+    if(!chat||!Array.isArray(chat.messages))throw new Error("This file does not look like a NoLimit AI chat backup");
+    var copy={id:uid(),title:String(chat.title||"Imported chat").slice(0,80),created:Date.now(),updated:Date.now(),messages:chat.messages.map(function(m){
+      return {role:m.role==="assistant"?"assistant":"user",content:String(m.content||""),model:m.model,reasoning:m.reasoning,usage:m.usage,cost:m.cost,images:Array.isArray(m.images)?m.images.filter(function(x){return typeof x==="string"&&x.indexOf("data:")!==0}):[]}
+    })};
+    chats.unshift(copy);active=copy.id;save();render();toast("Chat imported")
+  }catch(e){toast("Import failed: "+e.message)}
+}
+
+function openChatManage(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  q("#chatTitleInput").value=c.title||"New chat";
+  openModal("#chatManageModal")
+}
+
+function renameManagedChat(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  c.title=q("#chatTitleInput").value.trim().slice(0,80)||"New chat";c.updated=Date.now();save();closeModals();render()
+}
+
+function duplicateManagedChat(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  var copy=JSON.parse(JSON.stringify(c));copy.id=uid();copy.title=(c.title||"New chat")+" copy";copy.created=Date.now();copy.updated=Date.now();chats.unshift(copy);active=copy.id;save();closeModals();render();toast("Chat duplicated")
+}
+
+function deleteManagedChat(){
+  var i=chats.findIndex(function(x){return x.id===manageChatId});if(i<0)return;
+  chats.splice(i,1);if(active===manageChatId)active=chats[0]?chats[0].id:"";save();closeModals();render();toast("Chat deleted")
+}
+
 function newChat(){var c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save();closeSide();render();q("#prompt").focus()}
 function cycleReasoning(){var v=["none","minimal","low","medium","high","xhigh"],i=v.indexOf(settings.reasoning);settings.reasoning=v[(i+1)%v.length];save();render()}
 function toggleResearch(){var on=!(settings.web&&settings.fetch);settings.web=on;settings.fetch=on;if(on&&settings.reasoning==="none")settings.reasoning="medium";save();render();toast(on?"Research tools enabled":"Research tools disabled")}
@@ -761,6 +803,9 @@ q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
 q("#imageSide").onclick=q("#imageBtn").onclick=openImage;
 q("#videoSide").onclick=openVideo;
 q("#exportSide").onclick=exportChat;
+q("#backupSide").onclick=backupChat;
+q("#importSide").onclick=function(){q("#importFile").click()};
+q("#importFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importBackup(f);e.target.value=""};
 q("#webToggle").onclick=function(){settings.web=!settings.web;save();render()};
 q("#fetchToggle").onclick=function(){settings.fetch=!settings.fetch;save();render()};
 q("#imageToolToggle").onclick=function(){settings.imageTool=!settings.imageTool;save();render()};
@@ -784,6 +829,9 @@ q("#generateImage").onclick=generateImage;
 q("#generateVoice").onclick=generateVoice;
 q("#voiceModel").onchange=function(){q("#voiceName").value=defaultVoiceFor(q("#voiceModel").value)};
 q("#generateVideo").onclick=generateVideo;
+q("#renameChat").onclick=renameManagedChat;
+q("#duplicateChat").onclick=duplicateManagedChat;
+q("#deleteChat").onclick=deleteManagedChat;
 q("#micBtn").onclick=toggleMic;
 q("#artifactCopy").onclick=function(){if(!artifactCode)return;navigator.clipboard.writeText(artifactCode).then(function(){toast("Artifact HTML copied")})};
 q("#artifactOpen").onclick=function(){
