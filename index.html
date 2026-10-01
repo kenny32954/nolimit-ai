@@ -146,6 +146,8 @@ var settings=Object.assign({
   web:false,
   fetch:false,
   imageTool:false,
+  agent:false,
+  fusion:false,
   cache:false,
   autoSpeak:false
 },safeJSON(localStorage.getItem(SETSTORE),{}));
@@ -158,6 +160,7 @@ var busy=false;
 var controller=null;
 var recorder=null;
 var recorderChunks=[];
+var artifactCode="";
 
 function q(s){return document.querySelector(s)}
 function qa(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
@@ -183,7 +186,12 @@ function renderMarkdown(text){
   var fence=String.fromCharCode(96)+String.fromCharCode(96)+String.fromCharCode(96);
   var blocks=[];
   var rx=new RegExp(fence+"([\\w-]*)\\n([\\s\\S]*?)"+fence,"g");
-  raw=raw.replace(rx,function(_,lang,code){var token="@@CODE"+blocks.length+"@@";blocks.push('<pre><button class="codecopy" data-code="'+encodeURIComponent(code)+'">Copy</button><code>'+escapeHTML(code)+'</code></pre>');return token});
+  raw=raw.replace(rx,function(_,lang,code){
+    var token="@@CODE"+blocks.length+"@@";
+    var preview=(String(lang||"").toLowerCase()==="html"||String(lang||"").toLowerCase()==="htm")?'<button class="codepreview" data-code="'+encodeURIComponent(code)+'">Preview</button>':"";
+    blocks.push('<pre>'+preview+'<button class="codecopy" data-code="'+encodeURIComponent(code)+'">Copy</button><code>'+escapeHTML(code)+'</code></pre>');
+    return token
+  });
   var s=escapeHTML(raw);
   s=s.replace(/^### (.*)$/gm,"<h3>$1</h3>").replace(/^## (.*)$/gm,"<h2>$1</h2>").replace(/^# (.*)$/gm,"<h1>$1</h1>");
   s=s.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>");
@@ -218,6 +226,8 @@ function render(){
   q("#webToggle").classList.toggle("on",!!settings.web);
   q("#fetchToggle").classList.toggle("on",!!settings.fetch);
   q("#imageToolToggle").classList.toggle("on",!!settings.imageTool);
+  q("#agentToggle").classList.toggle("on",!!settings.agent);
+  q("#fusionToggle").classList.toggle("on",!!settings.fusion);
   q("#reasonToggle").classList.toggle("on",settings.reasoning!=="none");
   q("#reasonToggle").textContent="◌ Reasoning: "+settings.reasoning;
   q("#researchBtn").classList.toggle("on",!!settings.web&&!!settings.fetch);
@@ -267,6 +277,11 @@ function renderChat(){
   }
   if(busy){var th=document.createElement("div");th.className="thinking";th.textContent="Thinking…";box.appendChild(th)}
   qa(".codecopy").forEach(function(b){b.onclick=function(){navigator.clipboard.writeText(decodeURIComponent(b.getAttribute("data-code"))).then(function(){toast("Code copied")})}});
+  qa(".codepreview").forEach(function(b){b.onclick=function(){
+    artifactCode=decodeURIComponent(b.getAttribute("data-code")||"");
+    q("#artifactFrame").srcdoc=artifactCode;
+    openModal("#artifactModal")
+  }});
   requestAnimationFrame(function(){box.scrollTop=box.scrollHeight})
 }
 
@@ -351,7 +366,13 @@ function apiMessages(c){
 }
 
 function toolList(){
-  var t=[];if(settings.web)t.push({type:"openrouter:web_search"});if(settings.fetch)t.push({type:"openrouter:web_fetch"});if(settings.imageTool)t.push({type:"openrouter:image_generation"});return t
+  var t=[{type:"openrouter:datetime"}];
+  if(settings.web)t.push({type:"openrouter:web_search"});
+  if(settings.fetch)t.push({type:"openrouter:web_fetch"});
+  if(settings.imageTool)t.push({type:"openrouter:image_generation"});
+  if(settings.agent)t.push({type:"openrouter:subagent",parameters:{model:"openrouter/auto"}});
+  if(settings.fusion)t.push({type:"openrouter:fusion"});
+  return t
 }
 
 function hasPDF(c){return c.messages.some(function(m){return m.role==="user"&&m.pdfs&&m.pdfs.length})}
@@ -360,6 +381,7 @@ function addDelta(d,a){
   if(!d)return;
   if(typeof d.content==="string")a.content+=d.content;
   if(Array.isArray(d.content))d.content.forEach(function(p){if(p.text)a.content+=p.text;if(p.image_url&&p.image_url.url){a.images=a.images||[];a.images.push(p.image_url.url)}});
+  if(Array.isArray(d.images))d.images.forEach(function(img){var src=img&&img.image_url&&img.image_url.url?img.image_url.url:(img&&img.url?img.url:"");if(src){a.images=a.images||[];a.images.push(src)}});
   if(typeof d.reasoning==="string")a.reasoning=(a.reasoning||"")+d.reasoning;
   if(d.reasoning_details)a.reasoning_details=d.reasoning_details
 }
@@ -508,6 +530,8 @@ q("#exportSide").onclick=exportChat;
 q("#webToggle").onclick=function(){settings.web=!settings.web;save();render()};
 q("#fetchToggle").onclick=function(){settings.fetch=!settings.fetch;save();render()};
 q("#imageToolToggle").onclick=function(){settings.imageTool=!settings.imageTool;save();render()};
+q("#agentToggle").onclick=function(){settings.agent=!settings.agent;save();render();toast(settings.agent?"Agent subcalls enabled":"Agent subcalls disabled")};
+q("#fusionToggle").onclick=function(){settings.fusion=!settings.fusion;save();render();toast(settings.fusion?"Fusion enabled — this can use multiple model calls and more credits":"Fusion disabled")};
 q("#reasonToggle").onclick=cycleReasoning;
 q("#researchBtn").onclick=toggleResearch;
 q("#modalShade").onclick=closeModals;
@@ -523,6 +547,26 @@ q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
 q("#generateImage").onclick=generateImage;
 q("#micBtn").onclick=toggleMic;
+q("#artifactCopy").onclick=function(){if(!artifactCode)return;navigator.clipboard.writeText(artifactCode).then(function(){toast("Artifact HTML copied")})};
+q("#artifactOpen").onclick=function(){
+  if(!artifactCode)return;
+  var url=URL.createObjectURL(new Blob([artifactCode],{type:"text/html"}));
+  window.open(url,"_blank","noopener");
+  setTimeout(function(){URL.revokeObjectURL(url)},60000)
+};
+
+// Paste and drag/drop attachments.
+q("#prompt").addEventListener("paste",function(e){
+  var files=[];
+  if(e.clipboardData&&e.clipboardData.items){
+    Array.prototype.forEach.call(e.clipboardData.items,function(item){if(item.kind==="file"){var f=item.getAsFile();if(f)files.push(f)}})
+  }
+  if(files.length)addFiles(files)
+});
+var composer=q(".composer");
+["dragenter","dragover"].forEach(function(name){composer.addEventListener(name,function(e){e.preventDefault();composer.style.borderColor="#765244"})});
+["dragleave","drop"].forEach(function(name){composer.addEventListener(name,function(e){e.preventDefault();composer.style.borderColor=""})});
+composer.addEventListener("drop",function(e){var fs=e.dataTransfer&&e.dataTransfer.files?Array.prototype.slice.call(e.dataTransfer.files):[];if(fs.length)addFiles(fs)});
 
 finishAuth().then(render)
 })();
