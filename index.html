@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#171716">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src https://openrouter.ai; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; frame-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>NoLimit AI</title>
 <style>
 :root{--bg:#171716;--panel:#20201e;--panel2:#2a2927;--line:#3a3935;--text:#f1efe9;--muted:#85827c;--accent:#d87858}
@@ -240,6 +242,7 @@ function readDataURL(f){return new Promise(function(res,rej){var rd=new FileRead
 function errorText(j,f){if(!j)return f;if(typeof j==="string")return j;if(j.error){if(typeof j.error==="string")return j.error;if(j.error.message)return j.error.message}if(j.message)return j.message;return f}
 function errorRaw(raw,f){try{return errorText(JSON.parse(raw),f)}catch(e){return raw||f}}
 function escapeHTML(s){var d=document.createElement("div");d.textContent=String(s==null?"":s);return d.innerHTML}
+function safeHttpUrl(url){try{var u=new URL(String(url||""),location.href);return u.protocol==="https:"||u.protocol==="http:"?u.href:""}catch(e){return ""}}
 
 function renderMarkdown(text){
   var raw=String(text||"").replace(/\r\n/g,"\n");
@@ -323,7 +326,7 @@ function renderCitations(parent,annotations){
   annotations.forEach(function(a){
     var u=a&&a.url_citation?a.url_citation:(a&&a.type==="url_citation"?a.url_citation:null);
     var url=u&&u.url?u.url:(a&&a.url?a.url:"");
-    if(!url||seen[url])return;seen[url]=true;
+    url=safeHttpUrl(url);if(!url||seen[url])return;seen[url]=true;
     links.push({url:url,title:(u&&u.title)||(a&&a.title)||url})
   });
   if(!links.length)return;
