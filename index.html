@@ -341,7 +341,10 @@ function renderChat(){
   }else{
     c.messages.forEach(function(m,idx){
       if(m.role==="user"){
-        var w=document.createElement("div");w.className="user";var b=document.createElement("div");b.className="ub";b.textContent=m.content||"";renderFiles(b,m.fileNames);w.appendChild(b);box.appendChild(w)
+        var w=document.createElement("div");w.className="user";var b=document.createElement("div");b.className="ub";b.textContent=m.content||"";renderFiles(b,m.fileNames);
+        var ua=document.createElement("div");ua.className="msgtools";ua.style.justifyContent="flex-end";
+        var ed=document.createElement("button");ed.textContent="Edit";ed.onclick=function(){editUserMessage(idx)};
+        ua.appendChild(ed);b.appendChild(ua);w.appendChild(b);box.appendChild(w)
       }else{
         var a=document.createElement("div");a.className="assistant";
         if(m.reasoning){var rb=document.createElement("div");rb.className="reasonbox";rb.textContent=m.reasoning;a.appendChild(rb)}
@@ -353,7 +356,8 @@ function renderChat(){
         var rd=document.createElement("button");rd.textContent="Read";rd.onclick=function(){speak(m.content||"")};
         var av=document.createElement("button");av.textContent="AI Voice";av.onclick=function(){openVoice(m.content||"")};
         var rg=document.createElement("button");rg.textContent="Regenerate";rg.onclick=function(){regenerate(idx)};
-        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);
+        var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
+        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(br);
         var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));meta.textContent=bits.join(" · ");tools.appendChild(meta);
         a.appendChild(tools);box.appendChild(a)
       }
@@ -546,6 +550,20 @@ function regenerate(idx){
   if(busy)return;var c=ensure();if(!c.messages[idx]||c.messages[idx].role!=="assistant")return;
   c.messages.splice(idx,1);var last=c.messages[c.messages.length-1];if(!last||last.role!=="user"){save();render();return}
   q("#prompt").value=last.content||"";c.messages.pop();save();send()
+}
+
+function editUserMessage(idx){
+  if(busy)return;
+  var c=ensure(),m=c.messages[idx];if(!m||m.role!=="user")return;
+  q("#prompt").value=m.content||"";
+  c.messages=c.messages.slice(0,idx);
+  c.updated=Date.now();save();render();q("#prompt").focus();toast("Edit the message and send again")
+}
+
+function branchConversation(idx){
+  var c=ensure();
+  var copy={id:uid(),title:(c.title||"New chat")+" branch",created:Date.now(),updated:Date.now(),messages:JSON.parse(JSON.stringify(c.messages.slice(0,idx+1)))};
+  chats.unshift(copy);active=copy.id;save();render();toast("Created a branch")
 }
 
 async function loadModels(){
