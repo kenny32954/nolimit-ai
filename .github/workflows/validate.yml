@@ -16,27 +16,46 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Extract inline JavaScript
+      - name: Validate single-file app
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
+
           html = Path("index.html").read_text(encoding="utf-8")
-          start = html.index("<script>") + len("<script>")
-          end = html.index("</script>", start)
-          Path("/tmp/nolimit-app.js").write_text(html[start:end], encoding="utf-8")
+
           required = [
               'id="prompt"',
               'id="send"',
               'id="modelsModal"',
               'id="imageModal"',
+              'id="videoModal"',
+              'id="voiceModal"',
+              'id="artifactModal"',
               'id="webToggle"',
+              'id="advisorToggle"',
+              'id="fusionToggle"',
               'id="micBtn"',
               'https://openrouter.ai/api/v1',
+              'openrouter:web_search',
+              'openrouter:web_fetch',
+              'openrouter:subagent',
+              'openrouter:advisor',
+              'openrouter:fusion',
           ]
           missing = [item for item in required if item not in html]
           if missing:
               raise SystemExit("Missing required app markers: " + ", ".join(missing))
-          print("HTML checks passed")
+
+          # Never allow a real OpenRouter key to be committed to the public app.
+          if re.search(r"sk-or-v1-[A-Za-z0-9_-]{20,}", html):
+              raise SystemExit("A likely OpenRouter API key was found in index.html")
+
+          start = html.index("<script>") + len("<script>")
+          end = html.index("</script>", start)
+          Path("/tmp/nolimit-app.js").write_text(html[start:end], encoding="utf-8")
+
+          print("HTML and secret checks passed")
           PY
 
       - name: Check JavaScript syntax
