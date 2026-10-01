@@ -201,6 +201,9 @@ var settings=Object.assign({
   agent:false,
   advisor:false,
   advisorModel:"~anthropic/claude-opus-latest",
+  fallbackModel:"",
+  providerRouting:"balanced",
+  denyDataCollection:false,
   fusion:false,
   cache:false,
   autoSpeak:false
@@ -217,6 +220,7 @@ var controller=null;
 var recorder=null;
 var recorderChunks=[];
 var artifactCode="";
+var manageChatId=null;
 
 function q(s){return document.querySelector(s)}
 function qa(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
@@ -363,6 +367,9 @@ function openSettings(){
   q("#temperature").value=settings.temperature;
   q("#reasoning").value=settings.reasoning;
   q("#advisorModel").value=settings.advisorModel||"~anthropic/claude-opus-latest";
+  q("#fallbackModel").value=settings.fallbackModel||"";
+  q("#providerRouting").value=settings.providerRouting||"balanced";
+  q("#denyDataCollection").checked=!!settings.denyDataCollection;
   q("#cacheEnabled").checked=!!settings.cache;
   q("#autoSpeak").checked=!!settings.autoSpeak;
   openModal("#settingsModal")
@@ -762,7 +769,7 @@ q("#manualKeyBtn").onclick=function(){q("#manualKeyField").classList.remove("hid
 q("#disconnectNow").onclick=function(){localStorage.removeItem(KEYSTORE);closeModals();render();toast("Disconnected")};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.system=q("#systemPrompt").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.cache=q("#cacheEnabled").checked;settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.system=q("#systemPrompt").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
