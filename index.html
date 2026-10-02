@@ -276,6 +276,8 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .changelog{display:grid;gap:8px}.changelog h3{margin:9px 0 0;font-size:14px}.changelog ul{margin:5px 0 4px;padding-left:20px;color:#b1adb3;font-size:13px;line-height:1.55}.changelog li{margin:4px 0}
 .updateDot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accentGlow);margin-right:6px}
 
+
+.buildbadge.updateReady{color:var(--accent2)!important;border-color:color-mix(in srgb,var(--accent) 30%,transparent)!important;background:color-mix(in srgb,var(--accent) 8%,transparent)!important}
 </style>
 </head>
 <body>
@@ -323,6 +325,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="navgroup"><div class="navlabel">App</div>
 <button class="sbtn" id="installSide">Install app</button>
 <button class="sbtn" id="whatsNewSide">What’s new</button>
+<button class="sbtn" id="checkUpdateSide">Check for updates</button>
 <button class="sbtn" id="settingsBtn">Settings</button>
 <button class="sbtn" id="sideAuth">Connect OpenRouter</button></div>
 <div class="buildbadge" id="buildBadge">Quantum Breaks AI</div>
@@ -826,6 +829,8 @@ var manageChatId=null;
 var installPrompt=null;
 var lastFocusedElement=null;
 var updateAvailable=false;
+var swRegistration=null;
+var reloadingForUpdate=false;
 var imageReferenceData="";
 var videoFrameData="";
 var videoReferenceData="";
@@ -1475,6 +1480,22 @@ function openWhatsNew(){
   openModal("#whatsNewModal")
 }
 
+function offerAppUpdate(worker){
+  if(!worker)return;updateAvailable=true;
+  q("#buildBadge").classList.add("updateReady");
+  toastAction("A Quantum Breaks AI update is ready","Reload",function(){reloadingForUpdate=true;worker.postMessage({type:"SKIP_WAITING"})})
+}
+async function checkForUpdates(){
+  if(!("serviceWorker" in navigator)||location.protocol!=="https:")return toast("App updates require the HTTPS installed/web version");
+  try{
+    var reg=swRegistration||await navigator.serviceWorker.getRegistration("./");if(!reg)return toast("Service worker is not registered yet");
+    swRegistration=reg;
+    if(reg.waiting){offerAppUpdate(reg.waiting);return}
+    toast("Checking for updates…");await reg.update();
+    setTimeout(function(){if(reg.waiting)offerAppUpdate(reg.waiting);else if(!updateAvailable)toast("Quantum Breaks AI is up to date")},1400)
+  }catch(e){toast("Update check failed")}
+}
+
 var COMMANDS=[
   {name:"New chat",hint:"Ctrl/Cmd+N",run:newChat},
   {name:"Undo last edit/regeneration",hint:"Restore previous conversation state",run:undoLastMutation},
@@ -1505,6 +1526,7 @@ var COMMANDS=[
   {name:"Storage manager",hint:"Media persistence + cleanup",run:openStorageManager},
   {name:"Toggle focus mode",hint:"Hide chrome and tools",run:function(){settings.focusMode=!settings.focusMode;save();render()}},
   {name:"What’s new",hint:"Current build and upgrades",run:openWhatsNew},
+  {name:"Check for updates",hint:"Refresh the installed app shell",run:checkForUpdates},
   {name:"Settings",hint:"Appearance + API",run:openSettings},
   {name:"Toggle temporary chat",hint:"Do not persist after reload",run:function(){var c=ensure();c.temporary=!c.temporary;save();render()}},
   {name:"Export Markdown",hint:"Current chat",run:exportChat},
@@ -3152,6 +3174,7 @@ q("#bookmarksSide").onclick=openBookmarks;
 q("#archiveSide").onclick=openArchive;
 q("#trashSide").onclick=openTrash;
 q("#whatsNewSide").onclick=openWhatsNew;
+q("#checkUpdateSide").onclick=checkForUpdates;
 q("#installSide").onclick=async function(){
   if(installPrompt){
     installPrompt.prompt();
@@ -3343,7 +3366,14 @@ window.addEventListener("storage",function(e){
 });
 window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();installPrompt=e});
 if("serviceWorker" in navigator&&location.protocol==="https:"){
+  navigator.serviceWorker.addEventListener("controllerchange",function(){if(reloadingForUpdate)location.reload()});
   navigator.serviceWorker.register("./sw.js").then(function(reg){
+    swRegistration=reg;
+    if(reg.waiting)offerAppUpdate(reg.waiting);
+    reg.addEventListener("updatefound",function(){
+      var worker=reg.installing;if(!worker)return;
+      worker.addEventListener("statechange",function(){if(worker.state==="installed"&&navigator.serviceWorker.controller)offerAppUpdate(worker)})
+    });
     setInterval(function(){reg.update().catch(function(){})},1800000);
     document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")reg.update().catch(function(){})})
   }).catch(function(){})
