@@ -262,6 +262,8 @@ var settings=Object.assign({
   advisorModel:"~anthropic/claude-opus-latest",
   fallbackModel:"",
   providerRouting:"balanced",
+  responseFormat:"text",
+  maxTokens:0,
   denyDataCollection:false,
   fusion:false,
   cache:false,
@@ -466,6 +468,8 @@ function openSettings(){
   q("#advisorModel").value=settings.advisorModel||"~anthropic/claude-opus-latest";
   q("#fallbackModel").value=settings.fallbackModel||"";
   q("#providerRouting").value=settings.providerRouting||"balanced";
+  q("#responseFormat").value=settings.responseFormat||"text";
+  q("#maxTokens").value=settings.maxTokens||0;
   q("#denyDataCollection").checked=!!settings.denyDataCollection;
   q("#cacheEnabled").checked=!!settings.cache;
   q("#autoSpeak").checked=!!settings.autoSpeak;
@@ -619,6 +623,8 @@ async function send(){
     if(settings.fallbackModel){body.models=[settings.model,settings.fallbackModel];delete body.model}
     if(settings.providerRouting&&settings.providerRouting!=="balanced")body.provider={sort:settings.providerRouting};
     if(settings.denyDataCollection){body.provider=body.provider||{};body.provider.data_collection="deny"}
+    if(settings.responseFormat==="json_object")body.response_format={type:"json_object"};
+    if(Number(settings.maxTokens)>0)body.max_tokens=Math.floor(Number(settings.maxTokens));
     if(settings.reasoning!=="none")body.reasoning={effort:settings.reasoning,summary:"auto"};
     var tools=toolList();if(tools.length)body.tools=tools;
     if(hasPDF(c))body.plugins=[{id:"file-parser",pdf:{engine:"cloudflare-ai"}}];
@@ -994,6 +1000,23 @@ function exportChat(){
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/markdown"}));a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".md";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 
+function exportWorkspace(){
+  var safeSettings=Object.assign({},settings);
+  var data={type:"nolimit-ai-workspace",version:1,exported_at:new Date().toISOString(),settings:safeSettings,projects:projects,chats:chats.filter(function(ch){return !ch.temporary})};
+  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="nolimit-ai-workspace.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
+}
+
+async function importWorkspace(file){
+  try{
+    var raw=await file.text(),data=JSON.parse(raw);
+    if(!data||data.type!=="nolimit-ai-workspace"||!Array.isArray(data.chats))throw new Error("Not a NoLimit AI workspace backup");
+    settings=Object.assign(settings,data.settings||{});
+    projects=Array.isArray(data.projects)?data.projects:[];
+    chats=data.chats.map(function(ch){return Object.assign({},ch,{id:ch.id||uid(),temporary:false})});
+    active=chats[0]?chats[0].id:"";save();closeModals();render();toast("Workspace imported")
+  }catch(e){toast("Workspace import failed: "+e.message)}
+}
+
 function backupChat(){
   var c=ensure();
   var data={type:"nolimit-ai-chat",version:1,exported_at:new Date().toISOString(),chat:c};
@@ -1142,9 +1165,12 @@ qa("[data-close]").forEach(function(b){b.onclick=closeModals});
 q("#connectNow").onclick=connect;
 q("#manualKeyBtn").onclick=function(){q("#manualKeyField").classList.remove("hidden");q("#manualKey").focus()};
 q("#disconnectNow").onclick=function(){localStorage.removeItem(KEYSTORE);closeModals();render();toast("Disconnected")};
+q("#exportWorkspace").onclick=exportWorkspace;
+q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
+q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
