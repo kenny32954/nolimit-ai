@@ -299,6 +299,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .branchTree{display:grid;gap:7px}.branchNode{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px 11px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.024)}.branchNode.current{border-color:color-mix(in srgb,var(--accent) 40%,transparent);background:color-mix(in srgb,var(--accent) 7%,var(--panel))}.branchNodeMain{min-width:0}.branchNodeMain b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.branchNodeMain span{display:block;margin-top:3px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.branchJump{height:31px;padding:0 9px;border-radius:8px;background:rgba(255,255,255,.055);color:#bbb;font-size:11px}.branchIndent{margin-left:18px;border-left:1px solid rgba(255,255,255,.06);padding-left:10px;display:grid;gap:7px}
 
+
+.shortcutGrid{display:grid;gap:7px}.shortcutRow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 12px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.025);font-size:12px;color:#bbb}.shortcutRow kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#ddd;background:#111113;border:1px solid rgba(255,255,255,.1);border-bottom-color:rgba(255,255,255,.18);border-radius:7px;padding:6px 8px;box-shadow:0 2px 0 rgba(255,255,255,.04);white-space:nowrap}.title{cursor:pointer}.title:hover{color:var(--accent2)}
+
 </style>
 </head>
 <body>
@@ -347,6 +350,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="navgroup"><div class="navlabel">App</div>
 <button class="sbtn" id="installSide">Install app</button>
 <button class="sbtn" id="whatsNewSide">What’s new</button>
+<button class="sbtn" id="shortcutsSide">Keyboard shortcuts</button>
 <button class="sbtn" id="checkUpdateSide">Check for updates</button>
 <button class="sbtn" id="settingsBtn">Settings</button>
 <button class="sbtn" id="sideAuth">Connect OpenRouter</button></div>
@@ -415,6 +419,22 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button id="selProject">Project</button>
 </div>
 <div class="modalShade" id="modalShade"></div>
+
+<section class="modal" id="shortcutsModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Keyboard shortcuts</h2>
+<div class="shortcutGrid">
+<div class="shortcutRow"><span>Send message</span><kbd>Ctrl / ⌘ + Enter</kbd></div>
+<div class="shortcutRow"><span>New chat</span><kbd>Ctrl / ⌘ + N</kbd></div>
+<div class="shortcutRow"><span>Model picker</span><kbd>Ctrl / ⌘ + K</kbd></div>
+<div class="shortcutRow"><span>Command palette</span><kbd>Ctrl / ⌘ + P</kbd></div>
+<div class="shortcutRow"><span>Search everything</span><kbd>Ctrl / ⌘ + Shift + F</kbd></div>
+<div class="shortcutRow"><span>Focus composer / slash commands</span><kbd>/</kbd></div>
+<div class="shortcutRow"><span>Close menus and dialogs</span><kbd>Esc</kbd></div>
+<div class="shortcutRow"><span>Shortcut help</span><kbd>Ctrl / ⌘ + /</kbd></div>
+</div>
+<div class="smallnote" style="margin-top:12px">Inside the command palette and slash menu, use ↑ / ↓ and Enter to navigate without the mouse.</div>
+</section>
 
 <section class="modal" id="whatsNewModal">
 <button class="icon closemodal" data-close="1">✕</button>
@@ -1810,6 +1830,7 @@ var COMMANDS=[
   {name:"Storage manager",hint:"Media persistence + cleanup",run:openStorageManager},
   {name:"Toggle focus mode",hint:"Hide chrome and tools",run:function(){settings.focusMode=!settings.focusMode;save();render()}},
   {name:"What’s new",hint:"Current build and upgrades",run:openWhatsNew},
+  {name:"Keyboard shortcuts",hint:"Show app hotkeys",run:function(){openModal("#shortcutsModal")}},
   {name:"Check for updates",hint:"Refresh the installed app shell",run:checkForUpdates},
   {name:"Settings",hint:"Appearance + API",run:openSettings},
   {name:"Toggle temporary chat",hint:"Do not persist after reload",run:function(){var c=ensure();c.temporary=!c.temporary;save();render()}},
@@ -4188,7 +4209,9 @@ q("#bookmarksSide").onclick=openBookmarks;
 q("#archiveSide").onclick=openArchive;
 q("#trashSide").onclick=openTrash;
 q("#whatsNewSide").onclick=openWhatsNew;
+q("#shortcutsSide").onclick=function(){openModal("#shortcutsModal")};
 q("#checkUpdateSide").onclick=checkForUpdates;
+q("#title").onclick=function(){var c=current();if(!c)return;manageChatId=c.id;openChatManage()};
 q("#installSide").onclick=async function(){
   if(installPrompt){
     installPrompt.prompt();
@@ -4400,6 +4423,7 @@ document.addEventListener("keydown",function(e){
   if(e.key==="Escape"){hideSlashMenu();closeLightbox();closeModals();closeSide()}
   if(mod&&e.key.toLowerCase()==="k"){e.preventDefault();loadModels()}
   if(mod&&e.key.toLowerCase()==="p"){e.preventDefault();openCommandPalette()}
+  if(mod&&e.key==="/"){e.preventDefault();openModal("#shortcutsModal")}
   if(mod&&e.shiftKey&&e.key.toLowerCase()==="f"){e.preventDefault();openGlobalSearch()}
   if(mod&&e.key.toLowerCase()==="n"){e.preventDefault();newChat()}
   if(!mod&&!e.altKey&&e.key==="/"&&document.activeElement!==q("#prompt")&&document.activeElement&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();q("#prompt").focus();q("#prompt").value="/"}
