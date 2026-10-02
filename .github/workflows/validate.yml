@@ -1,4 +1,4 @@
-name: Validate NoLimit AI
+name: Validate Quantum Breaks AI
 
 on:
   push:
@@ -66,13 +66,13 @@ jobs:
 
           start = html.index("<script>") + len("<script>")
           end = html.index("</script>", start)
-          Path("/tmp/nolimit-app.js").write_text(html[start:end], encoding="utf-8")
+          Path("/tmp/quantum-breaks-app.js").write_text(html[start:end], encoding="utf-8")
 
           print("HTML, manifest, PWA files, and secret checks passed")
           PY
 
       - name: Check app JavaScript syntax
-        run: node --check /tmp/nolimit-app.js
+        run: node --check /tmp/quantum-breaks-app.js
 
       - name: Check service worker syntax
         run: node --check sw.js
