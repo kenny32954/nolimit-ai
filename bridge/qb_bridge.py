@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """Quantum Breaks AI serial bridge for the Casio fx-CG50.
 
-Protocol (ASCII lines):
-    Calculator -> PC: Q:<id>:<base64 UTF-8 prompt>
-    PC -> Calculator: A:<id>:<seq>:<done 0|1>:<base64 UTF-8 chunk>
-    PC -> Calculator: E:<id>:<base64 UTF-8 error>
+Protocol v0.2:
+    Legacy calculator request:
+        Q:<id>:<base64 UTF-8 prompt>
+
+    Subject-aware request:
+        Q:<id>:<subject>:<mode>:<base64 UTF-8 prompt>
+
+    PC response:
+        A:<id>:<seq>:<done 0|1>:<base64 UTF-8 chunk>
+
+    PC error:
+        E:<id>:<base64 UTF-8 error>
 
 The API endpoint is any OpenAI-compatible /chat/completions endpoint.
 """
@@ -24,6 +32,13 @@ except ImportError:
     print("Install with: python -m pip install pyserial")
     raise
 
+from subject_router import (
+    build_system_prompt,
+    normalize_mode,
+    resolve_subject,
+    subject_label,
+)
+
 BAUD = int(os.getenv("QB_SERIAL_BAUD", "115200"))
 PORT = os.getenv("QB_SERIAL_PORT", "")
 API_URL = os.getenv("QB_API_URL", "https://openrouter.ai/api/v1/chat/completions")
@@ -31,13 +46,15 @@ API_KEY = os.getenv("QB_API_KEY", "")
 MODEL = os.getenv("QB_MODEL", "")
 SYSTEM_PROMPT = os.getenv(
     "QB_SYSTEM_PROMPT",
-    "You are Quantum Breaks AI running through a Casio fx-CG50. "
-    "Be concise because the calculator screen is small."
+    "You are Quantum Breaks AI, a school-focused tutor running through a Casio fx-CG50. "
+    "Be accurate, concise, encouraging, and useful across school subjects."
 )
 MAX_HISTORY_MESSAGES = int(os.getenv("QB_HISTORY_MESSAGES", "12"))
 CHUNK_BYTES = int(os.getenv("QB_CHUNK_BYTES", "144"))
 
-history = []
+# Keep separate short histories per subject so chemistry context does not
+# accidentally bleed into an English or history session.
+histories = {}
 
 
 def b64e(text):
@@ -70,10 +87,44 @@ def extract_text(payload):
     return str(content)
 
 
-def call_model(prompt):
-    global history
+def parse_request(line):
+    line = line.strip()
+    if not line:
+        return None
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    parts = line.split(":")
+    if not parts or parts[0] != "Q":
+        return None
+
+    # Backwards compatibility with protocol v0.1.
+    if len(parts) == 3:
+        return {
+            "id": parts[1],
+            "subject": "auto",
+            "mode": "explain",
+            "prompt": b64d(parts[2]).strip(),
+        }
+
+    if len(parts) == 5:
+        return {
+            "id": parts[1],
+            "subject": parts[2],
+            "mode": parts[3],
+            "prompt": b64d(parts[4]).strip(),
+        }
+
+    raise RuntimeError("Malformed request frame.")
+
+
+def call_model(prompt, requested_subject="auto", requested_mode="explain"):
+    subject = resolve_subject(requested_subject, prompt)
+    mode = normalize_mode(requested_mode)
+    history = histories.get(subject, [])
+
+    messages = [{
+        "role": "system",
+        "content": build_system_prompt(SYSTEM_PROMPT, subject, mode),
+    }]
     messages.extend(history[-MAX_HISTORY_MESSAGES:])
     messages.append({"role": "user", "content": prompt})
 
@@ -89,7 +140,7 @@ def call_model(prompt):
         headers={
             "Authorization": "Bearer " + API_KEY,
             "Content-Type": "application/json",
-            "User-Agent": "QuantumBreaksAI-CG50-Bridge/0.1",
+            "User-Agent": "QuantumBreaksAI-CG50-Bridge/0.2",
         },
     )
 
@@ -108,8 +159,9 @@ def call_model(prompt):
 
     history.append({"role": "user", "content": prompt})
     history.append({"role": "assistant", "content": answer})
-    history = history[-MAX_HISTORY_MESSAGES:]
-    return answer
+    histories[subject] = history[-MAX_HISTORY_MESSAGES:]
+
+    return subject, mode, answer
 
 
 def send_answer(ser, req_id, text):
@@ -129,27 +181,40 @@ def send_answer(ser, req_id, text):
 
 
 def handle_line(ser, line):
-    line = line.strip()
-    if not line:
-        return
-
-    parts = line.split(":", 2)
-    if len(parts) != 3 or parts[0] != "Q":
-        return
-
-    req_id = parts[1]
-
     try:
-        prompt = b64d(parts[2]).strip()
+        req = parse_request(line)
+        if req is None:
+            return
+
+        req_id = req["id"]
+        prompt = req["prompt"]
         if not prompt:
             raise RuntimeError("Empty prompt.")
-        print("[%s] %s" % (req_id, prompt))
-        answer = call_model(prompt)
+
+        subject, mode, answer = call_model(
+            prompt,
+            req["subject"],
+            req["mode"],
+        )
+
+        print("[%s] %s / %s: %s" % (
+            req_id,
+            subject_label(subject),
+            mode,
+            prompt,
+        ))
         print(" -> %s" % answer.replace("\n", " ")[:200])
         send_answer(ser, req_id, answer)
+
     except Exception as exc:
         message = str(exc)
         print(" !! " + message, file=sys.stderr)
+        req_id = "0"
+        try:
+            if line.startswith("Q:"):
+                req_id = line.split(":", 2)[1]
+        except Exception:
+            pass
         send_line(ser, "E:%s:%s" % (req_id, b64e(message)))
 
 
@@ -164,10 +229,12 @@ def main():
         print("Set QB_MODEL to the model ID you want Quantum Breaks AI to use.")
         return 2
 
-    print("Quantum Breaks AI CG50 bridge")
+    print("Quantum Breaks AI CG50 bridge v0.2")
     print("Serial: %s @ %d" % (PORT, BAUD))
     print("API: %s" % API_URL)
     print("Model: %s" % MODEL)
+    print("Subjects: auto + school subject packs")
+    print("Modes: answer, explain, steps, check, quiz, summary, flashcards")
 
     with serial.Serial(PORT, BAUD, timeout=0.25) as ser:
         time.sleep(0.5)
