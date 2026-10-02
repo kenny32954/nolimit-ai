@@ -503,6 +503,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="filter" data-filter="vision">Vision</button>
 <button class="filter" data-filter="reasoning">Reasoning</button>
 <button class="filter" data-filter="structured">Structured</button>
+<button class="filter" data-filter="compatible">Compatible now</button>
 </div>
 <div class="models" id="models"></div>
 </section>
@@ -641,6 +642,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <h2>Conversation</h2>
 <div class="field"><label>Title</label><input id="chatTitleInput" maxlength="80"></div>
 <div class="field"><label>Tags</label><input id="chatTagsInput" maxlength="160" placeholder="coding, research, school"><div class="smallnote">Comma-separated. Tags are searchable from the sidebar and global search.</div></div>
+<div class="field"><label>Chat instructions</label><textarea id="chatInstructions" placeholder="Instructions that apply only to this conversation"></textarea><div class="smallnote">Sent with this chat only. Useful for tone, format, constraints, or project-specific rules.</div></div>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="lockChatModel" type="checkbox"> Lock the selected model to this conversation <span class="smallnote" id="chatModelLockLabel"></span></label>
 <div class="notice" id="chatStats"></div>
 <div class="row">
@@ -1552,7 +1554,7 @@ async function runDiagnostics(){
   if(navigator.storage&&navigator.storage.estimate){
     try{var est=await navigator.storage.estimate();if(est.usage!=null)add("Browser storage",fmtBytes(est.usage)+(est.quota?" / "+fmtBytes(est.quota):""))}catch(e){}
   }
-  add("Model",settings.model);
+  add("Model",effectiveModel(current()));
   if(location.protocol!=="https:")issues.push("App is not running over HTTPS.");
   if(!navigator.onLine)issues.push("Browser reports that it is offline.");
   if(isConnected()){
@@ -1695,6 +1697,7 @@ function apiMessages(c){
   var out=[],systemParts=[];
   if(settings.system)systemParts.push(settings.system);
   if(settings.memory)systemParts.push("Persistent local memory:\n"+settings.memory);
+  if(c.chatInstructions)systemParts.push("Instructions for this conversation:\n"+c.chatInstructions);
   if(c.compactSummary)systemParts.push("Summary of earlier conversation:\n"+c.compactSummary);
   if(c.scratchpadInContext&&c.scratchpad)systemParts.push("Chat scratchpad notes:\n"+c.scratchpad);
   var p=projectForChat(c);
@@ -1817,8 +1820,15 @@ async function reviewAnswer(c,userMessage,assistantMessage,force){
       {role:"user",content:"User request:\n"+String(userMessage||"").slice(0,30000)+"\n\nAnswer to review:\n"+String(assistantMessage.content||"").slice(0,60000)}
     ],temperature:0,response_format:{type:"json_schema",json_schema:{name:"answer_review",strict:true,schema:schema}},provider:{require_parameters:true},stream:false,usage:{include:true},max_tokens:1200};
     var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
-    var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Review failed"));
-    var raw=String(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim(),review=JSON.parse(raw);
+    var j=await r.json();
+    if(!r.ok&&[400,422].indexOf(r.status)>=0){
+      delete body.response_format;delete body.provider;
+      body.messages[0].content+=" Return valid minified JSON with keys confidence, verdict, summary, and issues.";
+      r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
+      j=await r.json()
+    }
+    if(!r.ok)throw new Error(errorText(j,"Review failed"));
+    var raw=String(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim().replace(/^\`\`\`(?:json)?\s*/i,"").replace(/\s*\`\`\`$/,""),review=JSON.parse(raw);
     review.cost=j.usage&&j.usage.cost!=null?j.usage.cost:j.cost;assistantMessage.review=review
   }catch(e){
     assistantMessage.reviewError=e.message
@@ -2170,6 +2180,14 @@ function openModelInfo(m){
   openModal("#modelInfoModal")
 }
 
+function modelCompatibleNow(m){
+  if(!m||m.id==="openrouter/auto")return true;
+  var ins=inputs(m),sp=m.supported_parameters||[];
+  if(pending.some(function(f){return f.kind==="image"})&&ins.indexOf("image")<0)return false;
+  if(settings.reasoning!=="none"&&sp.length&&sp.indexOf("reasoning")<0&&sp.indexOf("reasoning_effort")<0)return false;
+  if(settings.responseFormat==="json_schema"&&sp.length&&sp.indexOf("structured_outputs")<0&&sp.indexOf("response_format")<0)return false;
+  return true
+}
 function showModels(){
   var term=(q("#modelSearch").value||"").toLowerCase(),box=q("#models");box.innerHTML="";
   var recent=Array.isArray(settings.recentModels)?settings.recentModels:[];
@@ -2184,6 +2202,7 @@ function showModels(){
     if(modelFilter==="vision"&&inputs(m).indexOf("image")<0)return false;
     if(modelFilter==="reasoning"){var sp=m.supported_parameters||[];if(sp.indexOf("reasoning")<0&&sp.indexOf("reasoning_effort")<0)return false}
     if(modelFilter==="structured"){var sps=m.supported_parameters||[];if(sps.indexOf("structured_outputs")<0&&sps.indexOf("response_format")<0)return false}
+    if(modelFilter==="compatible"&&!modelCompatibleNow(m))return false;
     return true
   }).slice(0,180);
   list.forEach(function(m){
@@ -2199,6 +2218,7 @@ function showModels(){
     var caps=[];if(inputs(m).indexOf("image")>=0)caps.push("vision");
     var sp=m.supported_parameters||[];if(sp.indexOf("reasoning")>=0||sp.indexOf("reasoning_effort")>=0)caps.push("reasoning");
     if(sp.indexOf("structured_outputs")>=0||sp.indexOf("response_format")>=0)caps.push("structured");
+    if(modelCompatibleNow(m))caps.push("compatible");
     if(priceZero(m))caps.push("free");
     caps.forEach(function(x){var tag=document.createElement("span");tag.className="modelbadge";tag.textContent=x;badges.appendChild(tag)});
     if(caps.length)b.appendChild(badges);
@@ -2714,6 +2734,7 @@ function openChatManage(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
   q("#chatTitleInput").value=c.title||"New chat";
   q("#chatTagsInput").value=(c.tags||[]).join(", ");
+  q("#chatInstructions").value=c.chatInstructions||"";
   q("#lockChatModel").checked=!!c.modelOverride;
   q("#chatModelLockLabel").textContent=c.modelOverride?"("+c.modelOverride+")":"(currently "+effectiveModel(c)+")";
   q("#chatStats").textContent=chatStatsText(c);
@@ -2731,7 +2752,7 @@ function toggleChatModelLock(){
 }
 function renameManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
-  c.title=q("#chatTitleInput").value.trim().slice(0,80)||"New chat";c.tags=q("#chatTagsInput").value.split(",").map(function(x){return x.trim().replace(/^#/,"").slice(0,24)}).filter(Boolean).slice(0,12);c.updated=Date.now();save();closeModals();render()
+  c.title=q("#chatTitleInput").value.trim().slice(0,80)||"New chat";c.tags=q("#chatTagsInput").value.split(",").map(function(x){return x.trim().replace(/^#/,"").slice(0,24)}).filter(Boolean).slice(0,12);c.chatInstructions=q("#chatInstructions").value.slice(0,50000);c.updated=Date.now();save();closeModals();render()
 }
 
 async function generateChatTitle(){
@@ -2741,7 +2762,7 @@ async function generateChatTitle(){
   if(!material.trim())return toast("There is not enough conversation to title yet");
   q("#aiTitleChat").disabled=true;q("#aiTitleChat").textContent="Naming…";
   try{
-    var body={model:settings.model,messages:[
+    var body={model:effectiveModel(c),messages:[
       {role:"system",content:"Create a short, specific title for this conversation. Return only the title, no quotes, maximum 6 words."},
       {role:"user",content:material}
     ],stream:false,temperature:0.3,max_tokens:32};
@@ -2766,7 +2787,7 @@ async function compressChatContext(){
   q("#compressChat").disabled=true;q("#compressChat").textContent="Compressing…";
   try{
     var transcript=older.map(function(m){return (m.role==="user"?"User":"Assistant")+": "+String(m.content||"")}).join("\n\n").slice(0,120000);
-    var body={model:settings.model,messages:[
+    var body={model:effectiveModel(c),messages:[
       {role:"system",content:"Compress the conversation into a dense continuity summary. Preserve decisions, requirements, names, technical details, unresolved tasks, user preferences, and anything needed to continue accurately. Do not add facts."},
       {role:"user",content:transcript}
     ],stream:false,temperature:0.2,max_tokens:2500};
