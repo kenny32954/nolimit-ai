@@ -286,6 +286,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="projectsSide">Projects</button>
 <button class="sbtn" id="promptsSide">Prompt library</button>
 <button class="sbtn" id="scratchpadSide">Scratchpad</button>
+<button class="sbtn" id="snapshotsSide">Snapshots</button>
 <button class="sbtn" id="globalSearchSide">Search everything</button>
 <button class="sbtn" id="findSide">Find in chat</button>
 <button class="sbtn" id="bookmarksSide">Bookmarks</button>
@@ -469,6 +470,15 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="models" id="models"></div>
 </section>
 
+<section class="modal" id="snapshotsModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Conversation snapshots</h2>
+<div class="notice">Save restore points before experimenting with edits, model changes, or long branches.</div>
+<div class="row"><input id="snapshotName" style="flex:1;min-width:180px" maxlength="80" placeholder="Snapshot name (optional)"><button class="primary" id="createSnapshot">Create snapshot</button></div>
+<div style="height:12px"></div>
+<div id="snapshotsList" class="promptlist"></div>
+</section>
+
 <section class="modal" id="scratchpadModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Chat scratchpad</h2>
@@ -594,6 +604,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="secondary" id="compressChat">Compress context</button>
 <button class="secondary" id="pinChat">Pin</button>
 <button class="secondary" id="archiveChat">Archive</button>
+<button class="secondary" id="snapshotChat">Snapshot</button>
 <button class="secondary" id="duplicateChat">Duplicate</button>
 <button class="danger" id="deleteChat">Delete</button>
 </div>
@@ -1206,6 +1217,48 @@ function toggleContextPin(idx){
   var c=ensure(),m=c.messages[idx];if(!m)return;
   m.contextPinned=!m.contextPinned;c.updated=Date.now();save();render();toast(m.contextPinned?"Message pinned to context":"Context pin removed")
 }
+function snapshotPayload(c){
+  return {
+    id:uid(),
+    name:"",
+    created:Date.now(),
+    title:c.title,
+    tags:Array.isArray(c.tags)?c.tags.slice():[],
+    compactSummary:c.compactSummary||"",
+    compactCount:c.compactCount||0,
+    messages:(c.messages||[]).map(serializableMessage)
+  }
+}
+function openSnapshots(){openModal("#snapshotsModal");q("#snapshotName").value="";renderSnapshots()}
+function createSnapshot(){
+  var c=ensure(),snap=snapshotPayload(c),name=q("#snapshotName").value.trim();
+  snap.name=(name||new Date().toLocaleString()).slice(0,80);
+  c.snapshots=Array.isArray(c.snapshots)?c.snapshots:[];
+  c.snapshots.unshift(snap);c.snapshots=c.snapshots.slice(0,12);save();q("#snapshotName").value="";renderSnapshots();toast("Snapshot created")
+}
+async function restoreSnapshot(id){
+  var c=ensure(),snap=(c.snapshots||[]).find(function(s){return s.id===id});if(!snap)return;
+  if(!confirm("Restore snapshot '"+snap.name+"'? The current conversation state will be replaced."))return;
+  stashMutationUndo(c,"snapshot restore");
+  c.title=snap.title||c.title;c.tags=Array.isArray(snap.tags)?snap.tags.slice():[];c.compactSummary=snap.compactSummary||"";c.compactCount=snap.compactCount||0;c.messages=JSON.parse(JSON.stringify(snap.messages||[]));c.updated=Date.now();
+  save();await hydrateChatMedia(c);closeModals();render();restoreDraft();toast("Snapshot restored")
+}
+function deleteSnapshot(id){
+  var c=ensure();c.snapshots=(c.snapshots||[]).filter(function(s){return s.id!==id});save();renderSnapshots();toast("Snapshot deleted")
+}
+function renderSnapshots(){
+  var c=ensure(),box=q("#snapshotsList"),list=c.snapshots||[];box.innerHTML="";
+  if(!list.length){box.innerHTML='<div class="notice">No snapshots for this conversation yet.</div>';return}
+  list.forEach(function(snap){
+    var card=document.createElement("div");card.className="promptcard";
+    var info=document.createElement("div"),h=document.createElement("h3"),p=document.createElement("p");h.textContent=snap.name||"Snapshot";p.textContent=(snap.messages||[]).length+" messages · "+new Date(snap.created||Date.now()).toLocaleString();info.appendChild(h);info.appendChild(p);
+    var actions=document.createElement("div");actions.className="promptactions";
+    var restore=document.createElement("button");restore.textContent="Restore";restore.onclick=function(){restoreSnapshot(snap.id)};
+    var del=document.createElement("button");del.textContent="Delete";del.onclick=function(){deleteSnapshot(snap.id)};
+    actions.appendChild(restore);actions.appendChild(del);card.appendChild(info);card.appendChild(actions);box.appendChild(card)
+  })
+}
+
 function openScratchpad(){
   var c=ensure();q("#scratchpadText").value=c.scratchpad||"";q("#scratchpadContext").checked=!!c.scratchpadInContext;openModal("#scratchpadModal")
 }
@@ -1308,6 +1361,7 @@ var COMMANDS=[
   {name:"Projects",hint:"Local workspaces",run:openProjects},
   {name:"Prompt library",hint:"Saved reusable prompts",run:openPromptLibrary},
   {name:"Scratchpad",hint:"Notes for this conversation",run:openScratchpad},
+  {name:"Conversation snapshots",hint:"Save or restore chat states",run:openSnapshots},
   {name:"Search everything",hint:"Chats, projects, prompts, profiles",run:openGlobalSearch},
   {name:"Find in chat",hint:"Search current conversation",run:openFindInChat},
   {name:"Bookmarks",hint:"Saved messages",run:openBookmarks},
@@ -2762,6 +2816,7 @@ q("#analyticsSide").onclick=openAnalytics;
 q("#projectsSide").onclick=openProjects;
 q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
 q("#scratchpadSide").onclick=openScratchpad;
+q("#snapshotsSide").onclick=openSnapshots;
 q("#globalSearchSide").onclick=openGlobalSearch;
 q("#findSide").onclick=openFindInChat;
 q("#bookmarksSide").onclick=openBookmarks;
@@ -2873,9 +2928,11 @@ q("#aiTitleChat").onclick=generateChatTitle;
 q("#compressChat").onclick=compressChatContext;
 q("#pinChat").onclick=togglePinnedChat;
 q("#archiveChat").onclick=toggleArchiveManagedChat;
+q("#snapshotChat").onclick=function(){closeModals();openSnapshots()};
 q("#duplicateChat").onclick=duplicateManagedChat;
 q("#deleteChat").onclick=deleteManagedChat;
 q("#emptyTrash").onclick=emptyTrash;
+q("#createSnapshot").onclick=createSnapshot;
 q("#saveScratchpad").onclick=saveScratchpad;
 q("#insertScratchpad").onclick=insertScratchpad;
 q("#clearScratchpad").onclick=clearScratchpad;
