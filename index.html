@@ -201,6 +201,10 @@ html[data-focus="true"] .top .menu{display:none}
 html[data-focus="true"] .chat{padding-left:max(22px,calc((100vw - 920px)/2));padding-right:max(22px,calc((100vw - 920px)/2))}
 html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
+
+.promptlist{display:grid;gap:8px}.promptcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;padding:12px;border:1px solid rgba(255,255,255,.065);border-radius:14px;background:rgba(255,255,255,.026)}
+.promptcard h3{margin:0 0 5px;font-size:14px}.promptcard p{margin:0;color:var(--muted);font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.promptactions{display:flex;gap:5px}.promptactions button{height:32px;padding:0 9px;border-radius:9px;background:rgba(255,255,255,.055);font-size:11px;color:#bbb}
+
 </style>
 </head>
 <body>
@@ -215,6 +219,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="compareSide">Compare models</button>
 <button class="sbtn" id="usageSide">Usage</button>
 <button class="sbtn" id="projectsSide">Projects</button>
+<button class="sbtn" id="promptsSide">Prompt library</button>
 <button class="sbtn" id="installSide">Install app</button>
 <button class="sbtn" id="imageSide">Create image</button>
 <button class="sbtn" id="videoSide">Create video</button>
@@ -253,6 +258,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="crow">
 <div class="leftTools">
 <button class="tool" id="attach">＋</button>
+<button class="tool" id="promptLibBtn" title="Prompt library">★</button>
 <input id="files" type="file" hidden multiple accept="image/*,application/pdf,audio/*,.txt,.md,.json,.csv,.js,.html,.css,.py,.java,.cpp,.c,.ts,.tsx,.jsx,.xml,.yaml,.yml">
 <button class="tool" id="micBtn" title="Record and transcribe">●</button>
 <button class="tool" id="imageBtn" title="Create image">▣</button>
@@ -338,6 +344,17 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="filter" data-filter="reasoning">Reasoning</button>
 </div>
 <div class="models" id="models"></div>
+</section>
+
+<section class="modal" id="promptsModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Prompt library</h2>
+<div class="field"><input id="promptSearch" placeholder="Search saved prompts"></div>
+<div id="promptList" class="promptlist"></div>
+<div style="height:14px"></div>
+<div class="field"><label>Name</label><input id="promptName" maxlength="80" placeholder="Prompt name"></div>
+<div class="field"><label>Prompt</label><textarea id="promptBody" placeholder="Write a reusable prompt"></textarea></div>
+<div class="row"><button class="primary" id="savePrompt">Save prompt</button><button class="secondary" id="newPrompt">New</button><button class="secondary" id="saveComposerPrompt">Save current composer</button></div>
 </section>
 
 <section class="modal" id="projectsModal">
@@ -473,6 +490,7 @@ var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
 var ACTIVE="nolimit_active_v2";
 var PROJECT_STORE="nolimit_projects_v1";
+var PROMPT_STORE="nolimit_prompts_v1";
 
 function safeJSON(v,f){try{return JSON.parse(v)||f}catch(e){return f}}
 var chats=safeJSON(localStorage.getItem(STORE),[]);
@@ -506,6 +524,7 @@ var settings=Object.assign({
 },safeJSON(localStorage.getItem(SETSTORE),{}));
 var active=localStorage.getItem(ACTIVE)||"";
 var projects=safeJSON(localStorage.getItem(PROJECT_STORE),[]);
+var savedPrompts=safeJSON(localStorage.getItem(PROMPT_STORE),[]);
 var pending=[];
 var models=[];
 var imageModels=[];
@@ -533,7 +552,7 @@ function qa(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
 function uid(){return Math.random().toString(36).slice(2)+Date.now().toString(36)}
 function getKey(){return localStorage.getItem(KEYSTORE)||""}
 function isConnected(){return !!getKey()}
-function save(){var light=chats.filter(function(c){return !c.temporary}).map(function(c){return Object.assign({},c,{messages:(c.messages||[]).map(function(m){var x=Object.assign({},m);if(x.role==="user"){if(x.images&&x.images.length)x.images=[];if(x.pdfs&&x.pdfs.length)x.pdfs=[];if(x.textFiles&&x.textFiles.length)x.textFiles=x.textFiles.map(function(f){return{name:f.name,text:(f.text||"").slice(0,120000)}})}if(x.images)x.images=x.images.filter(function(src){return typeof src==="string"&&src.indexOf("data:")!==0});return x})})});try{localStorage.setItem(STORE,JSON.stringify(light));localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));localStorage.setItem(ACTIVE,active)}catch(e){try{localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));localStorage.setItem(ACTIVE,active)}catch(_){}}}
+function save(){var light=chats.filter(function(c){return !c.temporary}).map(function(c){return Object.assign({},c,{messages:(c.messages||[]).map(function(m){var x=Object.assign({},m);if(x.role==="user"){if(x.images&&x.images.length)x.images=[];if(x.pdfs&&x.pdfs.length)x.pdfs=[];if(x.textFiles&&x.textFiles.length)x.textFiles=x.textFiles.map(function(f){return{name:f.name,text:(f.text||"").slice(0,120000)}})}if(x.images)x.images=x.images.filter(function(src){return typeof src==="string"&&src.indexOf("data:")!==0});return x})})});try{localStorage.setItem(STORE,JSON.stringify(light));localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));localStorage.setItem(PROMPT_STORE,JSON.stringify(savedPrompts));localStorage.setItem(ACTIVE,active)}catch(e){try{localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));localStorage.setItem(PROMPT_STORE,JSON.stringify(savedPrompts));localStorage.setItem(ACTIVE,active)}catch(_){}}}
 function applyAppearance(){
   document.documentElement.dataset.theme=settings.theme||"dark";
   document.documentElement.dataset.accent=settings.accent||"coral";
@@ -727,6 +746,7 @@ var COMMANDS=[
   {name:"Create video",hint:"Video studio",run:openVideo},
   {name:"Compare models",hint:"Side by side",run:openCompare},
   {name:"Projects",hint:"Local workspaces",run:openProjects},
+  {name:"Prompt library",hint:"Saved reusable prompts",run:openPromptLibrary},
   {name:"Usage dashboard",hint:"OpenRouter key usage",run:openUsage},
   {name:"Diagnostics",hint:"Health check",run:openDiagnostics},
   {name:"Toggle focus mode",hint:"Hide chrome and tools",run:function(){settings.focusMode=!settings.focusMode;save();render()}},
@@ -1548,6 +1568,35 @@ function deleteManagedChat(){
   chats.splice(i,1);if(active===manageChatId)active=chats[0]?chats[0].id:"";save();closeModals();render();toast("Chat deleted")
 }
 
+
+var editingPromptId="";
+function openPromptLibrary(){
+  editingPromptId="";q("#promptName").value="";q("#promptBody").value="";q("#promptSearch").value="";
+  renderPromptLibrary();openModal("#promptsModal");setTimeout(function(){q("#promptSearch").focus()},30)
+}
+function renderPromptLibrary(){
+  var term=(q("#promptSearch").value||"").toLowerCase(),box=q("#promptList");box.innerHTML="";
+  var list=savedPrompts.filter(function(p){return !term||(p.name+" "+p.body).toLowerCase().includes(term)});
+  if(!list.length){box.innerHTML='<div class="notice">No matching saved prompts yet.</div>';return}
+  list.forEach(function(p){
+    var card=document.createElement("div");card.className="promptcard";
+    var info=document.createElement("div"),h=document.createElement("h3"),body=document.createElement("p");h.textContent=p.name||"Untitled prompt";body.textContent=p.body||"";info.appendChild(h);info.appendChild(body);
+    var actions=document.createElement("div");actions.className="promptactions";
+    var use=document.createElement("button");use.textContent="Use";use.onclick=function(){q("#prompt").value=p.body||"";closeModals();resizePrompt();q("#prompt").focus()};
+    var edit=document.createElement("button");edit.textContent="Edit";edit.onclick=function(){editingPromptId=p.id;q("#promptName").value=p.name||"";q("#promptBody").value=p.body||"";q("#promptBody").focus()};
+    var del=document.createElement("button");del.textContent="Delete";del.onclick=function(){savedPrompts=savedPrompts.filter(function(x){return x.id!==p.id});save();renderPromptLibrary();toast("Prompt deleted")};
+    actions.appendChild(use);actions.appendChild(edit);actions.appendChild(del);card.appendChild(info);card.appendChild(actions);box.appendChild(card)
+  })
+}
+function savePromptEntry(){
+  var name=q("#promptName").value.trim(),body=q("#promptBody").value.trim();if(!body)return toast("Enter a prompt first");
+  var p=editingPromptId?savedPrompts.find(function(x){return x.id===editingPromptId}):null;
+  if(!p){p={id:uid(),created:Date.now()};savedPrompts.unshift(p);editingPromptId=p.id}
+  p.name=(name||body.slice(0,40)||"Untitled prompt").slice(0,80);p.body=body;p.updated=Date.now();save();renderPromptLibrary();toast("Prompt saved")
+}
+function newPromptEntry(){editingPromptId="";q("#promptName").value="";q("#promptBody").value="";q("#promptName").focus()}
+function saveComposerAsPrompt(){var body=q("#prompt").value.trim();if(!body)return toast("The composer is empty");editingPromptId="";q("#promptName").value=body.slice(0,40);q("#promptBody").value=body;openModal("#promptsModal");renderPromptLibrary()}
+
 function projectOptions(){
   var s=q("#projectSelect");s.innerHTML="";
   var none=document.createElement("option");none.value="";none.textContent="No project";s.appendChild(none);
@@ -1624,6 +1673,7 @@ q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
 q("#compareSide").onclick=openCompare;
 q("#usageSide").onclick=openUsage;
 q("#projectsSide").onclick=openProjects;
+q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
 q("#installSide").onclick=async function(){
   if(installPrompt){
     installPrompt.prompt();
@@ -1671,6 +1721,10 @@ q("#runDiagnostics").onclick=runDiagnostics;
 q("#copyDiagnostics").onclick=function(){navigator.clipboard.writeText(lastDiagReport||"No diagnostics run yet.").then(function(){toast("Diagnostics copied")})};
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
+q("#promptSearch").oninput=renderPromptLibrary;
+q("#savePrompt").onclick=savePromptEntry;
+q("#newPrompt").onclick=newPromptEntry;
+q("#saveComposerPrompt").onclick=saveComposerAsPrompt;
 q("#projectSelect").onchange=function(){loadProjectFields(q("#projectSelect").value)};
 q("#newProject").onclick=createProject;
 q("#saveProject").onclick=saveProject;
