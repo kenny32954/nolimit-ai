@@ -208,6 +208,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .searchresults{display:grid;gap:7px}.searchresult{padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);text-align:left}.searchresult:hover{background:rgba(255,255,255,.05);border-color:color-mix(in srgb,var(--accent) 25%,transparent)}.searchresult b{display:block;font-size:12px;margin-bottom:4px}.searchresult span{display:block;font-size:12px;color:var(--muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bookmarkon{color:#ffd67d!important}
 
+
+.transcriptbox{min-height:150px;max-height:44vh;overflow:auto;white-space:pre-wrap;border:1px solid rgba(255,255,255,.065);background:rgba(255,255,255,.025);border-radius:14px;padding:12px;font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+
 </style>
 </head>
 <body>
@@ -228,6 +231,8 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="installSide">Install app</button>
 <button class="sbtn" id="imageSide">Create image</button>
 <button class="sbtn" id="videoSide">Create video</button>
+<button class="sbtn" id="voiceSide">AI voice</button>
+<button class="sbtn" id="transcribeSide">Transcribe audio</button>
 <button class="sbtn" id="shareSide">Share chat</button>
 <button class="sbtn" id="exportSide">Export Markdown</button>
 <button class="sbtn" id="backupSide">Backup chat</button>
@@ -437,6 +442,23 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="row" style="margin-top:10px"><button class="secondary" id="artifactOpen">Open in new tab</button><button class="secondary" id="artifactCopy">Copy HTML</button></div>
 </section>
 
+<section class="modal" id="transcribeModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Transcribe audio</h2>
+<div class="notice">Turn an audio file into text using OpenRouter speech-to-text models.</div>
+<div class="field"><label>Audio file</label><input id="transcribeFile" type="file" accept="audio/*"></div>
+<div class="field"><label>Transcription model</label><select id="transcribeModel"></select></div>
+<div class="row">
+<div class="field" style="flex:1;min-width:160px"><label>Language hint</label><input id="transcribeLanguage" maxlength="8" placeholder="auto, en, es…"></div>
+<label style="display:flex;align-items:center;gap:8px;margin:24px 0 12px"><input id="transcribeTimestamps" type="checkbox"> Word timestamps</label>
+</div>
+<button class="primary" id="runTranscription">Transcribe</button>
+<div id="transcribeProgress" class="progress hidden"><i></i></div>
+<div style="height:10px"></div>
+<div id="transcriptOutput" class="transcriptbox">No transcript yet.</div>
+<div class="row" style="margin-top:10px"><button class="secondary" id="copyTranscript">Copy transcript</button><button class="secondary" id="downloadTranscript">Download TXT</button></div>
+</section>
+
 <section class="modal" id="voiceModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>AI voice</h2>
@@ -541,6 +563,7 @@ var pending=[];
 var models=[];
 var imageModels=[];
 var speechModels=[];
+var transcriptionModels=[];
 var videoModels=[];
 var modelFilter="all";
 var busy=false;
@@ -789,6 +812,8 @@ var COMMANDS=[
   {name:"Research mode",hint:"Web + page reading",run:toggleResearch},
   {name:"Create image",hint:"Image studio",run:openImage},
   {name:"Create video",hint:"Video studio",run:openVideo},
+  {name:"AI voice",hint:"Text to speech",run:function(){openVoice("")}},
+  {name:"Transcribe audio",hint:"Speech to text",run:openTranscription},
   {name:"Compare models",hint:"Side by side",run:openCompare},
   {name:"Projects",hint:"Local workspaces",run:openProjects},
   {name:"Prompt library",hint:"Saved reusable prompts",run:openPromptLibrary},
@@ -1324,6 +1349,55 @@ async function toggleMic(){
 }
 
 
+
+async function loadTranscriptionModels(){
+  if(transcriptionModels.length)return transcriptionModels;
+  try{
+    var r=await fetch(BASE+"/models?output_modalities=transcription");
+    var j=await r.json();transcriptionModels=j.data||[]
+  }catch(e){transcriptionModels=[]}
+  return transcriptionModels
+}
+function fillTranscriptionModels(){
+  var s=q("#transcribeModel");s.innerHTML="";
+  transcriptionModels.forEach(function(m){var o=document.createElement("option");o.value=m.id;o.textContent=m.name||m.id;s.appendChild(o)});
+  if(!s.options.length){["openai/whisper-large-v3-turbo","openai/whisper-large-v3","openai/whisper-1"].forEach(function(id){var o=document.createElement("option");o.value=id;o.textContent=id;s.appendChild(o)})}
+}
+async function openTranscription(){
+  if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
+  openModal("#transcribeModal");q("#transcriptOutput").textContent="No transcript yet.";
+  await loadTranscriptionModels();fillTranscriptionModels()
+}
+async function advancedTranscribe(file){
+  if(!file)throw new Error("Choose an audio file first");
+  var type=file.type||"",format="webm",name=(file.name||"").toLowerCase();
+  if(type.indexOf("wav")>=0||name.endsWith(".wav"))format="wav";
+  else if(type.indexOf("mpeg")>=0||name.endsWith(".mp3"))format="mp3";
+  else if(name.endsWith(".flac"))format="flac";
+  else if(name.endsWith(".m4a"))format="m4a";
+  else if(type.indexOf("ogg")>=0||name.endsWith(".ogg"))format="ogg";
+  else if(name.endsWith(".aac"))format="aac";
+  var data=await readDataURL(file),b64=String(data).split(",")[1]||"";
+  var body={model:q("#transcribeModel").value,input_audio:{data:b64,format:format}};
+  var lang=q("#transcribeLanguage").value.trim();if(lang&&lang.toLowerCase()!=="auto")body.language=lang;
+  if(q("#transcribeTimestamps").checked){body.response_format="verbose_json";body.timestamp_granularities=["word"]}
+  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify(body)});
+  var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Transcription failed"));return j
+}
+async function runTranscription(){
+  var file=q("#transcribeFile").files&&q("#transcribeFile").files[0];if(!file)return toast("Choose an audio file");
+  q("#runTranscription").disabled=true;q("#transcribeProgress").classList.remove("hidden");q("#transcriptOutput").textContent="Transcribing…";
+  try{
+    var j=await advancedTranscribe(file),text=j.text||"";
+    if(Array.isArray(j.words)&&j.words.length){
+      text+="\n\n--- Word timestamps ---\n"+j.words.map(function(w){return "["+(w.start||0).toFixed(2)+"-"+(w.end||0).toFixed(2)+"] "+w.word}).join("\n")
+    }
+    q("#transcriptOutput").textContent=text||"(No text returned)";
+    if(j.usage&&j.usage.cost!=null)toast("Transcription cost "+money(j.usage.cost))
+  }catch(e){q("#transcriptOutput").textContent="Transcription failed: "+e.message}
+  q("#runTranscription").disabled=false;q("#transcribeProgress").classList.add("hidden")
+}
+
 async function loadSpeechModels(){
   if(speechModels.length)return;
   try{
@@ -1735,6 +1809,8 @@ q("#installSide").onclick=async function(){
 };
 q("#imageSide").onclick=q("#imageBtn").onclick=openImage;
 q("#videoSide").onclick=openVideo;
+q("#voiceSide").onclick=function(){openVoice("")};
+q("#transcribeSide").onclick=openTranscription;
 q("#shareSide").onclick=shareChat;
 q("#exportSide").onclick=exportChat;
 q("#backupSide").onclick=backupChat;
@@ -1795,6 +1871,9 @@ q("#videoReferenceInput").onchange=async function(e){
   var f=e.target.files&&e.target.files[0];videoReferenceData=f?await readDataURL(f):"";q("#videoReferenceName").textContent=f?("Reference: "+f.name):"Optional style/content reference."
 };
 q("#generateImage").onclick=generateImage;
+q("#runTranscription").onclick=runTranscription;
+q("#copyTranscript").onclick=function(){navigator.clipboard.writeText(q("#transcriptOutput").textContent||"").then(function(){toast("Transcript copied")})};
+q("#downloadTranscript").onclick=function(){downloadCode(q("#transcriptOutput").textContent||"","txt")};
 q("#generateVoice").onclick=generateVoice;
 q("#voiceModel").onchange=function(){q("#voiceName").value=defaultVoiceFor(q("#voiceModel").value)};
 q("#generateVideo").onclick=generateVideo;
