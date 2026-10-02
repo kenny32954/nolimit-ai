@@ -41,6 +41,11 @@ jobs:
           test -s /tmp/qb-uns.png
           test -s /tmp/qb-sel.png
 
+      - name: Run standalone offline core tests
+        run: |
+          gcc -std=c11 -Wall -Wextra -Werror             cg50/native/tests/offline_test.c             cg50/native/src/offline.c             -Icg50/native/src -lm             -o /tmp/qb_offline_test
+          /tmp/qb_offline_test
+
       - name: Check native C syntax
         run: |
           gcc -std=c11 -Wall -Wextra -Werror -fsyntax-only \
@@ -51,5 +56,6 @@ jobs:
             cg50/native/src/editor.c \
             cg50/native/src/picker.c \
             cg50/native/src/reference.c \
+            cg50/native/src/offline.c \
             cg50/native/src/base64.c \
             cg50/native/src/transport.c
