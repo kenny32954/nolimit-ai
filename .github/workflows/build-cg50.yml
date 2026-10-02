@@ -76,7 +76,7 @@ jobs:
           cp bridge/start_qbai.sh /tmp/QBAI-LIVE/bridge/
           cp bridge/LIVE_TEST_README.txt /tmp/QBAI-LIVE/
           cd /tmp
-          zip -9 -r QBAI-LIVE-PACK.zip QBAI-LIVE
+          python3 -m zipfile -c QBAI-LIVE-PACK.zip QBAI-LIVE
 
       - name: Upload calculator binary
         uses: actions/upload-artifact@v4
