@@ -56,8 +56,7 @@ jobs:
           set -e
           G3A_PATH="${{ steps.locate.outputs.path }}"
           mkdir -p release
-          base64 "$G3A_PATH" | tr -d '\n' > release/QBAI.g3a.b64
-          printf '\n' >> release/QBAI.g3a.b64
+          base64 "$G3A_PATH" > release/QBAI.g3a.b64
           sha256sum "$G3A_PATH" | awk '{print $1}' > release/QBAI.g3a.sha256
           cp "$G3A_PATH" /tmp/QBAI.g3a
 
