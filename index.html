@@ -255,6 +255,10 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .artifactSource{margin-top:10px;border:1px solid rgba(255,255,255,.065);border-radius:12px;background:rgba(255,255,255,.02);overflow:hidden}.artifactSource summary{padding:10px 12px;cursor:pointer;color:#aaa;font-size:12px}.artifactSource textarea{display:block;width:100%;min-height:220px;max-height:38vh;resize:vertical;border:0;border-top:1px solid rgba(255,255,255,.05);outline:0;background:#0c0c0e;color:#ddd;padding:12px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
 
+
+.lightbox{position:fixed;inset:0;z-index:140;display:none;background:rgba(0,0,0,.88);backdrop-filter:blur(16px);padding:62px 20px 68px}.lightbox.show{display:flex;flex-direction:column}.lightboxStage{flex:1;min-height:0;display:grid;place-items:center;overflow:auto}.lightboxStage img{max-width:96%;max-height:96%;object-fit:contain;border-radius:12px;box-shadow:0 25px 90px #0008;cursor:zoom-in;transition:max-width .2s,max-height .2s}.lightboxStage img.zoom{max-width:none;max-height:none;cursor:zoom-out}.lightboxClose{position:absolute;right:18px;top:18px;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.09);color:white;font-size:18px}.lightboxActions{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:7px;padding:6px;border-radius:12px;background:rgba(25,25,28,.88);border:1px solid rgba(255,255,255,.08)}.lightboxActions button{height:34px;border-radius:9px;padding:0 11px;color:#ddd}.lightboxActions button:hover{background:rgba(255,255,255,.08)}
+.userpreview,.generated,.imgresult{cursor:zoom-in}
+
 </style>
 </head>
 <body>
@@ -343,6 +347,11 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 </main>
 </div>
 
+<div class="lightbox" id="lightbox">
+<button class="lightboxClose" id="lightboxClose">✕</button>
+<div class="lightboxStage"><img id="lightboxImage" alt="Preview"></div>
+<div class="lightboxActions"><button id="lightboxOpen">Open original</button><button id="lightboxCopy">Copy image URL</button></div>
+</div>
 <div class="selectionToolbar" id="selectionToolbar">
 <button id="selCopy">Copy</button>
 <button id="selQuote">Quote</button>
@@ -737,6 +746,7 @@ var videoReferenceData="";
 var renderTimer=null;
 var draftTimer=null;
 var selectedText="";
+var lightboxSrc="";
 var commandActiveIndex=0;
 function scheduleRender(){
   if(renderTimer)return;
@@ -1057,7 +1067,7 @@ function renderFiles(parent,names,images){
   }
   if(images&&images.length){
     var previews=document.createElement("div");previews.className="userpreviews";
-    images.slice(0,8).forEach(function(src){var im=document.createElement("img");im.className="userpreview";im.src=src;im.alt="Attached image";previews.appendChild(im)});
+    images.slice(0,8).forEach(function(src){var im=document.createElement("img");im.className="userpreview";im.src=src;im.alt="Attached image";im.onclick=function(){openLightbox(src)};previews.appendChild(im)});
     parent.appendChild(previews)
   }
 }
@@ -1104,7 +1114,7 @@ function renderChat(){
         var a=document.createElement("div");a.className="assistant"+(m.error?" error":"");a.dataset.msgIndex=idx;
         if(m.reasoning){var rb=document.createElement("div");rb.className="reasonbox";rb.textContent=m.reasoning;a.appendChild(rb)}
         var t=document.createElement("div");t.className="md";t.innerHTML=renderMarkdown(m.content||"");a.appendChild(t);
-        if(m.images&&m.images.length)m.images.forEach(function(src){var im=document.createElement("img");im.className="generated";im.src=src;a.appendChild(im)});
+        if(m.images&&m.images.length)m.images.forEach(function(src){var im=document.createElement("img");im.className="generated";im.src=src;im.onclick=function(){openLightbox(src)};a.appendChild(im)});
         renderCitations(a,m.annotations);
         var tools=document.createElement("div");tools.className="msgtools";
         var cp=document.createElement("button");cp.textContent="Copy";cp.onclick=function(){navigator.clipboard.writeText(m.content||"").then(function(){toast("Copied")})};
@@ -1218,6 +1228,10 @@ function openBookmarks(){
 }
 
 
+function openLightbox(src){
+  if(!src)return;lightboxSrc=src;q("#lightboxImage").src=src;q("#lightboxImage").classList.remove("zoom");q("#lightbox").classList.add("show")
+}
+function closeLightbox(){q("#lightbox").classList.remove("show");q("#lightboxImage").classList.remove("zoom");lightboxSrc=""}
 function hideSelectionToolbar(){q("#selectionToolbar").classList.remove("show");selectedText=""}
 function updateSelectionToolbar(){
   var sel=window.getSelection&&window.getSelection();if(!sel||sel.isCollapsed)return hideSelectionToolbar();
@@ -1874,7 +1888,7 @@ async function generateImage(){
       return d.url||""
     }).filter(Boolean);
     if(!outputs.length)throw new Error("No image was returned");
-    outputs.forEach(function(src){var img=document.createElement("img");img.src=src;img.className="imgresult";q("#imageOutput").appendChild(img)});
+    outputs.forEach(function(src){var img=document.createElement("img");img.src=src;img.className="imgresult";img.onclick=function(){openLightbox(src)};q("#imageOutput").appendChild(img)});
     var meta=document.createElement("div");meta.className="smallnote";meta.textContent=(j.usage&&j.usage.cost!=null?("Cost "+money(j.usage.cost)+" · "):"")+outputs.length+" image"+(outputs.length===1?"":"s");q("#imageOutput").appendChild(meta);
     var add=document.createElement("button");add.className="secondary";add.style.marginTop="8px";add.textContent="Add to current chat";add.onclick=async function(){var c=ensure(),refs=[];for(var oi=0;oi<outputs.length;oi++){if(String(outputs[oi]).indexOf("data:")===0){var mid=await putMedia(outputs[oi],"generated-image-"+(oi+1),"image");if(mid)refs.push({name:"generated-image-"+(oi+1),mediaId:mid})}}c.messages.push({role:"assistant",created:Date.now(),content:(imageReferenceData?"Edited/generated image: ":"Generated image: ")+prompt,model:q("#imageModel").value,images:outputs,imageRefs:refs});c.updated=Date.now();save();closeModals();render()};q("#imageOutput").appendChild(add)
   }catch(e){q("#imageOutput").innerHTML='<div class="notice">'+escapeHTML(e.message)+'</div>'}
@@ -2737,6 +2751,11 @@ q("#customAccent").oninput=function(){settings.customAccent=this.value;settings.
 q("#densitySelect").onchange=function(){settings.density=this.value;save();applyAppearance()};
 q("#contentWidth").onchange=function(){settings.contentWidth=Number(this.value)||860;save();applyAppearance()};
 q("#chatFontSize").onchange=function(){settings.chatFontSize=Number(this.value)||17;save();applyAppearance()};
+q("#lightboxClose").onclick=closeLightbox;
+q("#lightbox").onclick=function(e){if(e.target===q("#lightbox")||e.target===q(".lightboxStage"))closeLightbox()};
+q("#lightboxImage").onclick=function(){this.classList.toggle("zoom")};
+q("#lightboxOpen").onclick=function(){if(lightboxSrc)window.open(lightboxSrc,"_blank","noopener")};
+q("#lightboxCopy").onclick=function(){if(!lightboxSrc)return;if(lightboxSrc.indexOf("data:")===0)return toast("This image is stored locally, so it has no public URL");navigator.clipboard.writeText(lightboxSrc).then(function(){toast("Image URL copied")})};
 q("#prompt").addEventListener("input",function(){resizePrompt();saveDraftSoon()});
 q("#chat").addEventListener("mouseup",function(){setTimeout(updateSelectionToolbar,0)});
 q("#chat").addEventListener("touchend",function(){setTimeout(updateSelectionToolbar,120)},{passive:true});
@@ -2762,7 +2781,7 @@ composer.addEventListener("drop",function(e){var fs=e.dataTransfer&&e.dataTransf
 
 document.addEventListener("keydown",function(e){
   var mod=e.ctrlKey||e.metaKey;
-  if(e.key==="Escape"){closeModals();closeSide()}
+  if(e.key==="Escape"){closeLightbox();closeModals();closeSide()}
   if(mod&&e.key.toLowerCase()==="k"){e.preventDefault();loadModels()}
   if(mod&&e.key.toLowerCase()==="p"){e.preventDefault();openCommandPalette()}
   if(mod&&e.shiftKey&&e.key.toLowerCase()==="f"){e.preventDefault();openGlobalSearch()}
