@@ -530,9 +530,16 @@ html[data-message-motion="off"] .assistant,html[data-message-motion="off"] .user
 @keyframes msgSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes msgFade{from{opacity:0}to{opacity:1}}@keyframes msgPop{from{opacity:0;transform:scale(.985) translateY(5px)}to{opacity:1;transform:none}}
 
 @media(max-width:760px){.lookPresetGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.advancedFxGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gradientBuilder{grid-template-columns:repeat(2,minmax(0,1fr))}.gradientBuilder>.reactiveToggle{grid-column:1/-1}}@media(max-width:480px){.lookPresetGrid,.advancedFxGrid{grid-template-columns:1fr}}
+
+/* v3.7 local wallpapers */
+.wallpaperFX{display:none;position:fixed;inset:-32px;z-index:-4;pointer-events:none;background-position:center;background-repeat:no-repeat;background-size:cover;opacity:var(--wallpaper-opacity,.32);filter:blur(var(--wallpaper-blur,0px)) saturate(1.08);transform:scale(1.025);transition:opacity .25s ease,filter .25s ease}
+html[data-wallpaper="true"] .wallpaperFX{display:block}
+.wallpaperBuilder{display:grid;grid-template-columns:minmax(150px,1fr) auto auto auto minmax(120px,1fr) minmax(120px,1fr) 110px;gap:8px;align-items:end;margin-top:10px;padding:10px;border:1px solid rgba(255,255,255,.055);border-radius:13px;background:rgba(255,255,255,.018)}.wallpaperInfo{align-self:center;display:grid}.wallpaperInfo b{font-size:10px}.wallpaperInfo span{font-size:8px;color:var(--muted);margin-top:2px}.wallpaperBuilder .field{margin:0}.wallpaperBuilder input[type="range"]{height:38px;padding:0!important;accent-color:var(--accent)}.wallpaperBuilder>.secondary{height:38px;align-self:end}
+@media(max-width:900px){.wallpaperBuilder{grid-template-columns:repeat(2,minmax(0,1fr))}.wallpaperInfo{grid-column:1/-1}}@media(max-width:480px){.wallpaperBuilder{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+<div class="wallpaperFX" id="wallpaperFX" aria-hidden="true"></div>
 <div class="ambientFX" id="ambientFX" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
 <div class="customGradientFX" aria-hidden="true"></div>
 <div class="scanlineFX" aria-hidden="true"></div>
@@ -686,7 +693,7 @@ html[data-message-motion="off"] .assistant,html[data-message-motion="off"] .user
 <h3>Workspace</h3>
 <ul><li>The sidebar is now organized into collapsible AI, Workspace, Create, Chat, and App drawers that remember your layout locally.</li><li>High-frequency AI and Workspace drawers stay open by default, while lower-frequency tool groups start collapsed to reduce visual noise.</li><li>Conversation branches, tasks, snapshots, backups, archives, trash, global search, and encrypted workspace exports remain available.</li></ul>
 <h3>Interface</h3>
-<ul><li>Added six whole-look presets—Quantum, Neon Grid, Deep Space, Ice Glass, Matrix Terminal, and Sunset Wave—that restyle the entire app in one click.</li><li>New visual controls cover Glass/Frosted/Solid/Holographic surfaces, Slide/Fade/Pop message motion, scanlines, vignette, and a two-color custom gradient overlay with angle and strength controls.</li><li>Saved/exported themes now carry the complete visual configuration, including animated backgrounds, motion, glass, reactive glow, surfaces, message effects, gradient settings, and overlays.</li></ul>
+<ul><li>Added six whole-look presets—Quantum, Neon Grid, Deep Space, Ice Glass, Matrix Terminal, and Sunset Wave—that restyle the entire app in one click.</li><li>Visual controls now cover Glass/Frosted/Solid/Holographic surfaces, message entrance motion, scanlines, vignette, custom gradients, and locally stored custom wallpaper images with opacity, blur, and fit controls.</li><li>Theme sharing remains safe and non-executable; wallpapers stay local to the browser and are intentionally excluded from exported theme files.</li></ul>
 </div>
 </section>
 
@@ -799,6 +806,16 @@ html[data-message-motion="off"] .assistant,html[data-message-motion="off"] .user
     <label>Color B<input id="gradientB" type="color" value="#0891b2"></label>
     <div class="field"><label>Angle</label><input id="gradientAngle" type="range" min="0" max="360" step="5"></div>
     <div class="field"><label>Strength</label><input id="gradientStrength" type="range" min="0" max="100" step="5"></div>
+  </div>
+  <div class="wallpaperBuilder">
+    <div class="wallpaperInfo"><b>Custom wallpaper</b><span>Stored only in this browser. Max 1.5 MB.</span></div>
+    <button class="secondary" id="chooseWallpaper" type="button">Choose image</button>
+    <button class="secondary" id="clearWallpaper" type="button">Clear</button>
+    <input id="wallpaperFile" type="file" accept="image/*" hidden>
+    <label class="reactiveToggle"><input id="wallpaperEnabled" type="checkbox"><span>Enabled</span></label>
+    <div class="field"><label>Opacity</label><input id="wallpaperOpacity" type="range" min="0" max="100" step="5"></div>
+    <div class="field"><label>Blur</label><input id="wallpaperBlur" type="range" min="0" max="30" step="1"></div>
+    <div class="field"><label>Fit</label><select id="wallpaperFit"><option value="cover">Cover</option><option value="contain">Contain</option></select></div>
   </div>
 </div>
 <div class="customThemeBuilder">
@@ -1259,7 +1276,7 @@ html[data-message-motion="off"] .assistant,html[data-message-motion="off"] .user
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="3.6.0";
+var APP_VERSION="3.7.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1337,6 +1354,11 @@ var settings=Object.assign({
   gradientB:"#0891b2",
   gradientAngle:135,
   gradientStrength:35,
+  wallpaperEnabled:false,
+  wallpaperData:"",
+  wallpaperOpacity:32,
+  wallpaperBlur:0,
+  wallpaperFit:"cover",
   customTheme:{bg:"#151517",bg0:"#0f0f11",panel:"#202024",panel2:"#27272c",text:"#f5f3ef",muted:"#99959b",accent:"#e07b5f"},
   customThemes:[]
 },safeJSON(localStorage.getItem(SETSTORE),{}));
@@ -1448,11 +1470,15 @@ function applyAppearance(){
   root.dataset.scanlines=settings.scanlines?"true":"false";
   root.dataset.vignette=settings.vignette===false?"false":"true";
   root.dataset.gradient=settings.gradientEnabled?"true":"false";
+  root.dataset.wallpaper=settings.wallpaperEnabled&&settings.wallpaperData?"true":"false";
   root.style.setProperty("--fx-strength",Math.max(0,Math.min(1,(Number(settings.backgroundStrength)||0)/100)));
   root.style.setProperty("--gradient-a",validHex(settings.gradientA)?settings.gradientA:"#7c3aed");
   root.style.setProperty("--gradient-b",validHex(settings.gradientB)?settings.gradientB:"#0891b2");
   root.style.setProperty("--gradient-angle",Math.max(0,Math.min(360,Number(settings.gradientAngle)||135))+"deg");
   root.style.setProperty("--gradient-strength",Math.max(0,Math.min(1,(Number(settings.gradientStrength)||0)/100)));
+  root.style.setProperty("--wallpaper-opacity",Math.max(0,Math.min(1,(Number(settings.wallpaperOpacity)||0)/100)));
+  root.style.setProperty("--wallpaper-blur",Math.max(0,Math.min(30,Number(settings.wallpaperBlur)||0))+"px");
+  var wp=q("#wallpaperFX");if(wp){wp.style.backgroundImage=settings.wallpaperData?'url("'+String(settings.wallpaperData).replace(/"/g,"%22")+'")':"none";wp.style.backgroundSize=settings.wallpaperFit==="contain"?"contain":"cover"}
   root.style.setProperty("--glass-blur",(Math.max(0,Math.min(100,Number(settings.glassStrength)==null?70:Number(settings.glassStrength)))*0.24).toFixed(1)+"px");
   root.style.setProperty("--content-max",Math.max(680,Math.min(1400,Number(settings.contentWidth)||860))+"px");
   root.style.setProperty("--chat-font",Math.max(14,Math.min(24,Number(settings.chatFontSize)||17))+"px");
@@ -2370,6 +2396,10 @@ function syncAppearanceStudio(){
   if(q("#gradientB"))q("#gradientB").value=validHex(settings.gradientB)?settings.gradientB:"#0891b2";
   if(q("#gradientAngle"))q("#gradientAngle").value=String(Math.max(0,Math.min(360,Number(settings.gradientAngle)||135)));
   if(q("#gradientStrength"))q("#gradientStrength").value=String(Math.max(0,Math.min(100,Number(settings.gradientStrength)||35)));
+  if(q("#wallpaperEnabled"))q("#wallpaperEnabled").checked=!!settings.wallpaperEnabled;
+  if(q("#wallpaperOpacity"))q("#wallpaperOpacity").value=String(Math.max(0,Math.min(100,Number(settings.wallpaperOpacity)||32)));
+  if(q("#wallpaperBlur"))q("#wallpaperBlur").value=String(Math.max(0,Math.min(30,Number(settings.wallpaperBlur)||0)));
+  if(q("#wallpaperFit"))q("#wallpaperFit").value=settings.wallpaperFit==="contain"?"contain":"cover";
   renderSavedThemes()
 }
 function applyLookPreset(name){
@@ -2404,6 +2434,13 @@ function setupAppearanceStudio(){
   q("#gradientB").oninput=function(){settings.gradientB=this.value;save();applyAppearance()};
   q("#gradientAngle").oninput=function(){settings.gradientAngle=Math.max(0,Math.min(360,Number(this.value)||0));save();applyAppearance()};
   q("#gradientStrength").oninput=function(){settings.gradientStrength=Math.max(0,Math.min(100,Number(this.value)||0));save();applyAppearance()};
+  q("#wallpaperEnabled").onchange=function(){settings.wallpaperEnabled=this.checked;save();applyAppearance()};
+  q("#wallpaperOpacity").oninput=function(){settings.wallpaperOpacity=Math.max(0,Math.min(100,Number(this.value)||0));save();applyAppearance()};
+  q("#wallpaperBlur").oninput=function(){settings.wallpaperBlur=Math.max(0,Math.min(30,Number(this.value)||0));save();applyAppearance()};
+  q("#wallpaperFit").onchange=function(){settings.wallpaperFit=this.value==="contain"?"contain":"cover";save();applyAppearance()};
+  q("#chooseWallpaper").onclick=function(){q("#wallpaperFile").click()};
+  q("#clearWallpaper").onclick=function(){settings.wallpaperData="";settings.wallpaperEnabled=false;q("#wallpaperEnabled").checked=false;save();applyAppearance();toast("Wallpaper cleared")};
+  q("#wallpaperFile").onchange=function(e){var f=e.target.files&&e.target.files[0];e.target.value="";if(!f)return;if(!String(f.type||"").startsWith("image/"))return toast("Choose an image file");if(f.size>1572864)return toast("Wallpaper must be 1.5 MB or smaller");var rd=new FileReader();rd.onload=function(){settings.wallpaperData=String(rd.result||"");settings.wallpaperEnabled=true;save();applyAppearance();syncAppearanceStudio();toast("Wallpaper applied")};rd.onerror=function(){toast("Could not read wallpaper")};rd.readAsDataURL(f)};
   qa("[data-look-preset]").forEach(function(b){b.onclick=function(){applyLookPreset(b.getAttribute("data-look-preset"))}});
   ["customBg","customBg0","customPanel","customPanel2","customText","customMuted","customThemeAccent"].forEach(function(id){q("#"+id).oninput=function(){applyThemeFromBuilder(false)}});
   q("#applyCustomTheme").onclick=function(){applyThemeFromBuilder(true)};
@@ -2644,6 +2681,7 @@ function openSettings(){
   q("#scanlines").checked=!!settings.scanlines;q("#vignette").checked=settings.vignette!==false;q("#gradientEnabled").checked=!!settings.gradientEnabled;
   q("#gradientA").value=validHex(settings.gradientA)?settings.gradientA:"#7c3aed";q("#gradientB").value=validHex(settings.gradientB)?settings.gradientB:"#0891b2";
   q("#gradientAngle").value=String(Math.max(0,Math.min(360,Number(settings.gradientAngle)||135)));q("#gradientStrength").value=String(Math.max(0,Math.min(100,Number(settings.gradientStrength)||35)));
+  q("#wallpaperEnabled").checked=!!settings.wallpaperEnabled;q("#wallpaperOpacity").value=String(Math.max(0,Math.min(100,Number(settings.wallpaperOpacity)||32)));q("#wallpaperBlur").value=String(Math.max(0,Math.min(30,Number(settings.wallpaperBlur)||0)));q("#wallpaperFit").value=settings.wallpaperFit==="contain"?"contain":"cover";
   q("#densitySelect").value=settings.density||"cozy";
   q("#contentWidth").value=String(settings.contentWidth||860);
   q("#chatFontSize").value=String(settings.chatFontSize||17);
