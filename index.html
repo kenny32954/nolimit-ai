@@ -502,10 +502,41 @@ html[data-reactive-glow="false"] .ambientFX b{display:none}
 .side,.top,.composer,.toolstrip,.modal,.toast,.selectionToolbar{backdrop-filter:blur(var(--glass-blur)) saturate(1.16)!important}
 .reactiveToggle{display:flex;align-items:center;gap:7px;align-self:end;min-height:38px;padding:0 10px;border:1px solid rgba(255,255,255,.065);border-radius:11px;background:rgba(255,255,255,.022);font-size:9px;color:#8a868e}.reactiveToggle input{accent-color:var(--accent)}
 @media(hover:none),(pointer:coarse){html[data-reactive-glow="true"] .ambientFX b{display:none}}
+
+/* v3.6 whole-look presets + advanced FX */
+.customGradientFX,.scanlineFX,.vignetteFX{position:fixed;inset:0;z-index:-1;pointer-events:none}
+.customGradientFX{display:none;background:linear-gradient(var(--gradient-angle),var(--gradient-a),transparent 52%,var(--gradient-b));opacity:var(--gradient-strength);mix-blend-mode:screen;transition:opacity .25s ease}
+html[data-gradient="true"] .customGradientFX{display:block}
+.scanlineFX{display:none;z-index:50;background:repeating-linear-gradient(to bottom,transparent 0 2px,rgba(255,255,255,.018) 3px,transparent 4px);mix-blend-mode:overlay;opacity:.42}
+html[data-scanlines="true"] .scanlineFX{display:block}
+.vignetteFX{display:none;z-index:49;background:radial-gradient(ellipse at center,transparent 52%,rgba(0,0,0,.18) 78%,rgba(0,0,0,.46) 100%)}
+html[data-vignette="true"] .vignetteFX{display:block}
+
+.visualPresetLab{margin:0 0 16px;padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:17px;background:linear-gradient(145deg,rgba(255,255,255,.03),rgba(255,255,255,.012));box-shadow:inset 0 1px rgba(255,255,255,.025)}
+.lookPresetGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.lookPreset{min-height:66px;padding:11px;border-radius:13px;border:1px solid rgba(255,255,255,.075);text-align:left;overflow:hidden;position:relative;background:rgba(255,255,255,.025)}.lookPreset:before{content:"";position:absolute;inset:-30px auto auto -20px;width:100px;height:100px;border-radius:50%;filter:blur(24px);opacity:.28}.lookPreset:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.14);box-shadow:0 10px 28px rgba(0,0,0,.17)}.lookPreset b,.lookPreset span{position:relative;display:block}.lookPreset b{font-size:11px;color:#eee}.lookPreset span{margin-top:5px;font-size:8px;color:#88838e}.quantumLook:before{background:#8b5cf6}.neonLook:before{background:#22d3ee}.spaceLook:before{background:#6d46c7}.iceLook:before{background:#7dd3fc}.matrixLook:before{background:#40d875}.sunsetLook:before{background:#fb7185}
+.advancedFxGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.advancedFxGrid .field{margin:0}.advancedFxGrid .reactiveToggle{align-self:end}
+.gradientBuilder{display:grid;grid-template-columns:auto 92px 92px minmax(130px,1fr) minmax(130px,1fr);gap:8px;align-items:end;margin-top:10px;padding:10px;border-radius:13px;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.018)}.gradientBuilder>label:not(.reactiveToggle){display:grid;gap:4px;font-size:8px;color:#77737b}.gradientBuilder input[type="color"]{width:100%;height:38px;padding:3px!important;border-radius:9px!important}.gradientBuilder .field{margin:0}.gradientBuilder input[type="range"]{height:38px;padding:0!important;accent-color:var(--accent)}
+
+html[data-surface-style="solid"] .side,html[data-surface-style="solid"] .top,html[data-surface-style="solid"] .composer,html[data-surface-style="solid"] .toolstrip,html[data-surface-style="solid"] .modal,html[data-surface-style="solid"] .toast{backdrop-filter:none!important;background:var(--panel)!important}
+html[data-surface-style="frosted"] .side,html[data-surface-style="frosted"] .top,html[data-surface-style="frosted"] .composer,html[data-surface-style="frosted"] .toolstrip,html[data-surface-style="frosted"] .modal{backdrop-filter:blur(calc(var(--glass-blur) * 1.35)) saturate(1.3)!important;background:color-mix(in srgb,var(--panel) 74%,transparent)!important}
+html[data-surface-style="holographic"] .composer,html[data-surface-style="holographic"] .top,html[data-surface-style="holographic"] .modal{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 7%,var(--panel)),color-mix(in srgb,var(--accent2) 5%,var(--panel)),var(--panel))!important;border-color:color-mix(in srgb,var(--accent) 24%,rgba(255,255,255,.08))!important;box-shadow:inset 0 1px rgba(255,255,255,.07),0 18px 58px rgba(0,0,0,.2),0 0 26px color-mix(in srgb,var(--accentGlow) 40%,transparent)!important}
+html[data-surface-style="holographic"] .composer:before{height:2px;opacity:.95;animation:holoShift calc(5s * var(--motion-speed)) linear infinite;background:linear-gradient(90deg,transparent,#67e8f9,#c084fc,#f9a8d4,#fde68a,transparent);background-size:200% 100%}
+@keyframes holoShift{to{background-position:200% 0}}
+
+html[data-message-motion="slide"] .assistant,html[data-message-motion="slide"] .user{animation:msgSlide .24s ease both}
+html[data-message-motion="fade"] .assistant,html[data-message-motion="fade"] .user{animation:msgFade .28s ease both}
+html[data-message-motion="pop"] .assistant,html[data-message-motion="pop"] .user{animation:msgPop .22s cubic-bezier(.2,.9,.25,1.2) both}
+html[data-message-motion="off"] .assistant,html[data-message-motion="off"] .user{animation:none!important}
+@keyframes msgSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes msgFade{from{opacity:0}to{opacity:1}}@keyframes msgPop{from{opacity:0;transform:scale(.985) translateY(5px)}to{opacity:1;transform:none}}
+
+@media(max-width:760px){.lookPresetGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.advancedFxGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gradientBuilder{grid-template-columns:repeat(2,minmax(0,1fr))}.gradientBuilder>.reactiveToggle{grid-column:1/-1}}@media(max-width:480px){.lookPresetGrid,.advancedFxGrid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="ambientFX" id="ambientFX" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+<div class="customGradientFX" aria-hidden="true"></div>
+<div class="scanlineFX" aria-hidden="true"></div>
+<div class="vignetteFX" aria-hidden="true"></div>
 <div class="app">
 <aside class="side" id="side">
 <div class="shead"><div class="brand"><div class="brandOrb">Q</div><div class="brandText"><strong>Quantum Breaks</strong><small>AI workspace</small></div></div><div class="sideHeadActions"><button class="icon railToggle" id="sideRailToggle" title="Toggle compact sidebar">↤</button><button class="icon" id="closeSide">✕</button></div></div>
@@ -744,6 +775,30 @@ html[data-reactive-glow="false"] .ambientFX b{display:none}
     <div class="field" style="flex:1;min-width:150px"><label>Background strength</label><input id="backgroundStrength" type="range" min="0" max="100" step="5"></div>
     <div class="field" style="flex:1;min-width:150px"><label>Glass strength</label><input id="glassStrength" type="range" min="0" max="100" step="5"></div>
     <label class="reactiveToggle"><input id="reactiveGlow" type="checkbox"><span>Reactive cursor glow</span></label>
+  </div>
+</div>
+<div class="visualPresetLab">
+  <div class="appearanceLabel">Whole-look presets</div>
+  <div class="lookPresetGrid">
+    <button type="button" class="lookPreset quantumLook" data-look-preset="quantum"><b>Quantum</b><span>Nebula · Aurora · Glass</span></button>
+    <button type="button" class="lookPreset neonLook" data-look-preset="neon"><b>Neon Grid</b><span>Cyber · Grid · Holographic</span></button>
+    <button type="button" class="lookPreset spaceLook" data-look-preset="space"><b>Deep Space</b><span>Void · Cosmic · Glass</span></button>
+    <button type="button" class="lookPreset iceLook" data-look-preset="ice"><b>Ice Glass</b><span>Frost · Aurora · Frosted</span></button>
+    <button type="button" class="lookPreset matrixLook" data-look-preset="matrix"><b>Matrix Terminal</b><span>Matrix · Grid · Scanlines</span></button>
+    <button type="button" class="lookPreset sunsetLook" data-look-preset="sunset"><b>Sunset Wave</b><span>Ember · Waves · Glow</span></button>
+  </div>
+  <div class="advancedFxGrid">
+    <div class="field"><label>Surface style</label><select id="surfaceStyle"><option value="glass">Glass</option><option value="frosted">Frosted</option><option value="solid">Solid</option><option value="holographic">Holographic</option></select></div>
+    <div class="field"><label>Message animation</label><select id="messageMotion"><option value="slide">Slide</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="off">Off</option></select></div>
+    <label class="reactiveToggle"><input id="scanlines" type="checkbox"><span>Scanlines</span></label>
+    <label class="reactiveToggle"><input id="vignette" type="checkbox"><span>Vignette</span></label>
+  </div>
+  <div class="gradientBuilder">
+    <label class="reactiveToggle"><input id="gradientEnabled" type="checkbox"><span>Custom gradient overlay</span></label>
+    <label>Color A<input id="gradientA" type="color" value="#7c3aed"></label>
+    <label>Color B<input id="gradientB" type="color" value="#0891b2"></label>
+    <div class="field"><label>Angle</label><input id="gradientAngle" type="range" min="0" max="360" step="5"></div>
+    <div class="field"><label>Strength</label><input id="gradientStrength" type="range" min="0" max="100" step="5"></div>
   </div>
 </div>
 <div class="customThemeBuilder">
@@ -1204,7 +1259,7 @@ html[data-reactive-glow="false"] .ambientFX b{display:none}
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="3.5.0";
+var APP_VERSION="3.6.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1273,6 +1328,15 @@ var settings=Object.assign({
   motionStyle:"calm",
   glassStrength:70,
   reactiveGlow:true,
+  surfaceStyle:"glass",
+  messageMotion:"slide",
+  scanlines:false,
+  vignette:true,
+  gradientEnabled:false,
+  gradientA:"#7c3aed",
+  gradientB:"#0891b2",
+  gradientAngle:135,
+  gradientStrength:35,
   customTheme:{bg:"#151517",bg0:"#0f0f11",panel:"#202024",panel2:"#27272c",text:"#f5f3ef",muted:"#99959b",accent:"#e07b5f"},
   customThemes:[]
 },safeJSON(localStorage.getItem(SETSTORE),{}));
@@ -1379,7 +1443,16 @@ function applyAppearance(){
   root.dataset.bgEffect=settings.backgroundEffect||"aurora";
   root.dataset.motion=settings.motionStyle||"calm";
   root.dataset.reactiveGlow=settings.reactiveGlow===false?"false":"true";
+  root.dataset.surfaceStyle=settings.surfaceStyle||"glass";
+  root.dataset.messageMotion=settings.messageMotion||"slide";
+  root.dataset.scanlines=settings.scanlines?"true":"false";
+  root.dataset.vignette=settings.vignette===false?"false":"true";
+  root.dataset.gradient=settings.gradientEnabled?"true":"false";
   root.style.setProperty("--fx-strength",Math.max(0,Math.min(1,(Number(settings.backgroundStrength)||0)/100)));
+  root.style.setProperty("--gradient-a",validHex(settings.gradientA)?settings.gradientA:"#7c3aed");
+  root.style.setProperty("--gradient-b",validHex(settings.gradientB)?settings.gradientB:"#0891b2");
+  root.style.setProperty("--gradient-angle",Math.max(0,Math.min(360,Number(settings.gradientAngle)||135))+"deg");
+  root.style.setProperty("--gradient-strength",Math.max(0,Math.min(1,(Number(settings.gradientStrength)||0)/100)));
   root.style.setProperty("--glass-blur",(Math.max(0,Math.min(100,Number(settings.glassStrength)==null?70:Number(settings.glassStrength)))*0.24).toFixed(1)+"px");
   root.style.setProperty("--content-max",Math.max(680,Math.min(1400,Number(settings.contentWidth)||860))+"px");
   root.style.setProperty("--chat-font",Math.max(14,Math.min(24,Number(settings.chatFontSize)||17))+"px");
