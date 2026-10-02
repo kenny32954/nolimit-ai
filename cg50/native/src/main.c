@@ -8,6 +8,7 @@
 
 #include "diagnostics.h"
 #include "editor.h"
+#include "offline.h"
 #include "picker.h"
 #include "reference.h"
 #include "transport.h"
@@ -321,7 +322,7 @@ static void draw_chat(app_state_t const *state)
                    state->waiting ? accent : green, text);
     }
     else {
-        draw_badge(DWIDTH - 78, 6, 66, "OFFLINE", line, muted);
+        draw_badge(DWIDTH - 96, 6, 84, "STANDALONE", line, muted);
     }
 
     dtext(10, 43, muted, "SUBJECT");
@@ -349,7 +350,7 @@ static void draw_chat(app_state_t const *state)
     else if(!state->prompt[0]) {
         dtext(12, 88, muted, "Press EXE to ask a question.");
         dtext(12, 107, muted, "F1 subject  F2 mode  OPTN level");
-        dtext(12, 126, muted, "College + advanced disciplines supported.");
+        dtext(12, 126, muted, "Standalone answers work with no cable.");
     }
 
     drect(0, DHEIGHT - 31, DWIDTH - 1, DHEIGHT - 1, panel);
@@ -423,12 +424,36 @@ static bool start_request(app_state_t *state)
 
     if(!state->prompt[0]) return false;
 
-    if(!state->bridge_ready) {
-        state->bridge_ready = qb_transport_probe();
-    }
+    state->answer[0] = '\0';
+    state->answer_len = 0;
+    state->scroll = 0;
+    recent_view = -1;
 
+    /*
+     * STANDALONE is the default. Live mode is used only when the user has
+     * explicitly linked a bridge through F5 diagnostics.
+     */
     if(!state->bridge_ready) {
-        snprintf(state->status, sizeof(state->status), "Bridge not found");
+        if(qb_offline_answer(
+            subjects[state->subject],
+            modes[state->mode],
+            levels[state->level],
+            state->prompt,
+            state->answer,
+            sizeof(state->answer)
+        )) {
+            state->answer_len = strlen(state->answer);
+            state->waiting = false;
+            save_history_turn(state);
+            snprintf(
+                state->status,
+                sizeof(state->status),
+                "Standalone Core - no connection required"
+            );
+            return true;
+        }
+
+        snprintf(state->status, sizeof(state->status), "Standalone Core could not answer");
         return false;
     }
 
@@ -449,11 +474,7 @@ static bool start_request(app_state_t *state)
     state->active_request_id = id;
     state->waiting = true;
     state->wait_ticks = 0;
-    state->answer[0] = '\0';
-    state->answer_len = 0;
-    state->scroll = 0;
-    recent_view = -1;
-    snprintf(state->status, sizeof(state->status), "Question sent");
+    snprintf(state->status, sizeof(state->status), "Live AI question sent");
     return true;
 }
 
