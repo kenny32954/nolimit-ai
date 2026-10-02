@@ -254,6 +254,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="projectsSide">Projects</button>
 <button class="sbtn" id="promptsSide">Prompt library</button>
 <button class="sbtn" id="scratchpadSide">Scratchpad</button>
+<button class="sbtn" id="globalSearchSide">Search everything</button>
 <button class="sbtn" id="findSide">Find in chat</button>
 <button class="sbtn" id="bookmarksSide">Bookmarks</button>
 <button class="sbtn" id="trashSide">Trash</button></div>
@@ -414,6 +415,14 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div id="trashList" class="searchresults"></div>
 <div style="height:12px"></div>
 <button class="danger" id="emptyTrash">Empty trash</button>
+</section>
+
+<section class="modal" id="globalSearchModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Search everything</h2>
+<div class="field"><input id="globalSearchInput" placeholder="Search chats, messages, projects, prompts, and profiles"></div>
+<div id="globalSearchResults" class="searchresults"></div>
+<div class="smallnote">Ctrl/Cmd+Shift+F opens global search.</div>
 </section>
 
 <section class="modal" id="findModal">
@@ -880,6 +889,39 @@ function renderChat(){
 }
 
 
+function globalSearch(){
+  var term=(q("#globalSearchInput").value||"").trim().toLowerCase(),box=q("#globalSearchResults");box.innerHTML="";
+  if(!term){box.innerHTML='<div class="notice">Type something to search across the entire local workspace.</div>';return}
+  var results=[];
+  chats.forEach(function(ch){
+    if(ch.trashedAt)return;
+    if((ch.title||"").toLowerCase().includes(term))results.push({type:"Chat",title:ch.title||"New chat",snippet:"Open conversation",run:function(){active=ch.id;save();closeModals();render();restoreDraft()}});
+    (ch.messages||[]).forEach(function(m,idx){
+      var content=String(m.content||"");if(content.toLowerCase().includes(term))results.push({type:m.role==="user"?"Your message":"AI message",title:ch.title||"Chat",snippet:content.replace(/\s+/g," ").slice(0,180),run:function(){jumpToMessage(ch.id,idx)}})
+    })
+  });
+  projects.forEach(function(p){
+    var hay=((p.name||"")+" "+(p.instructions||"")+" "+(p.knowledge||"")).toLowerCase();
+    if(hay.includes(term))results.push({type:"Project",title:p.name||"Untitled project",snippet:(p.instructions||p.knowledge||"").replace(/\s+/g," ").slice(0,180),run:function(){openProjects();q("#projectSelect").value=p.id;loadProjectFields(p.id)}})
+  });
+  savedPrompts.forEach(function(p){
+    if(((p.name||"")+" "+(p.body||"")).toLowerCase().includes(term))results.push({type:"Prompt",title:p.name||"Untitled prompt",snippet:(p.body||"").replace(/\s+/g," ").slice(0,180),run:function(){openPromptLibrary();editingPromptId=p.id;q("#promptName").value=p.name||"";q("#promptBody").value=p.body||""}})
+  });
+  profiles.forEach(function(p){
+    if((p.name||"").toLowerCase().includes(term))results.push({type:"AI profile",title:p.name||"Untitled profile",snippet:(p.settings&&p.settings.model)||"",run:function(){openProfiles()}})
+  });
+  if(!results.length){box.innerHTML='<div class="notice">No workspace results.</div>';return}
+  results.slice(0,160).forEach(function(r){
+    var b=document.createElement("button");b.className="searchresult";
+    var h=document.createElement("b");h.textContent=r.type+" · "+r.title;
+    var s=document.createElement("span");s.textContent=r.snippet||"";
+    b.appendChild(h);b.appendChild(s);b.onclick=function(){r.run()};box.appendChild(b)
+  })
+}
+function openGlobalSearch(){
+  q("#globalSearchInput").value="";openModal("#globalSearchModal");globalSearch();setTimeout(function(){q("#globalSearchInput").focus()},30)
+}
+
 function toggleContextPin(idx){
   var c=ensure(),m=c.messages[idx];if(!m)return;
   m.contextPinned=!m.contextPinned;c.updated=Date.now();save();render();toast(m.contextPinned?"Message pinned to context":"Context pin removed")
@@ -953,6 +995,7 @@ var COMMANDS=[
   {name:"Projects",hint:"Local workspaces",run:openProjects},
   {name:"Prompt library",hint:"Saved reusable prompts",run:openPromptLibrary},
   {name:"Scratchpad",hint:"Notes for this conversation",run:openScratchpad},
+  {name:"Search everything",hint:"Chats, projects, prompts, profiles",run:openGlobalSearch},
   {name:"Find in chat",hint:"Search current conversation",run:openFindInChat},
   {name:"Bookmarks",hint:"Saved messages",run:openBookmarks},
   {name:"Usage dashboard",hint:"OpenRouter key usage",run:openUsage},
@@ -1127,7 +1170,10 @@ function apiMessages(c){
     var visibleSet=new Set(history);
     var pinned=allHistory.filter(function(m){return m.contextPinned&&!visibleSet.has(m)&&!m.error});
     if(pinned.length)systemParts.push("Pinned conversation context kept outside the normal history window:\n"+pinned.map(function(m){return (m.role==="user"?"User":"Assistant")+": "+String(m.content||"")}).join("\n\n"));
-    if(systemParts.length&&out.length&&out[0].role==="system")out[0].content=systemParts.join("\n\n")
+    if(systemParts.length){
+      if(out.length&&out[0].role==="system")out[0].content=systemParts.join("\n\n");
+      else out.unshift({role:"system",content:systemParts.join("\n\n")})
+    }
   }
   history.forEach(function(m){
     if(m.error)return;
@@ -2122,6 +2168,7 @@ q("#usageSide").onclick=openUsage;
 q("#projectsSide").onclick=openProjects;
 q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
 q("#scratchpadSide").onclick=openScratchpad;
+q("#globalSearchSide").onclick=openGlobalSearch;
 q("#findSide").onclick=openFindInChat;
 q("#bookmarksSide").onclick=openBookmarks;
 q("#trashSide").onclick=openTrash;
@@ -2177,6 +2224,7 @@ q("#runDiagnostics").onclick=runDiagnostics;
 q("#copyDiagnostics").onclick=function(){navigator.clipboard.writeText(lastDiagReport||"No diagnostics run yet.").then(function(){toast("Diagnostics copied")})};
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
+q("#globalSearchInput").oninput=globalSearch;
 q("#findInput").oninput=function(){renderFindResults(false)};
 q("#promptSearch").oninput=renderPromptLibrary;
 q("#savePrompt").onclick=savePromptEntry;
@@ -2251,6 +2299,7 @@ document.addEventListener("keydown",function(e){
   if(e.key==="Escape"){closeModals();closeSide()}
   if(mod&&e.key.toLowerCase()==="k"){e.preventDefault();loadModels()}
   if(mod&&e.key.toLowerCase()==="p"){e.preventDefault();openCommandPalette()}
+  if(mod&&e.shiftKey&&e.key.toLowerCase()==="f"){e.preventDefault();openGlobalSearch()}
   if(mod&&e.key.toLowerCase()==="n"){e.preventDefault();newChat()}
   if(!mod&&!e.altKey&&e.key==="/"&&document.activeElement!==q("#prompt")&&document.activeElement&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();q("#prompt").focus();q("#prompt").value="/"}
 });
