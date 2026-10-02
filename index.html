@@ -536,6 +536,42 @@ html[data-message-motion="off"] .assistant,html[data-message-motion="off"] .user
 html[data-wallpaper="true"] .wallpaperFX{display:block}
 .wallpaperBuilder{display:grid;grid-template-columns:minmax(150px,1fr) auto auto auto minmax(120px,1fr) minmax(120px,1fr) 110px;gap:8px;align-items:end;margin-top:10px;padding:10px;border:1px solid rgba(255,255,255,.055);border-radius:13px;background:rgba(255,255,255,.018)}.wallpaperInfo{align-self:center;display:grid}.wallpaperInfo b{font-size:10px}.wallpaperInfo span{font-size:8px;color:var(--muted);margin-top:2px}.wallpaperBuilder .field{margin:0}.wallpaperBuilder input[type="range"]{height:38px;padding:0!important;accent-color:var(--accent)}.wallpaperBuilder>.secondary{height:38px;align-self:end}
 @media(max-width:900px){.wallpaperBuilder{grid-template-columns:repeat(2,minmax(0,1fr))}.wallpaperInfo{grid-column:1/-1}}@media(max-width:480px){.wallpaperBuilder{grid-template-columns:1fr}}
+
+/* v3.8 kinetic UI */
+.prismBg{background:conic-gradient(from 35deg,#8b5cf6,#22d3ee,#f472b6,#f59e0b,#8b5cf6)}
+.particlesBg{background:radial-gradient(circle at 16% 28%,#fff 0 1px,transparent 1.5px),radial-gradient(circle at 62% 34%,#91edf3 0 1px,transparent 1.5px),radial-gradient(circle at 82% 70%,#c1a7ff 0 1px,transparent 1.5px),radial-gradient(circle at 33% 78%,#fff8 0 1px,transparent 1.4px),#0b0c12;background-size:34px 34px,51px 51px,67px 67px,83px 83px}
+html[data-bg-effect="prism"] .ambientFX:before{content:"";position:absolute;inset:-45%;background:conic-gradient(from 0deg,color-mix(in srgb,var(--accent) 22%,transparent),rgba(34,211,238,.10),rgba(244,114,182,.10),rgba(245,158,11,.08),color-mix(in srgb,var(--accent) 22%,transparent));filter:blur(80px);animation:prismSpin calc(28s * var(--motion-speed)) linear infinite}
+html[data-bg-effect="prism"] .ambientFX:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 30%,rgba(0,0,0,.22))}
+@keyframes prismSpin{to{transform:rotate(360deg)}}
+html[data-bg-effect="particles"] .ambientFX{background-image:radial-gradient(circle,#ffffff88 0 1px,transparent 1.5px),radial-gradient(circle,var(--accent2) 0 1px,transparent 1.6px),radial-gradient(circle,#ffffff44 0 1px,transparent 1.4px),radial-gradient(circle,var(--accent) 0 1px,transparent 1.5px);background-size:115px 115px,175px 175px,235px 235px,325px 325px;animation:particleDrift calc(48s * var(--motion-speed)) linear infinite}
+html[data-bg-effect="particles"] .ambientFX:after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 120%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 58%)}
+@keyframes particleDrift{to{background-position:115px -230px,-175px 350px,235px -235px,-325px 162px}}
+
+.brandOrb,.welcome .logo,.assistantAvatar{position:relative;isolation:isolate}
+html[data-brand-motion="orbit"] .brandOrb:before,html[data-brand-motion="orbit"] .welcome .logo:before{content:"";position:absolute;inset:-4px;border-radius:inherit;border:1px solid transparent;border-top-color:var(--accent2);border-right-color:color-mix(in srgb,var(--accent) 70%,transparent);animation:brandOrbit calc(4.8s * var(--motion-speed)) linear infinite;opacity:.65}
+@keyframes brandOrbit{to{transform:rotate(360deg)}}
+html[data-brand-motion="pulse"] .brandOrb,html[data-brand-motion="pulse"] .welcome .logo,html[data-brand-motion="pulse"] .assistantAvatar{animation:brandPulse calc(2.4s * var(--motion-speed)) ease-in-out infinite}
+@keyframes brandPulse{50%{box-shadow:0 0 34px color-mix(in srgb,var(--accent) 46%,transparent),inset 0 1px rgba(255,255,255,.42);transform:scale(1.045)}}
+html[data-brand-motion="glitch"] .brandOrb,html[data-brand-motion="glitch"] .welcome .logo{animation:brandGlitch calc(4.6s * var(--motion-speed)) steps(1,end) infinite}
+@keyframes brandGlitch{0%,88%,100%{transform:none;filter:none}89%{transform:translateX(2px);filter:hue-rotate(45deg)}90%{transform:translate(-1px,1px) skewX(-4deg);filter:hue-rotate(-35deg)}91%{transform:none;filter:none}}
+html[data-brand-motion="off"] .brandOrb,html[data-brand-motion="off"] .welcome .logo,html[data-brand-motion="off"] .assistantAvatar{animation:none!important}
+html[data-brand-motion="off"] .brandOrb:before,html[data-brand-motion="off"] .welcome .logo:before{display:none!important}
+
+html[data-edge-glow="soft"] .composer,html[data-edge-glow="soft"] .top,html[data-edge-glow="soft"] .modal{box-shadow:0 18px 54px rgba(0,0,0,.22),0 0 22px color-mix(in srgb,var(--accentGlow) 26%,transparent),inset 0 1px rgba(255,255,255,.04)}
+html[data-edge-glow="neon"] .composer,html[data-edge-glow="neon"] .top,html[data-edge-glow="neon"] .modal{border-color:color-mix(in srgb,var(--accent) 38%,rgba(255,255,255,.08))!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 12%,transparent),0 0 28px color-mix(in srgb,var(--accentGlow) 65%,transparent),0 18px 55px rgba(0,0,0,.24)!important}
+html[data-edge-glow="neon"] .composer:before{height:2px;animation:edgeSweep calc(4s * var(--motion-speed)) linear infinite;background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);background-size:220% 100%}
+@keyframes edgeSweep{to{background-position:220% 0}}
+
+html[data-corner-style="round"]{--ui-radius:22px}html[data-corner-style="soft"]{--ui-radius:14px}html[data-corner-style="sharp"]{--ui-radius:6px}
+html[data-corner-style] .modal,html[data-corner-style] .composer,html[data-corner-style] .notice,html[data-corner-style] .appearanceStudio,html[data-corner-style] .themeLab,html[data-corner-style] .visualPresetLab,html[data-corner-style] .customThemeBuilder{border-radius:var(--ui-radius)!important}
+html[data-corner-style] .quickcard,html[data-corner-style] .lookPreset,html[data-corner-style] .themeTile,html[data-corner-style] .backgroundTile,html[data-corner-style] .savedThemeCard{border-radius:calc(var(--ui-radius) - 2px)!important}
+
+html[data-hover-depth="true"] .quickcard,html[data-hover-depth="true"] .lookPreset,html[data-hover-depth="true"] .themeTile,html[data-hover-depth="true"] .backgroundTile,html[data-hover-depth="true"] .savedThemeCard{transform:perspective(700px) rotateX(var(--tilt-y,0deg)) rotateY(var(--tilt-x,0deg)) translateY(var(--lift,0px));transform-style:preserve-3d;transition:transform .12s ease,border-color .16s ease,box-shadow .16s ease}
+html[data-hover-depth="true"] .quickcard:hover,html[data-hover-depth="true"] .lookPreset:hover,html[data-hover-depth="true"] .themeTile:hover,html[data-hover-depth="true"] .backgroundTile:hover,html[data-hover-depth="true"] .savedThemeCard:hover{--lift:-3px;box-shadow:0 16px 38px rgba(0,0,0,.24),0 0 20px color-mix(in srgb,var(--accentGlow) 26%,transparent)}
+
+.cursorSpark{position:fixed;z-index:90;width:7px;height:7px;border-radius:50%;pointer-events:none;background:var(--accent2);box-shadow:0 0 12px var(--accent),0 0 24px var(--accentGlow);transform:translate(-50%,-50%);animation:sparkOut .62s ease-out forwards}
+@keyframes sparkOut{0%{opacity:.9;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(calc(-50% + var(--spark-x,0px)),calc(-50% + var(--spark-y,0px))) scale(.15)}}
+@media(hover:none),(pointer:coarse){.cursorSpark{display:none!important}}
 </style>
 </head>
 <body>
@@ -693,7 +729,7 @@ html[data-wallpaper="true"] .wallpaperFX{display:block}
 <h3>Workspace</h3>
 <ul><li>The sidebar is now organized into collapsible AI, Workspace, Create, Chat, and App drawers that remember your layout locally.</li><li>High-frequency AI and Workspace drawers stay open by default, while lower-frequency tool groups start collapsed to reduce visual noise.</li><li>Conversation branches, tasks, snapshots, backups, archives, trash, global search, and encrypted workspace exports remain available.</li></ul>
 <h3>Interface</h3>
-<ul><li>Added six whole-look presets—Quantum, Neon Grid, Deep Space, Ice Glass, Matrix Terminal, and Sunset Wave—that restyle the entire app in one click.</li><li>Visual controls now cover Glass/Frosted/Solid/Holographic surfaces, message entrance motion, scanlines, vignette, custom gradients, and locally stored custom wallpaper images with opacity, blur, and fit controls.</li><li>Theme sharing remains safe and non-executable; wallpapers stay local to the browser and are intentionally excluded from exported theme files.</li></ul>
+<ul><li>Added Prism and Particles animated backgrounds, plus Orbit/Pulse/Glitch brand motion, Soft/Neon edge glow, and Soft/Round/Sharp global corner styles.</li><li>Optional 3D hover depth gives theme cards and quick actions pointer-reactive tilt, while an optional desktop cursor spark trail adds lightweight accent particles.</li><li>Theme exports are now v3 and carry these kinetic UI settings too; custom wallpapers remain browser-local and are never embedded in shared themes.</li></ul>
 </div>
 </section>
 
@@ -775,6 +811,8 @@ html[data-wallpaper="true"] .wallpaperFX{display:block}
     <button type="button" class="backgroundTile" data-bg-choice="cosmic"><span class="bgThumb cosmicBg"></span><b>Cosmic</b><small>Deep-space shimmer</small></button>
     <button type="button" class="backgroundTile" data-bg-choice="grid"><span class="bgThumb gridBg"></span><b>Grid</b><small>Digital perspective</small></button>
     <button type="button" class="backgroundTile" data-bg-choice="waves"><span class="bgThumb wavesBg"></span><b>Waves</b><small>Soft moving ribbons</small></button>
+    <button type="button" class="backgroundTile" data-bg-choice="prism"><span class="bgThumb prismBg"></span><b>Prism</b><small>Rotating spectral light</small></button>
+    <button type="button" class="backgroundTile" data-bg-choice="particles"><span class="bgThumb particlesBg"></span><b>Particles</b><small>Drifting light field</small></button>
     <button type="button" class="backgroundTile" data-bg-choice="none"><span class="bgThumb noneBg"></span><b>None</b><small>Clean solid theme</small></button>
   </div>
   <div class="themeLabRow">
@@ -797,6 +835,11 @@ html[data-wallpaper="true"] .wallpaperFX{display:block}
   <div class="advancedFxGrid">
     <div class="field"><label>Surface style</label><select id="surfaceStyle"><option value="glass">Glass</option><option value="frosted">Frosted</option><option value="solid">Solid</option><option value="holographic">Holographic</option></select></div>
     <div class="field"><label>Message animation</label><select id="messageMotion"><option value="slide">Slide</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="off">Off</option></select></div>
+    <div class="field"><label>Brand animation</label><select id="brandMotion"><option value="orbit">Orbit</option><option value="pulse">Pulse</option><option value="glitch">Glitch</option><option value="off">Off</option></select></div>
+    <div class="field"><label>Edge glow</label><select id="edgeGlow"><option value="off">Off</option><option value="soft">Soft</option><option value="neon">Neon</option></select></div>
+    <div class="field"><label>Corners</label><select id="cornerStyle"><option value="soft">Soft</option><option value="round">Round</option><option value="sharp">Sharp</option></select></div>
+    <label class="reactiveToggle"><input id="hoverDepth" type="checkbox"><span>3D hover depth</span></label>
+    <label class="reactiveToggle"><input id="cursorTrail" type="checkbox"><span>Cursor spark trail</span></label>
     <label class="reactiveToggle"><input id="scanlines" type="checkbox"><span>Scanlines</span></label>
     <label class="reactiveToggle"><input id="vignette" type="checkbox"><span>Vignette</span></label>
   </div>
@@ -1276,7 +1319,7 @@ html[data-wallpaper="true"] .wallpaperFX{display:block}
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="3.7.0";
+var APP_VERSION="3.8.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1359,6 +1402,11 @@ var settings=Object.assign({
   wallpaperOpacity:32,
   wallpaperBlur:0,
   wallpaperFit:"cover",
+  brandMotion:"orbit",
+  edgeGlow:"soft",
+  cornerStyle:"soft",
+  hoverDepth:true,
+  cursorTrail:false,
   customTheme:{bg:"#151517",bg0:"#0f0f11",panel:"#202024",panel2:"#27272c",text:"#f5f3ef",muted:"#99959b",accent:"#e07b5f"},
   customThemes:[]
 },safeJSON(localStorage.getItem(SETSTORE),{}));
@@ -1471,6 +1519,11 @@ function applyAppearance(){
   root.dataset.vignette=settings.vignette===false?"false":"true";
   root.dataset.gradient=settings.gradientEnabled?"true":"false";
   root.dataset.wallpaper=settings.wallpaperEnabled&&settings.wallpaperData?"true":"false";
+  root.dataset.brandMotion=settings.brandMotion||"orbit";
+  root.dataset.edgeGlow=settings.edgeGlow||"soft";
+  root.dataset.cornerStyle=settings.cornerStyle||"soft";
+  root.dataset.hoverDepth=settings.hoverDepth===false?"false":"true";
+  root.dataset.cursorTrail=settings.cursorTrail?"true":"false";
   root.style.setProperty("--fx-strength",Math.max(0,Math.min(1,(Number(settings.backgroundStrength)||0)/100)));
   root.style.setProperty("--gradient-a",validHex(settings.gradientA)?settings.gradientA:"#7c3aed");
   root.style.setProperty("--gradient-b",validHex(settings.gradientB)?settings.gradientB:"#0891b2");
@@ -2345,7 +2398,7 @@ function renderSavedThemes(){
 }
 function applySavedTheme(item){
   if(!item||!item.colors)return;settings.customTheme=Object.assign(defaultCustomTheme(),item.colors);settings.theme="custom";settings.accent="custom";settings.customAccent=settings.customTheme.accent;
-  settings.backgroundEffect=["aurora","cosmic","grid","waves","none"].indexOf(item.backgroundEffect)>=0?item.backgroundEffect:"aurora";
+  settings.backgroundEffect=["aurora","cosmic","grid","waves","prism","particles","none"].indexOf(item.backgroundEffect)>=0?item.backgroundEffect:"aurora";
   settings.backgroundStrength=Math.max(0,Math.min(100,Number(item.backgroundStrength)||70));
   settings.motionStyle=["calm","lively","off"].indexOf(item.motionStyle)>=0?item.motionStyle:"calm";
   settings.glassStrength=Math.max(0,Math.min(100,Number(item.glassStrength)==null?70:Number(item.glassStrength)));
@@ -2355,6 +2408,7 @@ function applySavedTheme(item){
   settings.scanlines=!!item.scanlines;settings.vignette=item.vignette!==false;settings.gradientEnabled=!!item.gradientEnabled;
   settings.gradientA=validHex(item.gradientA)?item.gradientA:"#7c3aed";settings.gradientB=validHex(item.gradientB)?item.gradientB:"#0891b2";
   settings.gradientAngle=Math.max(0,Math.min(360,Number(item.gradientAngle)||135));settings.gradientStrength=Math.max(0,Math.min(100,Number(item.gradientStrength)||35));
+  settings.brandMotion=["orbit","pulse","glitch","off"].indexOf(item.brandMotion)>=0?item.brandMotion:"orbit";settings.edgeGlow=["off","soft","neon"].indexOf(item.edgeGlow)>=0?item.edgeGlow:"soft";settings.cornerStyle=["soft","round","sharp"].indexOf(item.cornerStyle)>=0?item.cornerStyle:"soft";settings.hoverDepth=item.hoverDepth!==false;settings.cursorTrail=!!item.cursorTrail;
   fillCustomThemeInputs(settings.customTheme);q("#customAccent").value=settings.customTheme.accent;save();applyAppearance();toast("Applied "+(item.name||"custom theme"))
 }
 function applyThemeFromBuilder(showToast){
@@ -2364,18 +2418,18 @@ function applyThemeFromBuilder(showToast){
 function saveThemePreset(){
   var colors=readCustomThemeInputs(),name=q("#customThemeName").value.trim().slice(0,40)||"Custom "+((settings.customThemes||[]).length+1);
   settings.customThemes=Array.isArray(settings.customThemes)?settings.customThemes:[];
-  settings.customThemes.unshift({id:uid(),name:name,colors:colors,backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",glassStrength:Number(settings.glassStrength)||70,reactiveGlow:settings.reactiveGlow!==false,surfaceStyle:settings.surfaceStyle||"glass",messageMotion:settings.messageMotion||"slide",scanlines:!!settings.scanlines,vignette:settings.vignette!==false,gradientEnabled:!!settings.gradientEnabled,gradientA:settings.gradientA||"#7c3aed",gradientB:settings.gradientB||"#0891b2",gradientAngle:Number(settings.gradientAngle)||135,gradientStrength:Number(settings.gradientStrength)||35,created:Date.now()});
+  settings.customThemes.unshift({id:uid(),name:name,colors:colors,backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",glassStrength:Number(settings.glassStrength)||70,reactiveGlow:settings.reactiveGlow!==false,surfaceStyle:settings.surfaceStyle||"glass",messageMotion:settings.messageMotion||"slide",scanlines:!!settings.scanlines,vignette:settings.vignette!==false,gradientEnabled:!!settings.gradientEnabled,gradientA:settings.gradientA||"#7c3aed",gradientB:settings.gradientB||"#0891b2",gradientAngle:Number(settings.gradientAngle)||135,gradientStrength:Number(settings.gradientStrength)||35,brandMotion:settings.brandMotion||"orbit",edgeGlow:settings.edgeGlow||"soft",cornerStyle:settings.cornerStyle||"soft",hoverDepth:settings.hoverDepth!==false,cursorTrail:!!settings.cursorTrail,created:Date.now()});
   settings.customThemes=settings.customThemes.slice(0,12);save();renderSavedThemes();q("#customThemeName").value="";toast("Theme preset saved")
 }
 function exportThemePreset(){
-  var data={type:"quantum-breaks-theme",version:2,name:q("#customThemeName").value.trim()||"Quantum Breaks custom",colors:readCustomThemeInputs(),backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",glassStrength:Number(settings.glassStrength)||70,reactiveGlow:settings.reactiveGlow!==false,surfaceStyle:settings.surfaceStyle||"glass",messageMotion:settings.messageMotion||"slide",scanlines:!!settings.scanlines,vignette:settings.vignette!==false,gradientEnabled:!!settings.gradientEnabled,gradientA:settings.gradientA||"#7c3aed",gradientB:settings.gradientB||"#0891b2",gradientAngle:Number(settings.gradientAngle)||135,gradientStrength:Number(settings.gradientStrength)||35};
+  var data={type:"quantum-breaks-theme",version:3,name:q("#customThemeName").value.trim()||"Quantum Breaks custom",colors:readCustomThemeInputs(),backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",glassStrength:Number(settings.glassStrength)||70,reactiveGlow:settings.reactiveGlow!==false,surfaceStyle:settings.surfaceStyle||"glass",messageMotion:settings.messageMotion||"slide",scanlines:!!settings.scanlines,vignette:settings.vignette!==false,gradientEnabled:!!settings.gradientEnabled,gradientA:settings.gradientA||"#7c3aed",gradientB:settings.gradientB||"#0891b2",gradientAngle:Number(settings.gradientAngle)||135,gradientStrength:Number(settings.gradientStrength)||35,brandMotion:settings.brandMotion||"orbit",edgeGlow:settings.edgeGlow||"soft",cornerStyle:settings.cornerStyle||"soft",hoverDepth:settings.hoverDepth!==false,cursorTrail:!!settings.cursorTrail};
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download=(data.name||"quantum-theme").replace(/[^a-z0-9_-]+/gi,"_")+".quantum-theme.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000);toast("Theme exported")
 }
 async function importThemePreset(file){
   try{
     var data=JSON.parse(await file.text());if(!data||data.type!=="quantum-breaks-theme"||!data.colors)throw new Error("Not a Quantum Breaks theme");
     var d=defaultCustomTheme(),colors={};Object.keys(d).forEach(function(k){if(!validHex(data.colors[k]))throw new Error("Theme contains an invalid color");colors[k]=data.colors[k]});
-    var item={id:uid(),name:String(data.name||"Imported theme").slice(0,40),colors:colors,backgroundEffect:["aurora","cosmic","grid","waves","none"].indexOf(data.backgroundEffect)>=0?data.backgroundEffect:"aurora",backgroundStrength:Math.max(0,Math.min(100,Number(data.backgroundStrength)||70)),motionStyle:["calm","lively","off"].indexOf(data.motionStyle)>=0?data.motionStyle:"calm",glassStrength:Math.max(0,Math.min(100,Number(data.glassStrength)==null?70:Number(data.glassStrength))),reactiveGlow:data.reactiveGlow!==false,surfaceStyle:["glass","frosted","solid","holographic"].indexOf(data.surfaceStyle)>=0?data.surfaceStyle:"glass",messageMotion:["slide","fade","pop","off"].indexOf(data.messageMotion)>=0?data.messageMotion:"slide",scanlines:!!data.scanlines,vignette:data.vignette!==false,gradientEnabled:!!data.gradientEnabled,gradientA:validHex(data.gradientA)?data.gradientA:"#7c3aed",gradientB:validHex(data.gradientB)?data.gradientB:"#0891b2",gradientAngle:Math.max(0,Math.min(360,Number(data.gradientAngle)||135)),gradientStrength:Math.max(0,Math.min(100,Number(data.gradientStrength)||35)),created:Date.now()};
+    var item={id:uid(),name:String(data.name||"Imported theme").slice(0,40),colors:colors,backgroundEffect:["aurora","cosmic","grid","waves","prism","particles","none"].indexOf(data.backgroundEffect)>=0?data.backgroundEffect:"aurora",backgroundStrength:Math.max(0,Math.min(100,Number(data.backgroundStrength)||70)),motionStyle:["calm","lively","off"].indexOf(data.motionStyle)>=0?data.motionStyle:"calm",glassStrength:Math.max(0,Math.min(100,Number(data.glassStrength)==null?70:Number(data.glassStrength))),reactiveGlow:data.reactiveGlow!==false,surfaceStyle:["glass","frosted","solid","holographic"].indexOf(data.surfaceStyle)>=0?data.surfaceStyle:"glass",messageMotion:["slide","fade","pop","off"].indexOf(data.messageMotion)>=0?data.messageMotion:"slide",scanlines:!!data.scanlines,vignette:data.vignette!==false,gradientEnabled:!!data.gradientEnabled,gradientA:validHex(data.gradientA)?data.gradientA:"#7c3aed",gradientB:validHex(data.gradientB)?data.gradientB:"#0891b2",gradientAngle:Math.max(0,Math.min(360,Number(data.gradientAngle)||135)),gradientStrength:Math.max(0,Math.min(100,Number(data.gradientStrength)||35)),brandMotion:["orbit","pulse","glitch","off"].indexOf(data.brandMotion)>=0?data.brandMotion:"orbit",edgeGlow:["off","soft","neon"].indexOf(data.edgeGlow)>=0?data.edgeGlow:"soft",cornerStyle:["soft","round","sharp"].indexOf(data.cornerStyle)>=0?data.cornerStyle:"soft",hoverDepth:data.hoverDepth!==false,cursorTrail:!!data.cursorTrail,created:Date.now()};
     settings.customThemes=Array.isArray(settings.customThemes)?settings.customThemes:[];settings.customThemes.unshift(item);settings.customThemes=settings.customThemes.slice(0,12);save();renderSavedThemes();applySavedTheme(item)
   }catch(e){toast("Theme import failed: "+e.message)}
 }
@@ -2400,6 +2454,11 @@ function syncAppearanceStudio(){
   if(q("#wallpaperOpacity"))q("#wallpaperOpacity").value=String(Math.max(0,Math.min(100,Number(settings.wallpaperOpacity)||32)));
   if(q("#wallpaperBlur"))q("#wallpaperBlur").value=String(Math.max(0,Math.min(30,Number(settings.wallpaperBlur)||0)));
   if(q("#wallpaperFit"))q("#wallpaperFit").value=settings.wallpaperFit==="contain"?"contain":"cover";
+  if(q("#brandMotion"))q("#brandMotion").value=settings.brandMotion||"orbit";
+  if(q("#edgeGlow"))q("#edgeGlow").value=settings.edgeGlow||"soft";
+  if(q("#cornerStyle"))q("#cornerStyle").value=settings.cornerStyle||"soft";
+  if(q("#hoverDepth"))q("#hoverDepth").checked=settings.hoverDepth!==false;
+  if(q("#cursorTrail"))q("#cursorTrail").checked=!!settings.cursorTrail;
   renderSavedThemes()
 }
 function applyLookPreset(name){
@@ -2438,6 +2497,11 @@ function setupAppearanceStudio(){
   q("#wallpaperOpacity").oninput=function(){settings.wallpaperOpacity=Math.max(0,Math.min(100,Number(this.value)||0));save();applyAppearance()};
   q("#wallpaperBlur").oninput=function(){settings.wallpaperBlur=Math.max(0,Math.min(30,Number(this.value)||0));save();applyAppearance()};
   q("#wallpaperFit").onchange=function(){settings.wallpaperFit=this.value==="contain"?"contain":"cover";save();applyAppearance()};
+  q("#brandMotion").onchange=function(){settings.brandMotion=this.value;save();applyAppearance()};
+  q("#edgeGlow").onchange=function(){settings.edgeGlow=this.value;save();applyAppearance()};
+  q("#cornerStyle").onchange=function(){settings.cornerStyle=this.value;save();applyAppearance()};
+  q("#hoverDepth").onchange=function(){settings.hoverDepth=this.checked;save();applyAppearance()};
+  q("#cursorTrail").onchange=function(){settings.cursorTrail=this.checked;save();applyAppearance()};
   q("#chooseWallpaper").onclick=function(){q("#wallpaperFile").click()};
   q("#clearWallpaper").onclick=function(){settings.wallpaperData="";settings.wallpaperEnabled=false;q("#wallpaperEnabled").checked=false;save();applyAppearance();toast("Wallpaper cleared")};
   q("#wallpaperFile").onchange=function(e){var f=e.target.files&&e.target.files[0];e.target.value="";if(!f)return;if(!String(f.type||"").startsWith("image/"))return toast("Choose an image file");if(f.size>1572864)return toast("Wallpaper must be 1.5 MB or smaller");var rd=new FileReader();rd.onload=function(){settings.wallpaperData=String(rd.result||"");settings.wallpaperEnabled=true;save();applyAppearance();syncAppearanceStudio();toast("Wallpaper applied")};rd.onerror=function(){toast("Could not read wallpaper")};rd.readAsDataURL(f)};
@@ -2449,7 +2513,19 @@ function setupAppearanceStudio(){
   q("#importCustomThemeFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importThemePreset(f);e.target.value=""};
   q("#resetCustomTheme").onclick=function(){settings.customTheme=defaultCustomTheme();fillCustomThemeInputs(settings.customTheme);applyThemeFromBuilder(true)};
   fillCustomThemeInputs(settings.customTheme);syncAppearanceStudio();
-  document.addEventListener("pointermove",function(e){if(settings.reactiveGlow===false)return;var root=document.documentElement;root.style.setProperty("--pointer-x",e.clientX+"px");root.style.setProperty("--pointer-y",e.clientY+"px")},{passive:true})
+  var lastSpark=0;
+  document.addEventListener("pointermove",function(e){
+    var root=document.documentElement;
+    if(settings.reactiveGlow!==false){root.style.setProperty("--pointer-x",e.clientX+"px");root.style.setProperty("--pointer-y",e.clientY+"px")}
+    if(settings.hoverDepth!==false){
+      var card=e.target&&e.target.closest?e.target.closest(".quickcard,.lookPreset,.themeTile,.backgroundTile,.savedThemeCard"):null;
+      if(card){var rr=card.getBoundingClientRect(),px=(e.clientX-rr.left)/Math.max(1,rr.width)-.5,py=(e.clientY-rr.top)/Math.max(1,rr.height)-.5;card.style.setProperty("--tilt-x",(px*6).toFixed(2)+"deg");card.style.setProperty("--tilt-y",(-py*5).toFixed(2)+"deg")}
+    }
+    if(settings.cursorTrail&&settings.motionStyle!=="off"&&Date.now()-lastSpark>52&&window.matchMedia&&window.matchMedia("(hover:hover) and (pointer:fine)").matches){
+      lastSpark=Date.now();var s=document.createElement("i");s.className="cursorSpark";s.style.left=e.clientX+"px";s.style.top=e.clientY+"px";s.style.setProperty("--spark-x",((Math.random()-.5)*22).toFixed(1)+"px");s.style.setProperty("--spark-y",((Math.random()-.5)*22).toFixed(1)+"px");document.body.appendChild(s);setTimeout(function(){s.remove()},680)
+    }
+  },{passive:true});
+  document.addEventListener("pointerout",function(e){var card=e.target&&e.target.closest?e.target.closest(".quickcard,.lookPreset,.themeTile,.backgroundTile,.savedThemeCard"):null;if(card){card.style.removeProperty("--tilt-x");card.style.removeProperty("--tilt-y")}},true)
 }
 
 function setupSidebarGroups(){
@@ -2682,6 +2758,7 @@ function openSettings(){
   q("#gradientA").value=validHex(settings.gradientA)?settings.gradientA:"#7c3aed";q("#gradientB").value=validHex(settings.gradientB)?settings.gradientB:"#0891b2";
   q("#gradientAngle").value=String(Math.max(0,Math.min(360,Number(settings.gradientAngle)||135)));q("#gradientStrength").value=String(Math.max(0,Math.min(100,Number(settings.gradientStrength)||35)));
   q("#wallpaperEnabled").checked=!!settings.wallpaperEnabled;q("#wallpaperOpacity").value=String(Math.max(0,Math.min(100,Number(settings.wallpaperOpacity)||32)));q("#wallpaperBlur").value=String(Math.max(0,Math.min(30,Number(settings.wallpaperBlur)||0)));q("#wallpaperFit").value=settings.wallpaperFit==="contain"?"contain":"cover";
+  q("#brandMotion").value=settings.brandMotion||"orbit";q("#edgeGlow").value=settings.edgeGlow||"soft";q("#cornerStyle").value=settings.cornerStyle||"soft";q("#hoverDepth").checked=settings.hoverDepth!==false;q("#cursorTrail").checked=!!settings.cursorTrail;
   q("#densitySelect").value=settings.density||"cozy";
   q("#contentWidth").value=String(settings.contentWidth||860);
   q("#chatFontSize").value=String(settings.chatFontSize||17);
