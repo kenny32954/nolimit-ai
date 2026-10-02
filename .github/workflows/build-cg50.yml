@@ -6,6 +6,7 @@ on:
     branches: [cg50-integration]
     paths:
       - "cg50/native/**"
+      - "bridge/**"
       - ".github/workflows/build-cg50.yml"
 
 permissions:
@@ -60,11 +61,35 @@ jobs:
           sha256sum "$G3A_PATH" | awk '{print $1}' > release/QBAI.g3a.sha256
           cp "$G3A_PATH" /tmp/QBAI.g3a
 
+      - name: Package live test bundle
+        run: |
+          set -e
+          rm -rf /tmp/QBAI-LIVE
+          mkdir -p /tmp/QBAI-LIVE/bridge
+          cp /tmp/QBAI.g3a /tmp/QBAI-LIVE/QBAI.g3a
+          cp bridge/qb_bridge.py /tmp/QBAI-LIVE/bridge/
+          cp bridge/qb_launch.py /tmp/QBAI-LIVE/bridge/
+          cp bridge/subject_router.py /tmp/QBAI-LIVE/bridge/
+          cp bridge/requirements.txt /tmp/QBAI-LIVE/bridge/
+          cp bridge/INSTALL_WINDOWS.bat /tmp/QBAI-LIVE/bridge/
+          cp bridge/START_QBAI_WINDOWS.bat /tmp/QBAI-LIVE/bridge/
+          cp bridge/start_qbai.sh /tmp/QBAI-LIVE/bridge/
+          cp bridge/LIVE_TEST_README.txt /tmp/QBAI-LIVE/
+          cd /tmp
+          zip -9 -r QBAI-LIVE-PACK.zip QBAI-LIVE
+
       - name: Upload calculator binary
         uses: actions/upload-artifact@v4
         with:
           name: QBAI-CG50
           path: /tmp/QBAI.g3a
+          if-no-files-found: error
+
+      - name: Upload full live test pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: QBAI-LIVE-PACK
+          path: /tmp/QBAI-LIVE-PACK.zip
           if-no-files-found: error
 
       - name: Publish build encoding to branch
