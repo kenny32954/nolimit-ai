@@ -296,6 +296,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .followups{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.followupChip{max-width:100%;padding:7px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.035);color:#aaa;font-size:11px;text-align:left}.followupChip:hover{color:#eee;border-color:color-mix(in srgb,var(--accent) 30%,transparent);background:color-mix(in srgb,var(--accent) 7%,transparent)}.followupLoading{font-size:11px;color:#777;margin:8px 0}
 
+
+.branchTree{display:grid;gap:7px}.branchNode{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px 11px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.024)}.branchNode.current{border-color:color-mix(in srgb,var(--accent) 40%,transparent);background:color-mix(in srgb,var(--accent) 7%,var(--panel))}.branchNodeMain{min-width:0}.branchNodeMain b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.branchNodeMain span{display:block;margin-top:3px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.branchJump{height:31px;padding:0 9px;border-radius:8px;background:rgba(255,255,255,.055);color:#bbb;font-size:11px}.branchIndent{margin-left:18px;border-left:1px solid rgba(255,255,255,.06);padding-left:10px;display:grid;gap:7px}
+
 </style>
 </head>
 <body>
@@ -543,6 +546,13 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="models" id="models"></div>
 </section>
 
+<section class="modal" id="branchesModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Conversation branches</h2>
+<div class="notice">See where this conversation came from and jump between alternate forks.</div>
+<div id="branchTree" class="branchTree"></div>
+</section>
+
 <section class="modal" id="snapshotsModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Conversation snapshots</h2>
@@ -735,6 +745,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="secondary" id="pinChat">Pin</button>
 <button class="secondary" id="archiveChat">Archive</button>
 <button class="secondary" id="snapshotChat">Snapshot</button>
+<button class="secondary" id="branchesChat">Branches</button>
 <button class="secondary" id="resetChatOverrides">Reset AI overrides</button>
 <button class="secondary" id="duplicateChat">Duplicate</button>
 <button class="danger" id="deleteChat">Delete</button>
@@ -1547,6 +1558,36 @@ function toggleContextPin(idx){
   var c=ensure(),m=c.messages[idx];if(!m)return;
   m.contextPinned=!m.contextPinned;c.updated=Date.now();save();render();toast(m.contextPinned?"Message pinned to context":"Context pin removed")
 }
+function branchChildren(id){
+  return chats.filter(function(ch){return ch.parentChatId===id&&!ch.trashedAt}).sort(function(a,b){return(a.branchCreated||a.created||0)-(b.branchCreated||b.created||0)})
+}
+function lineageRoot(ch){
+  var seen=new Set(),cur=ch;
+  while(cur&&cur.parentChatId&&!seen.has(cur.id)){seen.add(cur.id);var p=chats.find(function(x){return x.id===cur.parentChatId&&!x.trashedAt});if(!p)break;cur=p}
+  return cur||ch
+}
+function branchLabel(ch){
+  var bits=[];if(ch.parentChatId)bits.push("branch");if(ch.branchFromIndex!==undefined)bits.push("after message "+(Number(ch.branchFromIndex)+1));bits.push((ch.messages||[]).length+" messages");return bits.join(" · ")
+}
+function jumpBranch(id){
+  var ch=chats.find(function(x){return x.id===id&&!x.trashedAt});if(!ch)return toast("That branch is unavailable");
+  active=ch.id;save();closeModals();render();restoreDraft()
+}
+function makeBranchNode(ch,currentId,depth){
+  var wrap=document.createElement("div"),row=document.createElement("div");row.className="branchNode"+(ch.id===currentId?" current":"");
+  var main=document.createElement("div");main.className="branchNodeMain";var b=document.createElement("b"),s=document.createElement("span");
+  b.textContent=ch.title||"New chat";s.textContent=(ch.id===currentId?"Current · ":"")+branchLabel(ch);main.appendChild(b);main.appendChild(s);
+  var go=document.createElement("button");go.className="branchJump";go.textContent=ch.id===currentId?"Current":"Open";go.disabled=ch.id===currentId;go.onclick=function(){jumpBranch(ch.id)};
+  row.appendChild(main);row.appendChild(go);wrap.appendChild(row);
+  if(depth<8){var kids=branchChildren(ch.id);if(kids.length){var childBox=document.createElement("div");childBox.className="branchIndent";kids.forEach(function(k){childBox.appendChild(makeBranchNode(k,currentId,depth+1))});wrap.appendChild(childBox)}}
+  return wrap
+}
+function renderBranches(){
+  var c=ensure(),box=q("#branchTree");box.innerHTML="";var root=lineageRoot(c);box.appendChild(makeBranchNode(root,c.id,0));
+  if(root.id===c.id&&!branchChildren(root.id).length){var note=document.createElement("div");note.className="smallnote";note.textContent="No branches yet. Use Branch on an assistant message to fork the conversation.";box.appendChild(note)}
+}
+function openBranches(){openModal("#branchesModal");renderBranches()}
+
 function snapshotPayload(c){
   return {
     id:uid(),
@@ -1753,6 +1794,7 @@ var COMMANDS=[
   {name:"Prompt library",hint:"Saved reusable prompts",run:openPromptLibrary},
   {name:"Scratchpad",hint:"Notes for this conversation",run:openScratchpad},
   {name:"Conversation snapshots",hint:"Save or restore chat states",run:openSnapshots},
+  {name:"Conversation branches",hint:"Navigate alternate forks",run:openBranches},
   {name:"Search everything",hint:"Chats, projects, prompts, profiles",run:openGlobalSearch},
   {name:"Find in chat",hint:"Search current conversation",run:openFindInChat},
   {name:"Conversation outline",hint:"Jump through long chats",run:openOutline},
@@ -2537,6 +2579,7 @@ function branchConversation(idx){
     id:uid(),title:(c.title||"New chat")+" branch",created:Date.now(),updated:Date.now(),
     messages:JSON.parse(JSON.stringify(c.messages.slice(0,idx+1))),
     projectId:c.projectId||"",tags:Array.isArray(c.tags)?c.tags.slice():[],chatInstructions:c.chatInstructions||"",
+    parentChatId:c.id,branchFromIndex:idx,branchCreated:Date.now(),
     modelOverride:c.modelOverride||"",reasoningOverride:c.reasoningOverride!==undefined?c.reasoningOverride:"",
     temperatureOverride:c.temperatureOverride!==undefined?c.temperatureOverride:"",
     scratchpad:c.scratchpad||"",scratchpadInContext:!!c.scratchpadInContext
@@ -4230,6 +4273,7 @@ q("#copyContextPreview").onclick=function(){navigator.clipboard.writeText(q("#co
 q("#pinChat").onclick=togglePinnedChat;
 q("#archiveChat").onclick=toggleArchiveManagedChat;
 q("#snapshotChat").onclick=function(){closeModals();openSnapshots()};
+q("#branchesChat").onclick=function(){closeModals();openBranches()};
 q("#resetChatOverrides").onclick=resetChatOverrides;
 q("#duplicateChat").onclick=duplicateManagedChat;
 q("#deleteChat").onclick=deleteManagedChat;
