@@ -436,13 +436,14 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div id="modelInfoGrid" class="diaggrid"></div>
 <div style="height:12px"></div>
 <div class="field"><label>Supported parameters</label><div id="modelInfoParams" class="modelbadges"></div></div>
-<div class="row"><button class="primary" id="useModelInfo">Use this model</button><button class="secondary" id="favoriteModelInfo">Favorite</button></div>
+<div class="row"><button class="primary" id="useModelInfo">Use this model</button><button class="secondary" id="favoriteModelInfo">Favorite</button><button class="secondary" id="copyModelId">Copy model ID</button></div>
 </section>
 
 <section class="modal" id="modelsModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Choose model</h2>
 <div class="field"><input id="modelSearch" placeholder="Search models"></div>
+<div class="row" style="margin-bottom:10px"><input id="customModelId" style="flex:1;min-width:200px" placeholder="Custom model ID, e.g. provider/model"><button class="secondary" id="useCustomModel">Use custom</button></div>
 <div class="filterbar">
 <button class="filter on" data-filter="all">All</button>
 <button class="filter" data-filter="recent">Recent</button>
@@ -2670,6 +2671,8 @@ q("#cleanStorage").onclick=cleanOrphanedMedia;
 q("#clearMediaStorage").onclick=clearAllMedia;
 q("#copyDiagnostics").onclick=function(){navigator.clipboard.writeText(lastDiagReport||"No diagnostics run yet.").then(function(){toast("Diagnostics copied")})};
 q("#useModelInfo").onclick=function(){if(!modelInfoCurrent)return;settings.model=modelInfoCurrent.id;rememberModel(modelInfoCurrent.id);closeModals();render();toast("Model changed to "+modelInfoCurrent.id)};
+q("#copyModelId").onclick=function(){if(!modelInfoCurrent)return;navigator.clipboard.writeText(modelInfoCurrent.id||"").then(function(){toast("Model ID copied")})};
+q("#useCustomModel").onclick=function(){var id=q("#customModelId").value.trim();if(!id)return toast("Enter a model ID");settings.model=id;rememberModel(id);closeModals();render();toast("Using custom model "+id)};
 q("#favoriteModelInfo").onclick=function(){if(!modelInfoCurrent)return;toggleFavoriteModel(modelInfoCurrent.id);q("#favoriteModelInfo").textContent=(settings.favoriteModels||[]).indexOf(modelInfoCurrent.id)>=0?"Unfavorite":"Favorite"};
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
