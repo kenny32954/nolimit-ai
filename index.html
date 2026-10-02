@@ -248,6 +248,10 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .userpreviews{display:flex;gap:7px;overflow:auto;margin-top:9px}.userpreview{width:84px;height:84px;flex:none;object-fit:cover;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:#111}.chipthumb{width:28px;height:28px;object-fit:cover;border-radius:7px;border:1px solid rgba(255,255,255,.08);flex:none}.filetypeicon{width:28px;height:28px;display:grid;place-items:center;border-radius:7px;background:rgba(255,255,255,.055);font-size:9px;font-weight:800;letter-spacing:.04em;color:#aaa;flex:none}
 
+
+.composer,.toolstrip,.pending,.foot{max-width:var(--content-max,860px)!important}.md{font-size:var(--chat-font,17px)!important}.ub{font-size:calc(var(--chat-font,17px) - 1px)}
+@media(min-width:900px){.chat{padding-left:max(50px,calc((100vw - 300px - var(--content-max,860px))/2))!important;padding-right:max(50px,calc((100vw - 300px - var(--content-max,860px))/2))!important}}
+
 </style>
 </head>
 <body>
@@ -384,8 +388,11 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field hidden" id="manualKeyField"><label>OpenRouter API key</label><input id="manualKey" type="password" autocomplete="off" placeholder="sk-or-v1-..."><div class="smallnote">Stored only in this browser for this site. It is not committed to GitHub.</div></div>
 <div class="row">
 <div class="field" style="flex:1;min-width:160px"><label>Theme</label><select id="themeSelect"><option value="dark">Dark</option><option value="midnight">Midnight</option><option value="ember">Ember</option><option value="oled">OLED</option></select></div>
-<div class="field" style="flex:1;min-width:160px"><label>Accent</label><select id="accentSelect"><option value="coral">Coral</option><option value="blue">Blue</option><option value="violet">Violet</option><option value="green">Green</option></select></div>
+<div class="field" style="flex:1;min-width:160px"><label>Accent</label><select id="accentSelect"><option value="coral">Coral</option><option value="blue">Blue</option><option value="violet">Violet</option><option value="green">Green</option><option value="custom">Custom</option></select></div>
 <div class="field" style="flex:1;min-width:160px"><label>Density</label><select id="densitySelect"><option value="cozy">Cozy</option><option value="compact">Compact</option></select></div>
+<div class="field" style="flex:1;min-width:160px"><label>Custom accent</label><input id="customAccent" type="color" value="#e07b5f"></div>
+<div class="field" style="flex:1;min-width:160px"><label>Chat width</label><select id="contentWidth"><option value="760">Narrow</option><option value="860">Normal</option><option value="1040">Wide</option><option value="1240">Ultra wide</option></select></div>
+<div class="field" style="flex:1;min-width:160px"><label>Message size</label><select id="chatFontSize"><option value="15">Small</option><option value="17">Normal</option><option value="19">Large</option><option value="21">Extra large</option></select></div>
 </div>
 <div class="field"><label>System instructions</label><textarea id="systemPrompt"></textarea></div>
 <div class="field"><label>Local memory</label><textarea id="localMemory" placeholder="Facts or preferences you want Quantum Breaks AI to remember across chats on this browser"></textarea><div class="smallnote">Stored only in this browser and appended to your system context.</div></div>
@@ -676,7 +683,10 @@ var settings=Object.assign({
   favoriteModels:[],
   theme:"dark",
   accent:"coral",
+  customAccent:"#e07b5f",
   density:"cozy",
+  contentWidth:860,
+  chatFontSize:17,
   focusMode:false,
   modePreset:"balanced",
   denyDataCollection:false,
@@ -752,11 +762,24 @@ function save(){
     }catch(_){ }
   }
 }
+function lightenHex(hex,amount){
+  var h=String(hex||"#e07b5f").replace("#","");if(h.length!==6)return "#ffb29a";
+  var n=parseInt(h,16),r=Math.min(255,((n>>16)&255)+amount),g=Math.min(255,((n>>8)&255)+amount),b=Math.min(255,(n&255)+amount);
+  return "#"+[r,g,b].map(function(v){return v.toString(16).padStart(2,"0")}).join("")
+}
 function applyAppearance(){
-  document.documentElement.dataset.theme=settings.theme||"dark";
-  document.documentElement.dataset.accent=settings.accent||"coral";
-  document.documentElement.dataset.density=settings.density||"cozy";
-  document.documentElement.dataset.focus=settings.focusMode?"true":"false";
+  var root=document.documentElement;
+  root.dataset.theme=settings.theme||"dark";
+  root.dataset.accent=settings.accent||"coral";
+  root.dataset.density=settings.density||"cozy";
+  root.dataset.focus=settings.focusMode?"true":"false";
+  root.style.setProperty("--content-max",Math.max(680,Math.min(1400,Number(settings.contentWidth)||860))+"px");
+  root.style.setProperty("--chat-font",Math.max(14,Math.min(24,Number(settings.chatFontSize)||17))+"px");
+  if(settings.accent==="custom"){
+    var accent=settings.customAccent||"#e07b5f";root.style.setProperty("--accent",accent);root.style.setProperty("--accent2",lightenHex(accent,45));root.style.setProperty("--accentGlow",accent+"38")
+  }else{
+    root.style.removeProperty("--accent");root.style.removeProperty("--accent2");root.style.removeProperty("--accentGlow")
+  }
 }
 function current(){return chats.find(function(c){return c.id===active&&!c.trashedAt})}
 function projectForChat(c){return c&&c.projectId?projects.find(function(p){return p.id===c.projectId}):null}
@@ -1296,7 +1319,10 @@ function openSettings(){
   q("#manualKeyField").classList.add("hidden");
   q("#themeSelect").value=settings.theme||"dark";
   q("#accentSelect").value=settings.accent||"coral";
+  q("#customAccent").value=settings.customAccent||"#e07b5f";
   q("#densitySelect").value=settings.density||"cozy";
+  q("#contentWidth").value=String(settings.contentWidth||860);
+  q("#chatFontSize").value=String(settings.chatFontSize||17);
   q("#systemPrompt").value=settings.system;
   q("#localMemory").value=settings.memory||"";
   q("#temperature").value=settings.temperature;
@@ -2542,7 +2568,7 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.density=q("#densitySelect").value;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#commandSearch").oninput=renderCommandPalette;
 q("#runDiagnostics").onclick=runDiagnostics;
@@ -2608,7 +2634,10 @@ q("#artifactOpen").onclick=function(){
 // Paste and drag/drop attachments.
 q("#themeSelect").onchange=function(){settings.theme=this.value;save();applyAppearance()};
 q("#accentSelect").onchange=function(){settings.accent=this.value;save();applyAppearance()};
+q("#customAccent").oninput=function(){settings.customAccent=this.value;settings.accent="custom";q("#accentSelect").value="custom";save();applyAppearance()};
 q("#densitySelect").onchange=function(){settings.density=this.value;save();applyAppearance()};
+q("#contentWidth").onchange=function(){settings.contentWidth=Number(this.value)||860;save();applyAppearance()};
+q("#chatFontSize").onchange=function(){settings.chatFontSize=Number(this.value)||17;save();applyAppearance()};
 q("#prompt").addEventListener("input",function(){resizePrompt();saveDraftSoon()});
 q("#chat").addEventListener("mouseup",function(){setTimeout(updateSelectionToolbar,0)});
 q("#chat").addEventListener("touchend",function(){setTimeout(updateSelectionToolbar,120)},{passive:true});
