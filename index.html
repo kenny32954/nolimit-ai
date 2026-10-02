@@ -364,10 +364,12 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="crow">
 <div class="leftTools">
 <button class="tool" id="attach">＋</button>
+<button class="tool" id="attachFolder" title="Attach folder">⌑</button>
 <button class="tool" id="promptLibBtn" title="Prompt library">★</button>
 <button class="tool" id="promptHistoryBtn" title="Recent prompts">↺</button>
 <button class="tool" id="improvePromptBtn" title="Improve prompt with AI">✧</button>
 <input id="files" type="file" hidden multiple accept="image/*,application/pdf,audio/*,.txt,.md,.json,.csv,.js,.html,.css,.py,.java,.cpp,.c,.ts,.tsx,.jsx,.xml,.yaml,.yml">
+<input id="folderFiles" type="file" hidden multiple webkitdirectory directory>
 <button class="tool" id="micBtn" title="Record and transcribe">●</button>
 <button class="tool" id="imageBtn" title="Create image">▣</button>
 </div>
@@ -1497,7 +1499,7 @@ function setupAccessibility(){
   q("#chat").setAttribute("role","log");q("#chat").setAttribute("aria-label","Conversation");
   q("#status").setAttribute("aria-live","polite");
   q("#buildBadge").textContent="v"+APP_VERSION;
-  var labels={menuBtn:"Open sidebar",closeSide:"Close sidebar",commandBtn:"Open command palette",lightboxClose:"Close image preview",attach:"Attach files",promptLibBtn:"Prompt library",improvePromptBtn:"Improve prompt",micBtn:"Record audio",imageBtn:"Create image",send:"Send message",scrollBottom:"Jump to latest"};
+  var labels={menuBtn:"Open sidebar",closeSide:"Close sidebar",commandBtn:"Open command palette",lightboxClose:"Close image preview",attach:"Attach files",attachFolder:"Attach folder",promptLibBtn:"Prompt library",promptHistoryBtn:"Recent prompts",improvePromptBtn:"Improve prompt",micBtn:"Record audio",imageBtn:"Create image",send:"Send message",scrollBottom:"Jump to latest"};
   Object.keys(labels).forEach(function(id){var el=q("#"+id);if(el)el.setAttribute("aria-label",labels[id])});
   qa(".modal").forEach(function(m,i){
     m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
@@ -1720,17 +1722,25 @@ async function finishAuth(){
 }
 
 async function addFiles(list){
+  list=Array.prototype.slice.call(list||[]);
+  if(list.length>40){toast("Attaching the first 40 files from this selection");list=list.slice(0,40)}
   for(var i=0;i<list.length;i++){
-    var f=list[i];if(f.size>18*1024*1024){toast(f.name+" is over the 18 MB in-browser limit");continue}
+    var f=list[i],displayName=f.webkitRelativePath||f.name;if(f.size>18*1024*1024){toast(displayName+" is over the 18 MB in-browser limit");continue}
     var type=f.type||"";
     if(type.indexOf("image/")===0){
-      var imageData=await readDataURL(f),imageId=await putMedia(imageData,f.name,"image");
-      pending.push({name:f.name,size:f.size,kind:"image",data:imageData,mediaId:imageId})
+      var imageData=await readDataURL(f),imageId=await putMedia(imageData,displayName,"image");
+      pending.push({name:displayName,size:f.size,kind:"image",data:imageData,mediaId:imageId})
     }else if(type==="application/pdf"||f.name.toLowerCase().slice(-4)===".pdf"){
-      var pdfData=await readDataURL(f),pdfId=await putMedia(pdfData,f.name,"pdf");
-      pending.push({name:f.name,size:f.size,kind:"pdf",data:pdfData,mediaId:pdfId})
-    }else if(type.indexOf("audio/")===0)pending.push({name:f.name,size:f.size,kind:"audio",file:f});
-    else{try{pending.push({name:f.name,size:f.size,kind:"text",text:await f.text()})}catch(e){toast("Could not read "+f.name)}}
+      var pdfData=await readDataURL(f),pdfId=await putMedia(pdfData,displayName,"pdf");
+      pending.push({name:displayName,size:f.size,kind:"pdf",data:pdfData,mediaId:pdfId})
+    }else if(type.indexOf("audio/")===0)pending.push({name:displayName,size:f.size,kind:"audio",file:f});
+    else{
+      try{
+        var txt=await f.text(),truncated=false;
+        if(txt.length>500000){txt=txt.slice(0,500000)+"\n\n[Quantum Breaks AI truncated this file after 500,000 characters.]";truncated=true}
+        pending.push({name:displayName,size:f.size,kind:"text",text:txt,truncated:truncated})
+      }catch(e){toast("Could not read "+displayName)}
+    }
   }
   renderPending();saveDraftSoon()
 }
@@ -3378,7 +3388,9 @@ q("#closeSide").onclick=q("#shade").onclick=closeSide;
 q("#newChat").onclick=newChat;
 q("#chatSearch").oninput=renderHistory;
 q("#attach").onclick=function(){q("#files").click()};
+q("#attachFolder").onclick=function(){q("#folderFiles").click()};
 q("#files").onchange=function(e){addFiles(Array.prototype.slice.call(e.target.files));e.target.value=""};
+q("#folderFiles").onchange=function(e){addFiles(Array.prototype.slice.call(e.target.files));e.target.value=""};
 q("#send").onclick=send;
 q("#prompt").onkeydown=function(e){
   if(e.altKey&&e.key==="ArrowUp"){e.preventDefault();cyclePromptHistory(-1);return}
