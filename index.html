@@ -614,6 +614,10 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field"><label>Project</label><select id="projectSelect"></select></div>
 <div class="field"><label>Name</label><input id="projectName" maxlength="80" placeholder="Project name"></div>
 <div class="field"><label>Default model</label><input id="projectModel" list="modelOptions" placeholder="Leave blank to use the global model"><div class="smallnote">Project chats use this unless the individual chat has a model lock.</div></div>
+<div class="row">
+<div class="field" style="flex:1;min-width:170px"><label>Default reasoning</label><select id="projectReasoning"><option value="">Use global</option><option value="none">None</option><option value="minimal">Minimal</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">Extra high</option></select></div>
+<div class="field" style="flex:1;min-width:170px"><label>Default temperature</label><input id="projectTemperature" type="number" min="0" max="2" step="0.1" placeholder="Use global"></div>
+</div>
 <div class="field"><label>Project instructions</label><textarea id="projectInstructions" placeholder="How Quantum Breaks AI should behave inside this project"></textarea></div>
 <div class="field"><label>Project knowledge</label><textarea id="projectKnowledge" placeholder="Paste reference notes, lore, specifications, or other context"></textarea><div class="row" style="margin-top:7px"><button class="secondary" id="projectKnowledgeFiles" type="button">Add text files</button><input id="projectKnowledgeFileInput" type="file" hidden multiple accept=".txt,.md,.json,.csv,.js,.ts,.tsx,.jsx,.html,.css,.py,.java,.cpp,.c,.xml,.yaml,.yml"></div><div class="smallnote">Keep this reasonably sized because it is sent with each project chat.</div></div>
 <div class="field"><label>Project chats</label><div id="projectChatList" class="searchresults"></div></div>
@@ -990,8 +994,8 @@ function applyAppearance(){
 }
 function current(){return chats.find(function(c){return c.id===active&&!c.trashedAt})}
 function effectiveModel(c){var p=projectForChat(c);return c&&c.modelOverride?c.modelOverride:(p&&p.model?p.model:settings.model)}
-function effectiveReasoning(c){return c&&c.reasoningOverride!==undefined&&c.reasoningOverride!==""?c.reasoningOverride:settings.reasoning}
-function effectiveTemperature(c){return c&&c.temperatureOverride!==undefined&&c.temperatureOverride!==""?Math.max(0,Math.min(2,Number(c.temperatureOverride))):Number(settings.temperature)}
+function effectiveReasoning(c){var p=projectForChat(c);return c&&c.reasoningOverride!==undefined&&c.reasoningOverride!==""?c.reasoningOverride:(p&&p.reasoning!==undefined&&p.reasoning!==""?p.reasoning:settings.reasoning)}
+function effectiveTemperature(c){var p=projectForChat(c),v=c&&c.temperatureOverride!==undefined&&c.temperatureOverride!==""?c.temperatureOverride:(p&&p.temperature!==undefined&&p.temperature!==""?p.temperature:settings.temperature);return Math.max(0,Math.min(2,Number(v)))}
 function setActiveModel(id){var c=current(),p=projectForChat(c);if(c&&(c.modelOverride||(p&&p.model)))c.modelOverride=id;else settings.model=id;rememberModel(id);save();render()}
 function projectForChat(c){return c&&c.projectId?projects.find(function(p){return p.id===c.projectId}):null}
 function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save()}return c}
@@ -3619,6 +3623,8 @@ function loadProjectFields(id){
   var p=projects.find(function(x){return x.id===id});
   q("#projectName").value=p?p.name:"";
   q("#projectModel").value=p?p.model||"":"";
+  q("#projectReasoning").value=p&&p.reasoning!==undefined?p.reasoning:"";
+  q("#projectTemperature").value=p&&p.temperature!==undefined&&p.temperature!==""?p.temperature:"";
   q("#projectInstructions").value=p?p.instructions||"":"";
   q("#projectKnowledge").value=p?p.knowledge||"":"";
   renderProjectChats(id)
@@ -3634,7 +3640,7 @@ function openProjects(){
 }
 
 function createProject(){
-  var p={id:uid(),name:"New project",instructions:"",knowledge:"",created:Date.now(),updated:Date.now()};
+  var p={id:uid(),name:"New project",instructions:"",knowledge:"",model:"",reasoning:"",temperature:"",created:Date.now(),updated:Date.now()};
   projects.unshift(p);save();projectOptions();q("#projectSelect").value=p.id;loadProjectFields(p.id);toast("Project created")
 }
 
@@ -3643,6 +3649,8 @@ function saveProject(){
   if(!p)return toast("Choose or create a project");
   p.name=q("#projectName").value.trim().slice(0,80)||"Untitled project";
   p.model=q("#projectModel").value.trim();
+  p.reasoning=q("#projectReasoning").value;
+  p.temperature=q("#projectTemperature").value===""?"":Math.max(0,Math.min(2,Number(q("#projectTemperature").value)));
   p.instructions=q("#projectInstructions").value.slice(0,50000);
   p.knowledge=q("#projectKnowledge").value.slice(0,150000);
   p.updated=Date.now();save();projectOptions();q("#projectSelect").value=p.id;render();toast("Project saved")
