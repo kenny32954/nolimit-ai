@@ -479,6 +479,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="row">
 <div class="field" style="flex:1;min-width:180px"><label>Response format</label><select id="responseFormat"><option value="text">Normal text</option><option value="json_object">JSON object</option><option value="json_schema">Strict JSON Schema</option></select></div>
 <div class="field" style="flex:1;min-width:180px"><label>Max output tokens</label><input id="maxTokens" type="number" min="0" step="256" placeholder="0 = model default"></div>
+<div class="field" style="flex:1;min-width:180px"><label>Request cost warning</label><input id="costWarnThreshold" type="number" min="0" step="0.01" placeholder="0 = off"><div class="smallnote">Warn before a request whose rough model-token estimate exceeds this many dollars.</div></div>
 <div class="field" style="flex:1;min-width:180px"><label>History messages sent</label><input id="historyLimit" type="number" min="0" step="1" placeholder="0 = all"><div class="smallnote">Optional context cap. 0 sends the full conversation.</div></div>
 <div class="field" style="flex:1;min-width:180px"><label>Context summary model</label><input id="summaryModel" placeholder="openrouter/auto"></div>
 </div>
@@ -868,6 +869,7 @@ var settings=Object.assign({
   jsonSchemaText:"",
   requireParameters:false,
   maxTokens:0,
+  costWarnThreshold:0,
   historyLimit:0,
   autoCompressContext:false,
   summaryModel:"openrouter/auto",
@@ -1745,8 +1747,9 @@ function updateComposerMetrics(){
   var approx=Math.ceil(chars/4),parts=[];
   parts.push("~"+formatTokenCount(approx)+" draft");
   if(pending.length)parts.push(pending.length+" file"+(pending.length===1?"":"s"));
+  var est=current()?roughRequestCost(current(),text,pending):null;if(est&&isFinite(est.cost)&&est.cost>0)parts.push("~"+money(est.cost));
   q("#composerMetrics").textContent=parts.join(" · ");
-  q("#composerMetrics").title="Approximate draft tokens before system prompt and chat history"
+  q("#composerMetrics").title="Approximate draft tokens and rough model-token request cost. Tool, review, media, and agent costs can add more."
 }
 function resizePrompt(){
   var p=q("#prompt");p.style.height="auto";p.style.height=Math.min(180,Math.max(64,p.scrollHeight))+"px";updateComposerMetrics()
@@ -1781,6 +1784,7 @@ function openSettings(){
   q("#jsonSchemaText").value=settings.jsonSchemaText||"";
   q("#requireParameters").checked=!!settings.requireParameters;
   q("#maxTokens").value=settings.maxTokens||0;
+  q("#costWarnThreshold").value=settings.costWarnThreshold||0;
   q("#historyLimit").value=settings.historyLimit||0;
   q("#autoCompressContext").checked=!!settings.autoCompressContext;
   q("#summaryModel").value=settings.summaryModel||"openrouter/auto";
@@ -2131,6 +2135,21 @@ async function improvePrompt(){
   b.disabled=false;b.classList.remove("loading");b.textContent="✧"
 }
 
+function roughRequestCost(c,text,files){
+  var modelId=effectiveModel(c),info=models.find(function(m){return m.id===modelId});if(!info||!info.pricing)return null;
+  var p=Number(info.pricing.prompt),o=Number(info.pricing.completion);if(!isFinite(p)&&!isFinite(o))return null;
+  if(!isFinite(p))p=0;if(!isFinite(o))o=0;
+  var chars=String(text||"").length;
+  (files||[]).forEach(function(f){if(f.kind==="text")chars+=String(f.text||"").length;else if(f.kind==="image")chars+=4000;else if(f.kind==="pdf")chars+=8000});
+  var inputTokens=approxContextTokens(c)+Math.ceil(chars/4),outputTokens=Number(settings.maxTokens)||2048;
+  return {model:modelId,inputTokens:inputTokens,outputTokens:outputTokens,cost:p*inputTokens+o*outputTokens}
+}
+function confirmEstimatedCost(c,text,files){
+  var threshold=Number(settings.costWarnThreshold)||0;if(threshold<=0)return true;
+  var est=roughRequestCost(c,text,files);if(!est||!isFinite(est.cost)||est.cost<threshold)return true;
+  return confirm("Rough token-cost estimate: "+money(est.cost)+" for "+est.model+". This can be higher when tools, agents, reviews, or media are used. Send anyway?")
+}
+
 async function preflightSend(files){
   if(settings.responseFormat==="json_schema"){
     try{var schema=JSON.parse(settings.jsonSchemaText||"");if(!schema||typeof schema!=="object"||Array.isArray(schema))throw new Error("Schema must be a JSON object")}
@@ -2203,8 +2222,9 @@ async function send(){
   if(!navigator.onLine){saveDraftSoon();toast("You are offline — your draft is saved locally");return}
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
   var files=pending.slice();if(!await preflightSend(files))return;
+  var c=ensure();if(!confirmEstimatedCost(c,text,files))return;
   if(text)rememberSentPrompt(text);
-  var c=ensure();pending=[];q("#prompt").value="";c.draft="";c.draftFiles=[];
+  pending=[];q("#prompt").value="";c.draft="";c.draftFiles=[];
   var aud=files.filter(function(f){return f.kind==="audio"});
   for(var ai=0;ai<aud.length;ai++){try{toast("Transcribing "+aud[ai].name+"…");var tr=await transcribe(aud[ai].file);text+=(text?"\n\n":"")+"[Audio transcript: "+aud[ai].name+"]\n"+tr}catch(e){toast(e.message)}}
   var m={role:"user",created:Date.now(),content:text||"Please analyze the attached file.",fileNames:files.map(function(x){return x.name}),images:files.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),imageRefs:files.filter(function(x){return x.kind==="image"&&x.mediaId}).map(function(x){return{name:x.name,mediaId:x.mediaId}}),pdfs:files.filter(function(x){return x.kind==="pdf"}).map(function(x){return{name:x.name,data:x.data,mediaId:x.mediaId||""}}),textFiles:files.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
@@ -3863,7 +3883,7 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.autoCompressContext=q("#autoCompressContext").checked;settings.summaryModel=q("#summaryModel").value.trim()||"openrouter/auto";settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.costWarnThreshold=Math.max(0,Number(q("#costWarnThreshold").value)||0);settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.autoCompressContext=q("#autoCompressContext").checked;settings.summaryModel=q("#summaryModel").value.trim()||"openrouter/auto";settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#commandSearch").oninput=function(){commandActiveIndex=0;renderCommandPalette()};
 q("#commandSearch").onkeydown=function(e){
