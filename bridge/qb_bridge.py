@@ -2,6 +2,10 @@
 """Quantum Breaks AI serial bridge for the Casio fx-CG50.
 
 Protocol v0.2:
+    Handshake:
+        CG50 -> PC: H:QBAI:2
+        PC -> CG50: K:QBAI:2
+
     Legacy calculator request:
         Q:<id>:<base64 UTF-8 prompt>
 
@@ -50,7 +54,7 @@ SYSTEM_PROMPT = os.getenv(
     "Be accurate, concise, encouraging, and useful across school subjects."
 )
 MAX_HISTORY_MESSAGES = int(os.getenv("QB_HISTORY_MESSAGES", "12"))
-CHUNK_BYTES = int(os.getenv("QB_CHUNK_BYTES", "144"))
+CHUNK_BYTES = max(32, int(os.getenv("QB_CHUNK_BYTES", "144")))
 
 # Keep separate short histories per subject so chemistry context does not
 # accidentally bleed into an English or history session.
@@ -62,7 +66,7 @@ def b64e(text):
 
 
 def b64d(text):
-    return base64.b64decode(text.encode("ascii")).decode("utf-8")
+    return base64.b64decode(text.encode("ascii"), validate=True).decode("utf-8")
 
 
 def send_line(ser, line):
@@ -92,20 +96,21 @@ def parse_request(line):
     if not line:
         return None
 
-    parts = line.split(":")
-    if not parts or parts[0] != "Q":
-        return None
-
     # Backwards compatibility with protocol v0.1.
-    if len(parts) == 3:
-        return {
-            "id": parts[1],
-            "subject": "auto",
-            "mode": "explain",
-            "prompt": b64d(parts[2]).strip(),
-        }
+    legacy = line.split(":", 2)
+    if len(legacy) == 3 and legacy[0] == "Q":
+        # A v0.2 frame has more separators; only treat this as legacy when
+        # there are exactly two colons in the full line.
+        if line.count(":") == 2:
+            return {
+                "id": legacy[1],
+                "subject": "auto",
+                "mode": "explain",
+                "prompt": b64d(legacy[2]).strip(),
+            }
 
-    if len(parts) == 5:
+    parts = line.split(":", 4)
+    if len(parts) == 5 and parts[0] == "Q":
         return {
             "id": parts[1],
             "subject": parts[2],
@@ -113,7 +118,10 @@ def parse_request(line):
             "prompt": b64d(parts[4]).strip(),
         }
 
-    raise RuntimeError("Malformed request frame.")
+    if line.startswith("Q:"):
+        raise RuntimeError("Malformed request frame.")
+
+    return None
 
 
 def call_model(prompt, requested_subject="auto", requested_mode="explain"):
@@ -140,7 +148,7 @@ def call_model(prompt, requested_subject="auto", requested_mode="explain"):
         headers={
             "Authorization": "Bearer " + API_KEY,
             "Content-Type": "application/json",
-            "User-Agent": "QuantumBreaksAI-CG50-Bridge/0.2",
+            "User-Agent": "QuantumBreaksAI-CG50-Bridge/0.3",
         },
     )
 
@@ -164,23 +172,46 @@ def call_model(prompt, requested_subject="auto", requested_mode="explain"):
     return subject, mode, answer
 
 
-def send_answer(ser, req_id, text):
-    raw = text.encode("utf-8")
-    if not raw:
-        raw = b"(empty response)"
+def utf8_chunks(text, max_bytes):
+    """Yield UTF-8 chunks without splitting a multibyte character."""
+    current = bytearray()
 
-    seq = 0
-    offset = 0
-    while offset < len(raw):
-        chunk = raw[offset:offset + CHUNK_BYTES]
-        offset += len(chunk)
-        done = 1 if offset >= len(raw) else 0
+    for char in text:
+        encoded = char.encode("utf-8")
+        if current and len(current) + len(encoded) > max_bytes:
+            yield bytes(current)
+            current.clear()
+
+        # A single Unicode scalar is at most 4 UTF-8 bytes, so with the
+        # enforced minimum chunk size this branch is only defensive.
+        if len(encoded) > max_bytes:
+            if current:
+                yield bytes(current)
+                current.clear()
+            yield encoded
+        else:
+            current.extend(encoded)
+
+    if current:
+        yield bytes(current)
+
+
+def send_answer(ser, req_id, text):
+    chunks = list(utf8_chunks(text or "(empty response)", CHUNK_BYTES))
+
+    for seq, chunk in enumerate(chunks):
+        done = 1 if seq == len(chunks) - 1 else 0
         encoded = base64.b64encode(chunk).decode("ascii")
         send_line(ser, "A:%s:%d:%d:%s" % (req_id, seq, done, encoded))
-        seq += 1
 
 
 def handle_line(ser, line):
+    line = line.strip()
+
+    if line == "H:QBAI:2":
+        send_line(ser, "K:QBAI:2")
+        return
+
     try:
         req = parse_request(line)
         if req is None:
@@ -229,10 +260,11 @@ def main():
         print("Set QB_MODEL to the model ID you want Quantum Breaks AI to use.")
         return 2
 
-    print("Quantum Breaks AI CG50 bridge v0.2")
+    print("Quantum Breaks AI CG50 bridge v0.3")
     print("Serial: %s @ %d" % (PORT, BAUD))
     print("API: %s" % API_URL)
     print("Model: %s" % MODEL)
+    print("Handshake: QBAI protocol v2")
     print("Subjects: auto + school subject packs")
     print("Modes: answer, explain, steps, check, quiz, summary, flashcards")
 
