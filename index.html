@@ -205,6 +205,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .promptlist{display:grid;gap:8px}.promptcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;padding:12px;border:1px solid rgba(255,255,255,.065);border-radius:14px;background:rgba(255,255,255,.026)}
 .promptcard h3{margin:0 0 5px;font-size:14px}.promptcard p{margin:0;color:var(--muted);font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.promptactions{display:flex;gap:5px}.promptactions button{height:32px;padding:0 9px;border-radius:9px;background:rgba(255,255,255,.055);font-size:11px;color:#bbb}
 
+
+.searchresults{display:grid;gap:7px}.searchresult{padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);text-align:left}.searchresult:hover{background:rgba(255,255,255,.05);border-color:color-mix(in srgb,var(--accent) 25%,transparent)}.searchresult b{display:block;font-size:12px;margin-bottom:4px}.searchresult span{display:block;font-size:12px;color:var(--muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bookmarkon{color:#ffd67d!important}
+
 </style>
 </head>
 <body>
@@ -220,6 +223,8 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="usageSide">Usage</button>
 <button class="sbtn" id="projectsSide">Projects</button>
 <button class="sbtn" id="promptsSide">Prompt library</button>
+<button class="sbtn" id="findSide">Find in chat</button>
+<button class="sbtn" id="bookmarksSide">Bookmarks</button>
 <button class="sbtn" id="installSide">Install app</button>
 <button class="sbtn" id="imageSide">Create image</button>
 <button class="sbtn" id="videoSide">Create video</button>
@@ -344,6 +349,13 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="filter" data-filter="reasoning">Reasoning</button>
 </div>
 <div class="models" id="models"></div>
+</section>
+
+<section class="modal" id="findModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2 id="findTitle">Find in chat</h2>
+<div class="field"><input id="findInput" placeholder="Search message text"></div>
+<div id="findResults" class="searchresults"></div>
 </section>
 
 <section class="modal" id="promptsModal">
@@ -693,12 +705,13 @@ function renderChat(){
   }else{
     c.messages.forEach(function(m,idx){
       if(m.role==="user"){
-        var w=document.createElement("div");w.className="user";var b=document.createElement("div");b.className="ub";b.textContent=m.content||"";renderFiles(b,m.fileNames);
+        var w=document.createElement("div");w.className="user";w.dataset.msgIndex=idx;var b=document.createElement("div");b.className="ub";b.textContent=m.content||"";renderFiles(b,m.fileNames);
         var ua=document.createElement("div");ua.className="msgtools";ua.style.justifyContent="flex-end";
         var ed=document.createElement("button");ed.textContent="Edit";ed.onclick=function(){editUserMessage(idx)};
-        ua.appendChild(ed);b.appendChild(ua);w.appendChild(b);box.appendChild(w)
+        var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
+        ua.appendChild(ed);ua.appendChild(bm);b.appendChild(ua);w.appendChild(b);box.appendChild(w)
       }else{
-        var a=document.createElement("div");a.className="assistant"+(m.error?" error":"");
+        var a=document.createElement("div");a.className="assistant"+(m.error?" error":"");a.dataset.msgIndex=idx;
         if(m.reasoning){var rb=document.createElement("div");rb.className="reasonbox";rb.textContent=m.reasoning;a.appendChild(rb)}
         var t=document.createElement("div");t.className="md";t.innerHTML=renderMarkdown(m.content||"");a.appendChild(t);
         if(m.images&&m.images.length)m.images.forEach(function(src){var im=document.createElement("img");im.className="generated";im.src=src;a.appendChild(im)});
@@ -709,7 +722,8 @@ function renderChat(){
         var av=document.createElement("button");av.textContent="AI Voice";av.onclick=function(){openVoice(m.content||"")};
         var rg=document.createElement("button");rg.textContent="Regenerate";rg.onclick=function(){regenerate(idx)};
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
-        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(br);
+        var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
+        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(br);tools.appendChild(bm);
         var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");meta.textContent=bits.join(" · ");tools.appendChild(meta);
         a.appendChild(tools);box.appendChild(a)
       }
@@ -725,6 +739,37 @@ function renderChat(){
   qa(".codedownload").forEach(function(b){b.onclick=function(){downloadCode(decodeURIComponent(b.getAttribute("data-code")||""),decodeURIComponent(b.getAttribute("data-lang")||""))}});
   qa(".coderun").forEach(function(b){b.onclick=function(){runJavaScript(decodeURIComponent(b.getAttribute("data-code")||""))}});
   requestAnimationFrame(function(){if(stickToBottom)box.scrollTop=box.scrollHeight;updateScrollButton()})
+}
+
+
+function toggleBookmark(idx){
+  var c=ensure(),m=c.messages[idx];if(!m)return;m.bookmarked=!m.bookmarked;c.updated=Date.now();save();render();toast(m.bookmarked?"Message bookmarked":"Bookmark removed")
+}
+function jumpToMessage(chatId,idx){
+  active=chatId;save();closeModals();render();
+  setTimeout(function(){var el=q('[data-msg-index="'+idx+'"]');if(el)el.scrollIntoView({behavior:"smooth",block:"center"})},60)
+}
+function renderFindResults(bookmarksOnly){
+  var term=(q("#findInput").value||"").toLowerCase(),box=q("#findResults");box.innerHTML="";
+  var results=[];
+  if(bookmarksOnly){
+    chats.forEach(function(ch){(ch.messages||[]).forEach(function(m,idx){if(m.bookmarked)results.push({chat:ch,msg:m,idx:idx})})})
+  }else{
+    var ch=ensure();(ch.messages||[]).forEach(function(m,idx){if(!term||String(m.content||"").toLowerCase().includes(term))results.push({chat:ch,msg:m,idx:idx})})
+  }
+  if(!results.length){box.innerHTML='<div class="notice">'+(bookmarksOnly?"No bookmarked messages yet.":"No matching messages.")+'</div>';return}
+  results.slice(0,120).forEach(function(r){
+    var b=document.createElement("button");b.className="searchresult";
+    var h=document.createElement("b");h.textContent=(r.msg.role==="user"?"You":"NoLimit AI")+(bookmarksOnly?" · "+(r.chat.title||"Chat"):"");
+    var s=document.createElement("span");s.textContent=(r.msg.content||"(attachment)").replace(/\s+/g," ").slice(0,180);
+    b.appendChild(h);b.appendChild(s);b.onclick=function(){jumpToMessage(r.chat.id,r.idx)};box.appendChild(b)
+  })
+}
+function openFindInChat(){
+  q("#findTitle").textContent="Find in chat";q("#findInput").classList.remove("hidden");q("#findInput").value="";openModal("#findModal");renderFindResults(false);setTimeout(function(){q("#findInput").focus()},30)
+}
+function openBookmarks(){
+  q("#findTitle").textContent="Bookmarks";q("#findInput").classList.add("hidden");q("#findInput").value="";openModal("#findModal");renderFindResults(true)
 }
 
 function renderPending(){
@@ -747,6 +792,8 @@ var COMMANDS=[
   {name:"Compare models",hint:"Side by side",run:openCompare},
   {name:"Projects",hint:"Local workspaces",run:openProjects},
   {name:"Prompt library",hint:"Saved reusable prompts",run:openPromptLibrary},
+  {name:"Find in chat",hint:"Search current conversation",run:openFindInChat},
+  {name:"Bookmarks",hint:"Saved messages",run:openBookmarks},
   {name:"Usage dashboard",hint:"OpenRouter key usage",run:openUsage},
   {name:"Diagnostics",hint:"Health check",run:openDiagnostics},
   {name:"Toggle focus mode",hint:"Hide chrome and tools",run:function(){settings.focusMode=!settings.focusMode;save();render()}},
@@ -1494,7 +1541,7 @@ function exportChat(){
 
 function exportWorkspace(){
   var safeSettings=Object.assign({},settings);
-  var data={type:"nolimit-ai-workspace",version:1,exported_at:new Date().toISOString(),settings:safeSettings,projects:projects,chats:chats.filter(function(ch){return !ch.temporary})};
+  var data={type:"nolimit-ai-workspace",version:2,exported_at:new Date().toISOString(),settings:safeSettings,projects:projects,prompts:savedPrompts,chats:chats.filter(function(ch){return !ch.temporary})};
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="nolimit-ai-workspace.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 
@@ -1504,6 +1551,7 @@ async function importWorkspace(file){
     if(!data||data.type!=="nolimit-ai-workspace"||!Array.isArray(data.chats))throw new Error("Not a NoLimit AI workspace backup");
     settings=Object.assign(settings,data.settings||{});
     projects=Array.isArray(data.projects)?data.projects:[];
+    savedPrompts=Array.isArray(data.prompts)?data.prompts:[];
     chats=data.chats.map(function(ch){return Object.assign({},ch,{id:ch.id||uid(),temporary:false})});
     active=chats[0]?chats[0].id:"";save();closeModals();render();toast("Workspace imported")
   }catch(e){toast("Workspace import failed: "+e.message)}
@@ -1674,6 +1722,8 @@ q("#compareSide").onclick=openCompare;
 q("#usageSide").onclick=openUsage;
 q("#projectsSide").onclick=openProjects;
 q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
+q("#findSide").onclick=openFindInChat;
+q("#bookmarksSide").onclick=openBookmarks;
 q("#installSide").onclick=async function(){
   if(installPrompt){
     installPrompt.prompt();
@@ -1721,6 +1771,7 @@ q("#runDiagnostics").onclick=runDiagnostics;
 q("#copyDiagnostics").onclick=function(){navigator.clipboard.writeText(lastDiagReport||"No diagnostics run yet.").then(function(){toast("Diagnostics copied")})};
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
+q("#findInput").oninput=function(){renderFindResults(false)};
 q("#promptSearch").oninput=renderPromptLibrary;
 q("#savePrompt").onclick=savePromptEntry;
 q("#newPrompt").onclick=newPromptEntry;
