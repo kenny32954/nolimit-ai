@@ -675,6 +675,14 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div id="compareOutput" class="comparegrid" style="margin-top:12px"></div>
 </section>
 
+<section class="modal" id="messageEditModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Edit AI response</h2>
+<div class="notice">This edits only your local copy. Edited responses are marked so they are not confused with the model’s original output.</div>
+<div class="field"><textarea id="messageEditText" style="min-height:320px"></textarea></div>
+<div class="row"><button class="primary" id="saveMessageEdit">Save edit</button><button class="secondary" id="restoreMessageOriginal">Restore model original</button></div>
+</section>
+
 <section class="modal" id="chatManageModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Conversation</h2>
@@ -900,6 +908,7 @@ var recorder=null;
 var recorderChunks=[];
 var artifactCode="";
 var manageChatId=null;
+var editMessageIndex=-1;
 var installPrompt=null;
 var lastFocusedElement=null;
 var updateAvailable=false;
@@ -1334,6 +1343,7 @@ function renderChat(){
         }
         var tools=document.createElement("div");tools.className="msgtools";
         var cp=document.createElement("button");cp.textContent="Copy";cp.onclick=function(){navigator.clipboard.writeText(m.content||"").then(function(){toast("Copied")})};
+        var eda=document.createElement("button");eda.textContent="Edit";eda.onclick=function(){openMessageEditor(idx)};
         var sv=document.createElement("button");sv.textContent="Save";sv.onclick=function(){saveResponseFile(m,idx)};
         var rd=document.createElement("button");rd.textContent="Read";rd.onclick=function(){speak(m.content||"")};
         var av=document.createElement("button");av.textContent="AI Voice";av.onclick=function(){openVoice(m.content||"")};
@@ -1346,8 +1356,8 @@ function renderChat(){
         var down=document.createElement("button");down.textContent="👎";down.title="Not helpful";down.className="ratingbtn"+(m.rating===-1?" on":"");down.onclick=function(){rateMessage(idx,-1)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
-        tools.appendChild(cp);tools.appendChild(sv);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(up);tools.appendChild(down);tools.appendChild(bm);tools.appendChild(pin);
-        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");if(m.finishReason&&m.finishReason!=="stop")bits.push("finish "+m.finishReason);if(m.cacheStatus)bits.push("cache "+String(m.cacheStatus).toLowerCase()+(m.cacheAge?" "+m.cacheAge+"s":""));if(m.contextTrimmed)bits.push("fit -"+m.contextTrimmed+" msgs");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
+        tools.appendChild(cp);tools.appendChild(eda);tools.appendChild(sv);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(up);tools.appendChild(down);tools.appendChild(bm);tools.appendChild(pin);
+        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");if(m.editedByUser)bits.push("locally edited");if(m.finishReason&&m.finishReason!=="stop")bits.push("finish "+m.finishReason);if(m.cacheStatus)bits.push("cache "+String(m.cacheStatus).toLowerCase()+(m.cacheAge?" "+m.cacheAge+"s":""));if(m.contextTrimmed)bits.push("fit -"+m.contextTrimmed+" msgs");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
     })
@@ -2992,6 +3002,23 @@ function speak(text){
   speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(String(text||"").replace(/[\x60*_#>\[\]()]/g," "));speechSynthesis.speak(u)
 }
 
+function openMessageEditor(idx){
+  var c=ensure(),m=c.messages[idx];if(!m||m.role!=="assistant")return;
+  editMessageIndex=idx;q("#messageEditText").value=m.content||"";
+  q("#restoreMessageOriginal").disabled=!m.originalContent;
+  openModal("#messageEditModal");setTimeout(function(){q("#messageEditText").focus()},30)
+}
+function saveMessageEdit(){
+  var c=ensure(),m=c.messages[editMessageIndex];if(!m||m.role!=="assistant")return;
+  var text=q("#messageEditText").value;
+  if(!m.originalContent)m.originalContent=m.content||"";
+  m.content=text;m.editedByUser=true;m.editedAt=Date.now();c.updated=Date.now();save();closeModals();render();toast("Local response edit saved")
+}
+function restoreMessageOriginal(){
+  var c=ensure(),m=c.messages[editMessageIndex];if(!m||!m.originalContent)return;
+  m.content=m.originalContent;m.originalContent="";m.editedByUser=false;m.editedAt=0;c.updated=Date.now();save();closeModals();render();toast("Original model response restored")
+}
+
 function responseMarkdown(m,idx){
   var lines=["# Quantum Breaks AI response","",m.content||""],links=citationLinks(m.annotations);
   if(links.length){lines.push("","## Sources","");links.forEach(function(x){lines.push("- "+x.title+" — "+x.url)})}
@@ -3848,6 +3875,8 @@ q("#saveScratchpad").onclick=saveScratchpad;
 q("#insertScratchpad").onclick=insertScratchpad;
 q("#clearScratchpad").onclick=clearScratchpad;
 q("#micBtn").onclick=toggleMic;
+q("#saveMessageEdit").onclick=saveMessageEdit;
+q("#restoreMessageOriginal").onclick=restoreMessageOriginal;
 q("#clearRunner").onclick=function(){q("#runnerOutput").textContent=""};
 q("#artifactRun").onclick=function(){artifactCode=q("#artifactEditor").value;q("#artifactFrame").srcdoc=artifactCode;toast("Preview refreshed")};
 q("#artifactDownload").onclick=function(){artifactCode=q("#artifactEditor").value;downloadCode(artifactCode,"html")};
