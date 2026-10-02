@@ -2366,12 +2366,14 @@ function analyticsData(){
       messages++;
       if(m.usage&&m.usage.total_tokens!=null)tokens+=Number(m.usage.total_tokens)||0;
       if(m.cost!=null)cost+=Number(m.cost)||0;
+      if(m.review&&m.review.cost!=null)cost+=Number(m.review.cost)||0;
       attachments+=(m.fileNames||[]).length;
       if(m.role==="assistant"&&m.model){
         modelsUsed[m.model]=(modelsUsed[m.model]||0)+1;
         if(m.rating===1||m.rating===-1){modelRatings[m.model]=modelRatings[m.model]||{up:0,down:0};if(m.rating===1)modelRatings[m.model].up++;else modelRatings[m.model].down++}
       }
-    })
+    });
+    if(ch.lastSummaryCost!=null)cost+=Number(ch.lastSummaryCost)||0
   });
   return {activeChats:activeChats,messages:messages,tokens:tokens,cost:cost,attachments:attachments,modelsUsed:modelsUsed,modelRatings:modelRatings}
 }
@@ -2390,7 +2392,7 @@ function renderAnalytics(){
   sorted.forEach(function(id){var row=document.createElement("div");row.className="analyticsModel";var b=document.createElement("b");b.textContent=id;var s=document.createElement("span"),rating=d.modelRatings[id],ratingText="";if(rating){var total=rating.up+rating.down;if(total)ratingText=" · "+Math.round(rating.up/total*100)+"% helpful ("+total+" rated)"}s.textContent=d.modelsUsed[id]+" replies"+ratingText;row.appendChild(b);row.appendChild(s);modelBox.appendChild(row)})
 }
 function exportAnalyticsCSV(){
-  var rows=[["date","chat","role","model","tokens","cost","attachments"]];
+  var rows=[["date","chat","role","model","tokens","cost","review_cost","rating","attachments"]];
   chats.filter(function(ch){return !ch.trashedAt}).forEach(function(ch){
     (ch.messages||[]).forEach(function(m){
       rows.push([
@@ -2400,6 +2402,8 @@ function exportAnalyticsCSV(){
         m.model||"",
         m.usage&&m.usage.total_tokens!=null?m.usage.total_tokens:"",
         m.cost!=null?m.cost:"",
+        m.review&&m.review.cost!=null?m.review.cost:"",
+        m.rating||"",
         (m.fileNames||[]).length
       ])
     })
@@ -3181,6 +3185,13 @@ async function importBackup(file){
           cacheStatus:m.cacheStatus,
           cacheAge:m.cacheAge,
           cacheTTL:m.cacheTTL,
+          finishReason:m.finishReason,
+          contextTrimmed:Number(m.contextTrimmed)||0,
+          rating:Number(m.rating)||0,
+          review:m.review,
+          editedByUser:!!m.editedByUser,
+          editedAt:m.editedAt||0,
+          originalContent:m.originalContent||"",
           bookmarked:!!m.bookmarked,
           contextPinned:!!m.contextPinned,
           fileNames:Array.isArray(m.fileNames)?m.fileNames:[],
@@ -3205,9 +3216,9 @@ async function importBackup(file){
 
 function chatStatsText(c){
   var messages=(c.messages||[]).length,tokens=0,cost=0;
-  (c.messages||[]).forEach(function(m){if(m.usage&&m.usage.total_tokens!=null)tokens+=Number(m.usage.total_tokens)||0;if(m.cost!=null)cost+=Number(m.cost)||0});
+  (c.messages||[]).forEach(function(m){if(m.usage&&m.usage.total_tokens!=null)tokens+=Number(m.usage.total_tokens)||0;if(m.cost!=null)cost+=Number(m.cost)||0;if(m.review&&m.review.cost!=null)cost+=Number(m.review.cost)||0});if(c.lastSummaryCost!=null)cost+=Number(c.lastSummaryCost)||0;
   var p=projectForChat(c),bits=[messages+" messages"];
-  if(tokens)bits.push(formatTokenCount(tokens)+" generated tokens");
+  if(tokens)bits.push(formatTokenCount(tokens)+" tracked tokens");
   if(cost)bits.push(money(cost)+" tracked cost");
   if(p)bits.push("project: "+p.name);
   if(c.compactSummary)bits.push("context compressed"+(c.lastSummaryCost!=null?" "+money(c.lastSummaryCost):""));
