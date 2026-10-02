@@ -894,6 +894,7 @@ var modelInfoCurrent=null;
 var lastComparePrompt="";
 var lastCompareResults=[];
 var busy=false;
+var busyChatId="";
 var controller=null;
 var recorder=null;
 var recorderChunks=[];
@@ -2161,7 +2162,11 @@ async function updateCompactSummaryForSend(c){
 }
 
 async function send(){
-  if(busy){if(controller)controller.abort();return}
+  if(busy){
+    if(current()&&current().id===busyChatId){if(controller)controller.abort()}
+    else toast("Another conversation is generating. Open that conversation to stop it or wait for it to finish.");
+    return
+  }
   hideSlashMenu();
   var text=q("#prompt").value.trim();if(!text&&!pending.length)return;
   if(!pending.length&&handleCommand(text))return;
@@ -2183,7 +2188,7 @@ async function send(){
     }catch(summaryError){toast("Context summary skipped: "+summaryError.message)}
   }
   var requestMessages=fit.messages;
-  var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:requestModel,contextTrimmed:fit.trimmed||0};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";q("#send").classList.add("busy");render();
+  var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:requestModel,contextTrimmed:fit.trimmed||0};c.messages.push(a);save();busy=true;busyChatId=c.id;controller=new AbortController();render();
   if(fit.trimmed)toast("Context fit skipped "+fit.trimmed+" older message"+(fit.trimmed===1?"":"s")+" for this request");
   if(fit.over)toast("This request is still close to or over the selected model's context limit.");
   try{
@@ -2233,7 +2238,7 @@ async function send(){
     if(e.name==="AbortError"&&!a.content)c.messages.pop();
     save()
   }finally{
-    busy=false;controller=null;q("#send").textContent="↑";q("#send").classList.remove("busy");render();if(settings.autoSpeak&&a.content&&!a.error)speak(a.content);
+    busy=false;busyChatId="";controller=null;render();if(settings.autoSpeak&&a.content&&!a.error)speak(a.content);
     if(settings.review&&a.content&&!a.error)reviewAnswer(c,m.content,a)
   }
 }
