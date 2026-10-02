@@ -271,6 +271,11 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .reviewbox{margin:12px 0 6px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.025);overflow:hidden}.reviewbox summary{cursor:pointer;padding:10px 12px;font-size:12px;color:#aaa}.reviewbox.good summary{color:#95d4aa}.reviewbox.warn summary{color:#e6b37e}.reviewbody{padding:0 12px 11px;font-size:12px;line-height:1.5;color:#aaa}.reviewbody ul{margin:7px 0 0;padding-left:18px}.reviewbody .reviewnote{font-size:10px;color:#666;margin-top:8px}.reviewing{margin:8px 0;font-size:11px;color:#777}
 
+
+.buildbadge{padding:9px 11px 2px;font-size:9px;color:#4f4c53;letter-spacing:.06em}.buildbadge:hover{color:#77737b}
+.changelog{display:grid;gap:8px}.changelog h3{margin:9px 0 0;font-size:14px}.changelog ul{margin:5px 0 4px;padding-left:20px;color:#b1adb3;font-size:13px;line-height:1.55}.changelog li{margin:4px 0}
+.updateDot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accentGlow);margin-right:6px}
+
 </style>
 </head>
 <body>
@@ -317,8 +322,10 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 <div class="navgroup"><div class="navlabel">App</div>
 <button class="sbtn" id="installSide">Install app</button>
+<button class="sbtn" id="whatsNewSide">What’s new</button>
 <button class="sbtn" id="settingsBtn">Settings</button>
 <button class="sbtn" id="sideAuth">Connect OpenRouter</button></div>
+<div class="buildbadge" id="buildBadge">Quantum Breaks AI</div>
 </div>
 </aside>
 <div class="shade" id="shade"></div>
@@ -377,6 +384,20 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button id="selScratchpad">Scratchpad</button>
 </div>
 <div class="modalShade" id="modalShade"></div>
+
+<section class="modal" id="whatsNewModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>What’s new</h2>
+<div class="notice" id="whatsNewVersion"></div>
+<div class="changelog">
+<h3>Reliability</h3>
+<ul><li>Draft attachments now survive reloads.</li><li>Portable backups preserve local media references safely.</li><li>Model catalog caching and compatibility preflight reduce avoidable request failures.</li></ul>
+<h3>AI workflow</h3>
+<ul><li>Strict JSON Schema responses.</li><li>Optional second-pass answer review.</li><li>Prompt improver, snapshots, context compression, tags, and conversation outline.</li></ul>
+<h3>Workspace</h3>
+<ul><li>Persistent image/PDF storage, encrypted backups, analytics, archives, trash, global search, and local profiles.</li></ul>
+</div>
+</section>
 
 <section class="modal" id="commandModal">
 <button class="icon closemodal" data-close="1">✕</button>
@@ -728,6 +749,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
+var APP_VERSION="2.1.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -800,6 +822,8 @@ var recorderChunks=[];
 var artifactCode="";
 var manageChatId=null;
 var installPrompt=null;
+var lastFocusedElement=null;
+var updateAvailable=false;
 var imageReferenceData="";
 var videoFrameData="";
 var videoReferenceData="";
@@ -875,9 +899,17 @@ function setActiveModel(id){var c=current();if(c&&c.modelOverride)c.modelOverrid
 function projectForChat(c){return c&&c.projectId?projects.find(function(p){return p.id===c.projectId}):null}
 function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save()}return c}
 function closeSide(){q("#side").classList.remove("open");q("#shade").classList.remove("show")}
-function openModal(id){q("#modalShade").classList.add("show");q(id).classList.add("show")}
-function closeModals(){q("#modalShade").classList.remove("show");qa(".modal").forEach(function(m){m.classList.remove("show")})}
-function toast(t){var d=document.createElement("div");d.className="toast";d.textContent=t;d.title="Click to dismiss";d.onclick=function(){d.remove()};document.body.appendChild(d);setTimeout(function(){if(d.isConnected)d.remove()},2500)}
+function openModal(id){
+  lastFocusedElement=document.activeElement;
+  q("#modalShade").classList.add("show");var modal=q(id);modal.classList.add("show");
+  setTimeout(function(){var f=modal.querySelector('input:not([type="hidden"]),textarea,select,button:not([disabled])');if(f)f.focus()},20)
+}
+function closeModals(){
+  q("#modalShade").classList.remove("show");qa(".modal").forEach(function(m){m.classList.remove("show")});
+  if(lastFocusedElement&&lastFocusedElement.focus)try{lastFocusedElement.focus()}catch(e){}
+  lastFocusedElement=null
+}
+function toast(t){var d=document.createElement("div");d.className="toast";d.setAttribute("role","status");d.setAttribute("aria-live","polite");d.textContent=t;d.title="Click to dismiss";d.onclick=function(){d.remove()};document.body.appendChild(d);setTimeout(function(){if(d.isConnected)d.remove()},2500)}
 function toastAction(text,label,action){
   var d=document.createElement("div");d.className="toast toastaction";
   var s=document.createElement("span");s.textContent=text;
@@ -1423,6 +1455,24 @@ function renderPending(){
 }
 
 
+function setupAccessibility(){
+  q("#prompt").setAttribute("aria-label","Message Quantum Breaks AI");
+  q("#send").setAttribute("aria-label","Send message");
+  q("#chat").setAttribute("role","log");q("#chat").setAttribute("aria-label","Conversation");
+  q("#status").setAttribute("aria-live","polite");
+  q("#buildBadge").textContent="v"+APP_VERSION;
+  var labels={menuBtn:"Open sidebar",closeSide:"Close sidebar",commandBtn:"Open command palette",lightboxClose:"Close image preview",attach:"Attach files",promptLibBtn:"Prompt library",improvePromptBtn:"Improve prompt",micBtn:"Record audio",imageBtn:"Create image",send:"Send message",scrollBottom:"Jump to latest"};
+  Object.keys(labels).forEach(function(id){var el=q("#"+id);if(el)el.setAttribute("aria-label",labels[id])});
+  qa(".modal").forEach(function(m,i){
+    m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
+    var h=m.querySelector("h2");if(h){if(!h.id)h.id="modal-title-"+i;m.setAttribute("aria-labelledby",h.id)}
+  })
+}
+function openWhatsNew(){
+  q("#whatsNewVersion").innerHTML='<span class="updateDot"></span>Quantum Breaks AI v'+APP_VERSION;
+  openModal("#whatsNewModal")
+}
+
 var COMMANDS=[
   {name:"New chat",hint:"Ctrl/Cmd+N",run:newChat},
   {name:"Undo last edit/regeneration",hint:"Restore previous conversation state",run:undoLastMutation},
@@ -1452,6 +1502,7 @@ var COMMANDS=[
   {name:"Diagnostics",hint:"Health check",run:openDiagnostics},
   {name:"Storage manager",hint:"Media persistence + cleanup",run:openStorageManager},
   {name:"Toggle focus mode",hint:"Hide chrome and tools",run:function(){settings.focusMode=!settings.focusMode;save();render()}},
+  {name:"What’s new",hint:"Current build and upgrades",run:openWhatsNew},
   {name:"Settings",hint:"Appearance + API",run:openSettings},
   {name:"Toggle temporary chat",hint:"Do not persist after reload",run:function(){var c=ensure();c.temporary=!c.temporary;save();render()}},
   {name:"Export Markdown",hint:"Current chat",run:exportChat},
@@ -3036,6 +3087,7 @@ q("#outlineSide").onclick=openOutline;
 q("#bookmarksSide").onclick=openBookmarks;
 q("#archiveSide").onclick=openArchive;
 q("#trashSide").onclick=openTrash;
+q("#whatsNewSide").onclick=openWhatsNew;
 q("#installSide").onclick=async function(){
   if(installPrompt){
     installPrompt.prompt();
@@ -3229,6 +3281,7 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();ins
 if("serviceWorker" in navigator&&location.protocol==="https:"){
   navigator.serviceWorker.register("./sw.js").catch(function(){})
 }
+setupAccessibility();
 finishAuth().then(function(){render();restoreDraft();setTimeout(function(){ensureModelCatalog().then(function(){render()})},250)})
 })();
 </script>
