@@ -176,8 +176,10 @@
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Conversation</h2>
 <div class="field"><label>Title</label><input id="chatTitleInput" maxlength="80"></div>
+<div class="notice" id="chatStats"></div>
 <div class="row">
 <button class="primary" id="renameChat">Rename</button>
+<button class="secondary" id="pinChat">Pin</button>
 <button class="secondary" id="duplicateChat">Duplicate</button>
 <button class="danger" id="deleteChat">Delete</button>
 </div>
@@ -394,14 +396,14 @@ function render(){
 function renderHistory(){
   var term=(q("#chatSearch").value||"").toLowerCase();
   var box=q("#history");box.innerHTML="";
-  chats.slice().sort(function(a,b){return(b.updated||0)-(a.updated||0)}).filter(function(c){
+  chats.slice().sort(function(a,b){if(!!a.pinned!==!!b.pinned)return a.pinned?-1:1;return(b.updated||0)-(a.updated||0)}).filter(function(c){
     if(!term)return true;
     if((c.title||"").toLowerCase().includes(term))return true;
     var p=projectForChat(c);if(p&&(p.name||"").toLowerCase().includes(term))return true;
     return (c.messages||[]).some(function(m){return String(m.content||"").toLowerCase().includes(term)})
   }).forEach(function(c){
     var row=document.createElement("div");row.className="historyitem"+(c.id===active?" on":"");
-    var b=document.createElement("button");b.className="hrow";b.textContent=c.title||"New chat";
+    var b=document.createElement("button");b.className="hrow";b.textContent=(c.pinned?"◆ ":"")+(c.title||"New chat");
     b.onclick=function(){active=c.id;save();closeSide();render()};
     var more=document.createElement("button");more.className="chatmore";more.textContent="⋯";
     more.onclick=function(e){e.stopPropagation();manageChatId=c.id;openChatManage()};
@@ -1166,15 +1168,32 @@ async function importBackup(file){
   }catch(e){toast("Import failed: "+e.message)}
 }
 
+function chatStatsText(c){
+  var messages=(c.messages||[]).length,tokens=0,cost=0;
+  (c.messages||[]).forEach(function(m){if(m.usage&&m.usage.total_tokens!=null)tokens+=Number(m.usage.total_tokens)||0;if(m.cost!=null)cost+=Number(m.cost)||0});
+  var p=projectForChat(c),bits=[messages+" messages"];
+  if(tokens)bits.push(formatTokenCount(tokens)+" generated tokens");
+  if(cost)bits.push(money(cost)+" tracked cost");
+  if(p)bits.push("project: "+p.name);
+  if(c.temporary)bits.push("temporary");
+  return bits.join(" · ")
+}
 function openChatManage(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
   q("#chatTitleInput").value=c.title||"New chat";
+  q("#chatStats").textContent=chatStatsText(c);
+  q("#pinChat").textContent=c.pinned?"Unpin":"Pin";
   openModal("#chatManageModal")
 }
 
 function renameManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
   c.title=q("#chatTitleInput").value.trim().slice(0,80)||"New chat";c.updated=Date.now();save();closeModals();render()
+}
+
+function togglePinnedChat(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  c.pinned=!c.pinned;c.updated=Date.now();save();q("#pinChat").textContent=c.pinned?"Unpin":"Pin";renderHistory();toast(c.pinned?"Chat pinned":"Chat unpinned")
 }
 
 function duplicateManagedChat(){
@@ -1326,6 +1345,7 @@ q("#generateVoice").onclick=generateVoice;
 q("#voiceModel").onchange=function(){q("#voiceName").value=defaultVoiceFor(q("#voiceModel").value)};
 q("#generateVideo").onclick=generateVideo;
 q("#renameChat").onclick=renameManagedChat;
+q("#pinChat").onclick=togglePinnedChat;
 q("#duplicateChat").onclick=duplicateManagedChat;
 q("#deleteChat").onclick=deleteManagedChat;
 q("#micBtn").onclick=toggleMic;
