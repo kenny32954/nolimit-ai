@@ -493,6 +493,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field" style="flex:1;min-width:180px"><label>Response format</label><select id="responseFormat"><option value="text">Normal text</option><option value="json_object">JSON object</option><option value="json_schema">Strict JSON Schema</option></select></div>
 <div class="field" style="flex:1;min-width:180px"><label>Max output tokens</label><input id="maxTokens" type="number" min="0" step="256" placeholder="0 = model default"></div>
 <div class="field" style="flex:1;min-width:180px"><label>Request cost warning</label><input id="costWarnThreshold" type="number" min="0" step="0.01" placeholder="0 = off"><div class="smallnote">Warn before a request whose rough model-token estimate exceeds this many dollars.</div></div>
+<div class="field" style="flex:1;min-width:180px"><label>Daily tracked-spend warning</label><input id="dailySpendBudget" type="number" min="0" step="0.01" placeholder="0 = off"><div class="smallnote">Warn when today’s locally tracked model cost plus this request would exceed the amount.</div></div>
 <div class="field" style="flex:1;min-width:180px"><label>History messages sent</label><input id="historyLimit" type="number" min="0" step="1" placeholder="0 = all"><div class="smallnote">Optional context cap. 0 sends the full conversation.</div></div>
 <div class="field" style="flex:1;min-width:180px"><label>Context summary model</label><input id="summaryModel" placeholder="openrouter/auto"></div>
 </div>
@@ -924,6 +925,7 @@ var settings=Object.assign({
   requireParameters:false,
   maxTokens:0,
   costWarnThreshold:0,
+  dailySpendBudget:0,
   historyLimit:0,
   autoCompressContext:false,
   summaryModel:"openrouter/auto",
@@ -1264,7 +1266,7 @@ function render(){
   q("#status").textContent=!navigator.onLine?"Offline":((isConnected()?"Connected":"Not connected")+ctxText);
   q("#status").classList.toggle("warn",!!(limit&&approx/limit>.8));
   var promptPrice=modelInfo&&modelInfo.pricing&&modelInfo.pricing.prompt!=null?Number(modelInfo.pricing.prompt):NaN;
-  var tip=[];if(limit)tip.push("Approximate context: "+formatTokenCount(approx)+" of "+formatTokenCount(limit));if(isFinite(promptPrice))tip.push("Estimated current input cost: "+money(promptPrice*approx));q("#status").title=tip.join(" · ");
+  var tip=[];if(limit)tip.push("Approximate context: "+formatTokenCount(approx)+" of "+formatTokenCount(limit));if(isFinite(promptPrice))tip.push("Estimated current input cost: "+money(promptPrice*approx));var todaySpend=trackedSpendToday();if(todaySpend>0)tip.push("Tracked today: "+money(todaySpend));q("#status").title=tip.join(" · ");
   q("#topAuth").textContent=isConnected()?"Connected":"Connect";
   q("#topAuth").classList.toggle("ok",isConnected());
   q("#sideAuth").textContent=isConnected()?"OpenRouter connected":"Connect OpenRouter";
@@ -1951,6 +1953,7 @@ function openSettings(){
   q("#requireParameters").checked=!!settings.requireParameters;
   q("#maxTokens").value=settings.maxTokens||0;
   q("#costWarnThreshold").value=settings.costWarnThreshold||0;
+  q("#dailySpendBudget").value=settings.dailySpendBudget||0;
   q("#historyLimit").value=settings.historyLimit||0;
   q("#autoCompressContext").checked=!!settings.autoCompressContext;
   q("#summaryModel").value=settings.summaryModel||"openrouter/auto";
@@ -2368,6 +2371,27 @@ function confirmEstimatedCost(c,text,files){
   var est=roughRequestCost(c,text,files,true);if(!est||!isFinite(est.cost)||est.cost<threshold)return true;
   return confirm("Rough token-cost estimate: "+money(est.cost)+" for "+est.model+". This can be higher when tools, agents, reviews, or media are used. Send anyway?")
 }
+function localDayKey(ts){
+  var d=new Date(ts||Date.now());return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")
+}
+function trackedSpendToday(){
+  var key=localDayKey(),sum=0;
+  chats.forEach(function(ch){
+    (ch.messages||[]).forEach(function(m){
+      if(m.role!=="assistant"||localDayKey(m.created)!==key)return;
+      if(m.cost!=null)sum+=Number(m.cost)||0;
+      if(m.review&&m.review.cost!=null)sum+=Number(m.review.cost)||0
+    });
+    if(ch.lastSummaryCost!=null&&ch.lastSummaryAt&&localDayKey(ch.lastSummaryAt)===key)sum+=Number(ch.lastSummaryCost)||0
+  });
+  return sum
+}
+function confirmDailySpend(c,text,files){
+  var budget=Number(settings.dailySpendBudget)||0;if(budget<=0)return true;
+  var spent=trackedSpendToday(),est=roughRequestCost(c,text,files,true),next=est&&isFinite(est.cost)?est.cost:0;
+  if(spent+next<=budget)return true;
+  return confirm("Daily tracked-spend warning: about "+money(spent)+" has been tracked today"+(next?(" and this request is roughly "+money(next)):"")+", above your "+money(budget)+" warning level. Send anyway?")
+}
 
 async function preflightSend(files){
   if(settings.responseFormat==="json_schema"){
@@ -2426,7 +2450,7 @@ async function updateCompactSummaryForSend(c){
   var m=j.choices&&j.choices[0]&&j.choices[0].message||{},holder={content:"",images:[]};collectOutputContent(m.content,holder);
   var summary=String(holder.content||"").trim();if(!summary)throw new Error("No context summary was returned");
   c.compactSummary=summary;c.compactCount=cutoff;c.updated=Date.now();
-  c.lastSummaryUsage=j.usage||{};c.lastSummaryCost=j.usage&&j.usage.cost!=null?j.usage.cost:j.cost;save();return true
+  c.lastSummaryUsage=j.usage||{};c.lastSummaryCost=j.usage&&j.usage.cost!=null?j.usage.cost:j.cost;c.lastSummaryAt=Date.now();save();return true
 }
 
 async function send(){
@@ -2442,6 +2466,7 @@ async function send(){
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
   var files=pending.slice();if(!await preflightSend(files))return;
   var c=ensure();if(!confirmEstimatedCost(c,text,files))return;
+  if(!confirmDailySpend(c,text,files))return;
   if(text)rememberSentPrompt(text);
   pending=[];q("#prompt").value="";c.draft="";c.draftFiles=[];
   var aud=files.filter(function(f){return f.kind==="audio"});
@@ -2455,6 +2480,16 @@ async function send(){
       toast("Summarizing older context…");
       if(await updateCompactSummaryForSend(c))fit=fitRequestMessages(apiMessages(c),requestModel)
     }catch(summaryError){toast("Context summary skipped: "+summaryError.message)}
+  }
+  if(fit.over){
+    c.messages.pop();
+    pending=files.filter(function(f){return f.kind!=="audio"});
+    q("#prompt").value=m.content||text||"";
+    c.draft=q("#prompt").value;c.draftFiles=[];
+    pending.forEach(function(f){if(f.mediaId)c.draftFiles.push({name:f.name,size:f.size,kind:f.kind,mediaId:f.mediaId,text:f.kind==="text"?f.text:undefined})});
+    save();renderPending();resizePrompt();render();
+    toastAction("This request is still too large for the selected model context.","Models",function(){loadModels()});
+    return
   }
   var requestMessages=fit.messages;
   var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:requestModel,contextTrimmed:fit.trimmed||0};c.messages.push(a);save();busy=true;busyChatId=c.id;controller=new AbortController();render();
@@ -4196,7 +4231,7 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.costWarnThreshold=Math.max(0,Number(q("#costWarnThreshold").value)||0);settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.autoCompressContext=q("#autoCompressContext").checked;settings.summaryModel=q("#summaryModel").value.trim()||"openrouter/auto";settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.costWarnThreshold=Math.max(0,Number(q("#costWarnThreshold").value)||0);settings.dailySpendBudget=Math.max(0,Number(q("#dailySpendBudget").value)||0);settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.autoCompressContext=q("#autoCompressContext").checked;settings.summaryModel=q("#summaryModel").value.trim()||"openrouter/auto";settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#commandSearch").oninput=function(){commandActiveIndex=0;renderCommandPalette()};
 q("#commandSearch").onkeydown=function(e){
