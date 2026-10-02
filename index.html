@@ -905,6 +905,7 @@ var imageReferenceData="";
 var videoFrameData="";
 var videoReferenceData="";
 var renderTimer=null;
+var streamSaveTimer=null;
 var draftTimer=null;
 var selectedText="";
 var lightboxSrc="";
@@ -914,8 +915,8 @@ var slashActiveIndex=0;
 var lastMutationUndo=null;
 var saveWarned=false;
 function scheduleRender(){
-  if(renderTimer)return;
-  renderTimer=setTimeout(function(){renderTimer=null;render()},40)
+  if(!renderTimer)renderTimer=setTimeout(function(){renderTimer=null;render()},40);
+  if(!streamSaveTimer)streamSaveTimer=setTimeout(function(){streamSaveTimer=null;save()},900)
 }
 
 function q(s){return document.querySelector(s)}
