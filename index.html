@@ -935,6 +935,8 @@ var commandActiveIndex=0;
 var slashActiveIndex=0;
 var lastMutationUndo=null;
 var saveWarned=false;
+var cachedContextChatId="";
+var cachedContextTokens=0;
 function scheduleRender(){
   if(!renderTimer)renderTimer=setTimeout(function(){renderTimer=null;render()},40);
   if(!streamSaveTimer)streamSaveTimer=setTimeout(function(){streamSaveTimer=null;save()},900)
@@ -1200,7 +1202,7 @@ function render(){
   var currentModel=effectiveModel(c);
   q("#modelBottom").textContent=(c.modelOverride?"🔒 ":(cp&&cp.model?"◆ ":""))+currentModel;
   q("#modelBottom").title=c.modelOverride?"Chat-locked model":(cp&&cp.model?"Project default model":"Global model");
-  var approx=approxContextTokens(c);
+  var approx=approxContextTokens(c);cachedContextChatId=c.id;cachedContextTokens=approx;
   var modelInfo=models.find(function(m){return m.id===currentModel}),limit=modelInfo&&modelInfo.context_length?Number(modelInfo.context_length):0;
   var ctxText=approx?" · ~"+formatTokenCount(approx)+(limit?"/"+formatTokenCount(limit):"")+" ctx":"";
   q("#status").textContent=!navigator.onLine?"Offline":((isConnected()?"Connected":"Not connected")+ctxText);
@@ -2135,18 +2137,19 @@ async function improvePrompt(){
   b.disabled=false;b.classList.remove("loading");b.textContent="✧"
 }
 
-function roughRequestCost(c,text,files){
+function roughRequestCost(c,text,files,exact){
   var modelId=effectiveModel(c),info=models.find(function(m){return m.id===modelId});if(!info||!info.pricing)return null;
   var p=Number(info.pricing.prompt),o=Number(info.pricing.completion);if(!isFinite(p)&&!isFinite(o))return null;
   if(!isFinite(p))p=0;if(!isFinite(o))o=0;
   var chars=String(text||"").length;
   (files||[]).forEach(function(f){if(f.kind==="text")chars+=String(f.text||"").length;else if(f.kind==="image")chars+=4000;else if(f.kind==="pdf")chars+=8000});
-  var inputTokens=approxContextTokens(c)+Math.ceil(chars/4),outputTokens=Number(settings.maxTokens)||2048;
+  var baseTokens=!exact&&c&&c.id===cachedContextChatId?cachedContextTokens:approxContextTokens(c);
+  var inputTokens=baseTokens+Math.ceil(chars/4),outputTokens=Number(settings.maxTokens)||2048;
   return {model:modelId,inputTokens:inputTokens,outputTokens:outputTokens,cost:p*inputTokens+o*outputTokens}
 }
 function confirmEstimatedCost(c,text,files){
   var threshold=Number(settings.costWarnThreshold)||0;if(threshold<=0)return true;
-  var est=roughRequestCost(c,text,files);if(!est||!isFinite(est.cost)||est.cost<threshold)return true;
+  var est=roughRequestCost(c,text,files,true);if(!est||!isFinite(est.cost)||est.cost<threshold)return true;
   return confirm("Rough token-cost estimate: "+money(est.cost)+" for "+est.model+". This can be higher when tools, agents, reviews, or media are used. Send anyway?")
 }
 
