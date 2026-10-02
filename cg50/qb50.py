@@ -3,7 +3,7 @@
 # Conservative built-ins only for calculator compatibility.
 
 WIDTH = 21
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 history = []
 subject = "auto"
@@ -14,12 +14,21 @@ SUBJECTS = (
     "geometry", "statistics",
     "calculus", "biology",
     "chemistry", "physics",
-    "earth", "ela",
-    "literature", "writing",
-    "history", "government",
+    "earth",
+    "environmental_science",
+    "ela", "literature",
+    "writing", "history",
+    "social_studies",
+    "geography", "government",
     "economics", "business",
+    "accounting",
     "computer_science",
-    "language", "health"
+    "engineering", "cte",
+    "agriculture",
+    "psychology", "sociology",
+    "art", "music", "media",
+    "language", "health",
+    "physical_education"
 )
 
 MODES = (
@@ -123,17 +132,16 @@ def help_screen():
     print("/about")
     print("/quit")
     rule()
-    print("Live subject-aware")
-    print("AI transport is next.")
+    print("All-subject routing")
+    print("is ready in bridge.")
 
 
 def about():
     print("Quantum Breaks AI")
     print("fx-CG50 school")
     print("assistant prototype.")
-    print("All-subject routing")
-    print("is built into the")
-    print("desktop bridge.")
+    print("Named subject packs")
+    print("+ general fallback.")
 
 
 def math_mode():
