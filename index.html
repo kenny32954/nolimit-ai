@@ -513,6 +513,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="filter" data-filter="structured">Structured</button>
 <button class="filter" data-filter="compatible">Compatible now</button>
 </div>
+<div class="row" style="margin:0 0 10px"><button class="secondary" id="pickFreeCompatible">Largest-context free compatible</button><button class="secondary" id="pickCheapestCompatible">Lowest-cost compatible</button></div>
 <div class="models" id="models"></div>
 </section>
 
@@ -599,6 +600,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field"><label>Name</label><input id="projectName" maxlength="80" placeholder="Project name"></div>
 <div class="field"><label>Project instructions</label><textarea id="projectInstructions" placeholder="How Quantum Breaks AI should behave inside this project"></textarea></div>
 <div class="field"><label>Project knowledge</label><textarea id="projectKnowledge" placeholder="Paste reference notes, lore, specifications, or other context"></textarea><div class="smallnote">Keep this reasonably sized because it is sent with each project chat.</div></div>
+<div class="field"><label>Project chats</label><div id="projectChatList" class="searchresults"></div></div>
 <div class="row">
 <button class="primary" id="saveProject">Save project</button>
 <button class="secondary" id="newProject">New project</button>
@@ -621,6 +623,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Local analytics</h2>
 <div class="notice">Calculated entirely from conversation data stored in this browser.</div>
+<div class="row" style="margin-bottom:10px"><button class="secondary" id="exportAnalytics">Export CSV</button></div>
 <div id="analyticsGrid" class="usagegrid"></div>
 <div style="height:14px"></div>
 <h3 style="margin:0 0 8px">Recent activity</h3>
@@ -2233,6 +2236,25 @@ function renderAnalytics(){
   if(!sorted.length)modelBox.innerHTML='<div class="notice">No model usage recorded yet.</div>';
   sorted.forEach(function(id){var row=document.createElement("div");row.className="analyticsModel";var b=document.createElement("b");b.textContent=id;var s=document.createElement("span");s.textContent=d.modelsUsed[id]+" replies";row.appendChild(b);row.appendChild(s);modelBox.appendChild(row)})
 }
+function exportAnalyticsCSV(){
+  var rows=[["date","chat","role","model","tokens","cost","attachments"]];
+  chats.filter(function(ch){return !ch.trashedAt}).forEach(function(ch){
+    (ch.messages||[]).forEach(function(m){
+      rows.push([
+        m.created?new Date(m.created).toISOString():"",
+        ch.title||"New chat",
+        m.role||"",
+        m.model||"",
+        m.usage&&m.usage.total_tokens!=null?m.usage.total_tokens:"",
+        m.cost!=null?m.cost:"",
+        (m.fileNames||[]).length
+      ])
+    })
+  });
+  function csvCell(v){v=String(v==null?"":v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+  var csv=rows.map(function(row){return row.map(csvCell).join(",")}).join("\n"),a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="quantum-breaks-ai-analytics.csv";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
+}
 function openAnalytics(){openModal("#analyticsModal");renderAnalytics()}
 
 async function openUsage(){
@@ -2341,6 +2363,22 @@ function toggleFavoriteModel(id){
   var arr=Array.isArray(settings.favoriteModels)?settings.favoriteModels.slice():[];
   if(arr.indexOf(id)>=0)arr=arr.filter(function(x){return x!==id});else arr.unshift(id);
   settings.favoriteModels=arr.slice(0,30);save();showModels()
+}
+
+async function pickTechnicalModel(mode){
+  await ensureModelCatalog();
+  var candidates=models.filter(function(m){return modelCompatibleNow(m)});
+  if(mode==="free")candidates=candidates.filter(priceZero);
+  if(!candidates.length)return toast(mode==="free"?"No free compatible models were found":"No compatible models were found");
+  if(mode==="free"){
+    candidates.sort(function(a,b){return Number(b.context_length||0)-Number(a.context_length||0)})
+  }else{
+    candidates.sort(function(a,b){
+      function cost(m){var p=m.pricing||{},x=Number(p.prompt),y=Number(p.completion);if(!isFinite(x))x=Infinity;if(!isFinite(y))y=Infinity;return x+y}
+      var d=cost(a)-cost(b);if(d)return d;return Number(b.context_length||0)-Number(a.context_length||0)
+    })
+  }
+  var chosen=candidates[0];setActiveModel(chosen.id);closeModals();toast((mode==="free"?"Selected free compatible model: ":"Selected lowest-cost compatible model: ")+chosen.id)
 }
 
 function openModelInfo(m){
@@ -3200,11 +3238,24 @@ function projectOptions(){
   projects.forEach(function(p){var o=document.createElement("option");o.value=p.id;o.textContent=p.name||"Untitled project";s.appendChild(o)})
 }
 
+function renderProjectChats(id){
+  var box=q("#projectChatList");box.innerHTML="";
+  if(!id){box.innerHTML='<div class="notice">Choose a project to see its chats.</div>';return}
+  var list=chats.filter(function(ch){return ch.projectId===id&&!ch.trashedAt}).sort(function(a,b){return(b.updated||0)-(a.updated||0)});
+  if(!list.length){box.innerHTML='<div class="notice">No chats assigned to this project yet.</div>';return}
+  list.slice(0,80).forEach(function(ch){
+    var b=document.createElement("button");b.className="searchresult";
+    var h=document.createElement("b");h.textContent=(ch.archivedAt?"Archived · ":"")+(ch.title||"New chat");
+    var s=document.createElement("span");s.textContent=(ch.messages||[]).length+" messages · "+new Date(ch.updated||ch.created||Date.now()).toLocaleString();
+    b.appendChild(h);b.appendChild(s);b.onclick=function(){active=ch.id;save();closeModals();render();restoreDraft()};box.appendChild(b)
+  })
+}
 function loadProjectFields(id){
   var p=projects.find(function(x){return x.id===id});
   q("#projectName").value=p?p.name:"";
   q("#projectInstructions").value=p?p.instructions||"":"";
-  q("#projectKnowledge").value=p?p.knowledge||"":""
+  q("#projectKnowledge").value=p?p.knowledge||"":"";
+  renderProjectChats(id)
 }
 
 function openProjects(){
@@ -3231,7 +3282,7 @@ function saveProject(){
 
 function assignProject(){
   var c=ensure(),id=q("#projectSelect").value;
-  c.projectId=id||"";c.updated=Date.now();save();render();toast(id?"Chat assigned to project":"Chat removed from project")
+  c.projectId=id||"";c.updated=Date.now();save();renderProjectChats(id);render();toast(id?"Chat assigned to project":"Chat removed from project")
 }
 
 function deleteProject(){
@@ -3332,6 +3383,7 @@ q("#profilesSide").onclick=openProfiles;
 q("#compareSide").onclick=openCompare;
 q("#usageSide").onclick=openUsage;
 q("#analyticsSide").onclick=openAnalytics;
+q("#exportAnalytics").onclick=exportAnalyticsCSV;
 q("#projectsSide").onclick=openProjects;
 q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
 q("#promptHistoryBtn").onclick=openPromptHistory;
@@ -3413,6 +3465,8 @@ q("#refreshStorage").onclick=refreshStorageManager;
 q("#cleanStorage").onclick=cleanOrphanedMedia;
 q("#clearMediaStorage").onclick=clearAllMedia;
 q("#copyDiagnostics").onclick=function(){navigator.clipboard.writeText(lastDiagReport||"No diagnostics run yet.").then(function(){toast("Diagnostics copied")})};
+q("#pickFreeCompatible").onclick=function(){pickTechnicalModel("free")};
+q("#pickCheapestCompatible").onclick=function(){pickTechnicalModel("cheap")};
 q("#useModelInfo").onclick=function(){if(!modelInfoCurrent)return;setActiveModel(modelInfoCurrent.id);closeModals();toast("Model changed to "+modelInfoCurrent.id)};
 q("#copyModelId").onclick=function(){if(!modelInfoCurrent)return;navigator.clipboard.writeText(modelInfoCurrent.id||"").then(function(){toast("Model ID copied")})};
 q("#useCustomModel").onclick=function(){var id=q("#customModelId").value.trim();if(!id)return toast("Enter a model ID");setActiveModel(id);closeModals();toast("Using custom model "+id)};
