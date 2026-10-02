@@ -182,6 +182,15 @@ button:active{transform:scale(.97)}
 html[data-density="compact"] .chat{padding-top:14px}html[data-density="compact"] .user{margin-bottom:16px}html[data-density="compact"] .assistant{margin-bottom:18px}html[data-density="compact"] .composer{min-height:112px}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation-duration:.001ms!important;transition-duration:.001ms!important}}
 
+
+.modelrow2{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:6px;align-items:stretch}
+.modelpick{min-width:0;text-align:left;padding:11px 12px;border-radius:11px;background:rgba(255,255,255,.026);border:1px solid rgba(255,255,255,.065)}
+.modelpick:hover{background:rgba(255,255,255,.05);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
+.modelpick.selected{border-color:color-mix(in srgb,var(--accent) 45%,transparent);box-shadow:inset 3px 0 var(--accent)}
+.modelstar{width:42px;border-radius:11px;background:rgba(255,255,255,.026);border:1px solid rgba(255,255,255,.065);color:#777}
+.modelstar.on{color:#ffd67d;background:rgba(255,196,82,.07);border-color:rgba(255,196,82,.18)}
+.modelbadges{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.modelbadge{font-size:10px;padding:3px 6px;border-radius:999px;background:rgba(255,255,255,.045);color:#97939a;border:1px solid rgba(255,255,255,.055)}
+
 </style>
 </head>
 <body>
@@ -313,6 +322,7 @@ html[data-density="compact"] .chat{padding-top:14px}html[data-density="compact"]
 <div class="filterbar">
 <button class="filter on" data-filter="all">All</button>
 <button class="filter" data-filter="recent">Recent</button>
+<button class="filter" data-filter="favorites">Favorites</button>
 <button class="filter" data-filter="free">Free</button>
 <button class="filter" data-filter="vision">Vision</button>
 <button class="filter" data-filter="reasoning">Reasoning</button>
@@ -474,6 +484,7 @@ var settings=Object.assign({
   maxTokens:0,
   historyLimit:0,
   recentModels:[],
+  favoriteModels:[],
   theme:"dark",
   accent:"coral",
   density:"cozy",
@@ -1109,21 +1120,44 @@ function rememberModel(id){
   var arr=Array.isArray(settings.recentModels)?settings.recentModels.slice():[];
   arr=arr.filter(function(x){return x!==id});arr.unshift(id);settings.recentModels=arr.slice(0,8);save()
 }
+function toggleFavoriteModel(id){
+  var arr=Array.isArray(settings.favoriteModels)?settings.favoriteModels.slice():[];
+  if(arr.indexOf(id)>=0)arr=arr.filter(function(x){return x!==id});else arr.unshift(id);
+  settings.favoriteModels=arr.slice(0,30);save();showModels()
+}
 function showModels(){
   var term=(q("#modelSearch").value||"").toLowerCase(),box=q("#models");box.innerHTML="";
   var recent=Array.isArray(settings.recentModels)?settings.recentModels:[];
+  var favorites=Array.isArray(settings.favoriteModels)?settings.favoriteModels:[];
   var all=[{id:"openrouter/auto",name:"Auto Router"}].concat(models);
   all.sort(function(a,b){var ai=recent.indexOf(a.id),bi=recent.indexOf(b.id);if(ai<0)ai=999;if(bi<0)bi=999;return ai-bi});
   var list=all.filter(function(m){
     var hay=((m.name||"")+" "+(m.id||"")).toLowerCase();if(term&&hay.indexOf(term)<0)return false;
     if(modelFilter==="recent"&&recent.indexOf(m.id)<0)return false;
+    if(modelFilter==="favorites"&&favorites.indexOf(m.id)<0)return false;
     if(modelFilter==="free"&&!priceZero(m))return false;
     if(modelFilter==="vision"&&inputs(m).indexOf("image")<0)return false;
     if(modelFilter==="reasoning"){var sp=m.supported_parameters||[];if(sp.indexOf("reasoning")<0&&sp.indexOf("reasoning_effort")<0)return false}
     return true
   }).slice(0,180);
   list.forEach(function(m){
-    var b=document.createElement("button");b.className="mrow";var st=document.createElement("strong");st.textContent=m.name||m.id;var sm=document.createElement("span");sm.className="modelmeta";var bits=[m.id];if(m.context_length)bits.push(Math.round(m.context_length/1000)+"k ctx");if(priceZero(m))bits.push("free");else if(m.pricing){if(m.pricing.prompt!=null)bits.push("in "+perMillion(m.pricing.prompt));if(m.pricing.completion!=null)bits.push("out "+perMillion(m.pricing.completion))}sm.textContent=bits.join(" · ");b.appendChild(st);b.appendChild(sm);b.onclick=function(){settings.model=m.id;rememberModel(m.id);closeModals();render();toast("Model changed")};box.appendChild(b)
+    var row=document.createElement("div");row.className="modelrow2";
+    var b=document.createElement("button");b.className="modelpick"+(settings.model===m.id?" selected":"");
+    var st=document.createElement("strong");st.textContent=m.name||m.id;
+    var sm=document.createElement("span");sm.className="modelmeta";var bits=[m.id];
+    if(m.context_length)bits.push(Math.round(m.context_length/1000)+"k ctx");
+    if(priceZero(m))bits.push("free");
+    else if(m.pricing){if(m.pricing.prompt!=null)bits.push("in "+perMillion(m.pricing.prompt));if(m.pricing.completion!=null)bits.push("out "+perMillion(m.pricing.completion))}
+    sm.textContent=bits.join(" · ");b.appendChild(st);b.appendChild(sm);
+    var badges=document.createElement("div");badges.className="modelbadges";
+    var caps=[];if(inputs(m).indexOf("image")>=0)caps.push("vision");
+    var sp=m.supported_parameters||[];if(sp.indexOf("reasoning")>=0||sp.indexOf("reasoning_effort")>=0)caps.push("reasoning");
+    if(priceZero(m))caps.push("free");
+    caps.forEach(function(x){var tag=document.createElement("span");tag.className="modelbadge";tag.textContent=x;badges.appendChild(tag)});
+    if(caps.length)b.appendChild(badges);
+    b.onclick=function(){settings.model=m.id;rememberModel(m.id);closeModals();render();toast("Model changed to "+m.id)};
+    var star=document.createElement("button");star.className="modelstar"+(favorites.indexOf(m.id)>=0?" on":"");star.textContent=favorites.indexOf(m.id)>=0?"★":"☆";star.title="Favorite model";star.onclick=function(){toggleFavoriteModel(m.id)};
+    row.appendChild(b);row.appendChild(star);box.appendChild(row)
   })
 }
 
