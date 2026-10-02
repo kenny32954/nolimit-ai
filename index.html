@@ -698,6 +698,15 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 </div>
 </section>
 
+<section class="modal" id="filePreviewModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2 id="filePreviewName">File preview</h2>
+<div class="notice" id="filePreviewMeta"></div>
+<iframe id="filePreviewFrame" class="hidden" style="width:100%;height:58vh;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:white"></iframe>
+<pre id="filePreviewText" class="hidden" style="min-height:260px;max-height:58vh;overflow:auto;background:#0d0d0f;border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:13px;white-space:pre-wrap;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace"></pre>
+<div class="row" style="margin-top:10px"><button class="secondary" id="copyFilePreview">Copy text</button><button class="secondary" id="downloadFilePreview">Download</button></div>
+</section>
+
 <section class="modal" id="contextPreviewModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Context preview</h2>
@@ -899,6 +908,7 @@ var renderTimer=null;
 var draftTimer=null;
 var selectedText="";
 var lightboxSrc="";
+var filePreviewState=null;
 var commandActiveIndex=0;
 var slashActiveIndex=0;
 var lastMutationUndo=null;
@@ -1230,14 +1240,19 @@ function renderHistory(){
   });
   if(!filtered.length)box.innerHTML='<div class="notice" style="margin-top:8px">'+(term?"No chats match your search.":"No chats yet.")+"</div>"
 }
-function renderFiles(parent,names,images){
+function renderFiles(parent,names,images,pdfs,textFiles){
   if(names&&names.length){
     var f=document.createElement("div");f.className="files";
     names.forEach(function(n){
-      var chip=document.createElement("div");chip.className="filechip";
+      var chip=document.createElement("button");chip.className="filechip";chip.type="button";
       var ico=document.createElement("span");ico.className="filetypeicon";
       var ext=(String(n).split(".").pop()||"FILE").toUpperCase().slice(0,4);ico.textContent=ext;
       var label=document.createElement("span");label.textContent=n;
+      var pdf=(pdfs||[]).find(function(x){return x.name===n&&x.data});
+      var txt=(textFiles||[]).find(function(x){return x.name===n});
+      if(pdf){chip.title="Preview "+n;chip.onclick=function(){openFilePreview(n,pdf.data,"pdf")}}
+      else if(txt){chip.title="Preview "+n;chip.onclick=function(){openFilePreview(n,txt.text||"","text")}}
+      else chip.disabled=true;
       chip.appendChild(ico);chip.appendChild(label);f.appendChild(chip)
     });
     parent.appendChild(f)
@@ -1284,7 +1299,7 @@ function renderChat(){
   }else{
     c.messages.forEach(function(m,idx){
       if(m.role==="user"){
-        var w=document.createElement("div");w.className="user";w.dataset.msgIndex=idx;var b=document.createElement("div");b.className="ub";b.textContent=m.content||"";renderFiles(b,m.fileNames,m.images);
+        var w=document.createElement("div");w.className="user";w.dataset.msgIndex=idx;var b=document.createElement("div");b.className="ub";b.textContent=m.content||"";renderFiles(b,m.fileNames,m.images,m.pdfs,m.textFiles);
         var ua=document.createElement("div");ua.className="msgtools";ua.style.justifyContent="flex-end";
         var ed=document.createElement("button");ed.textContent="Edit";ed.onclick=function(){editUserMessage(idx)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
@@ -1494,6 +1509,26 @@ function openBookmarks(){
   q("#findTitle").textContent="Bookmarks";q("#findInput").classList.add("hidden");q("#findInput").value="";openModal("#findModal");renderFindResults(true)
 }
 
+
+function openFilePreview(name,data,kind){
+  filePreviewState={name:name||"file",data:data||"",kind:kind||"text"};
+  q("#filePreviewName").textContent=name||"File preview";
+  q("#filePreviewMeta").textContent=kind==="pdf"?"PDF attachment stored in this browser.":"Text attachment · "+formatTokenCount(Math.ceil(String(data||"").length/4))+" approximate tokens";
+  q("#filePreviewFrame").classList.toggle("hidden",kind!=="pdf");
+  q("#filePreviewText").classList.toggle("hidden",kind==="pdf");
+  q("#copyFilePreview").classList.toggle("hidden",kind==="pdf");
+  if(kind==="pdf"){q("#filePreviewFrame").src=data;q("#filePreviewText").textContent=""}
+  else{q("#filePreviewFrame").removeAttribute("src");q("#filePreviewText").textContent=String(data||"")}
+  openModal("#filePreviewModal")
+}
+function downloadPreviewFile(){
+  if(!filePreviewState)return;
+  var a=document.createElement("a");
+  if(filePreviewState.kind==="pdf")a.href=filePreviewState.data;
+  else a.href=URL.createObjectURL(new Blob([filePreviewState.data],{type:"text/plain"}));
+  a.download=filePreviewState.name||"quantum-breaks-file";a.click();
+  if(filePreviewState.kind!=="pdf")setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
+}
 
 function openLightbox(src){
   if(!src)return;lightboxSrc=src;q("#lightboxImage").src=src;q("#lightboxImage").classList.remove("zoom");q("#lightbox").classList.add("show")
@@ -3796,6 +3831,8 @@ q("#customAccent").oninput=function(){settings.customAccent=this.value;settings.
 q("#densitySelect").onchange=function(){settings.density=this.value;save();applyAppearance()};
 q("#contentWidth").onchange=function(){settings.contentWidth=Number(this.value)||860;save();applyAppearance()};
 q("#chatFontSize").onchange=function(){settings.chatFontSize=Number(this.value)||17;save();applyAppearance()};
+q("#copyFilePreview").onclick=function(){if(filePreviewState&&filePreviewState.kind!=="pdf")navigator.clipboard.writeText(String(filePreviewState.data||"")).then(function(){toast("File text copied")})};
+q("#downloadFilePreview").onclick=downloadPreviewFile;
 q("#lightboxClose").onclick=closeLightbox;
 q("#lightbox").onclick=function(e){if(e.target===q("#lightbox")||e.target===q(".lightboxStage"))closeLightbox()};
 q("#lightboxImage").onclick=function(){this.classList.toggle("zoom")};
