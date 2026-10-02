@@ -158,14 +158,14 @@ bool qb_transport_probe(void)
     Serial_ClearRX();
     rx_len = 0;
 
-    if(!serial_send("H:QBAI:2\n")) {
+    if(!serial_send("H:QBAI:3\n")) {
         ready = false;
         return false;
     }
 
     for(i = 0; i < 500; i++) {
         if(read_line(line, sizeof(line))) {
-            if(strcmp(line, "K:QBAI:2") == 0) {
+            if(strcmp(line, "K:QBAI:3") == 0) {
                 ready = true;
                 return true;
             }
@@ -182,6 +182,7 @@ bool qb_transport_send_request(
     uint32_t request_id,
     char const *subject,
     char const *mode,
+    char const *level,
     char const *prompt
 )
 {
@@ -203,10 +204,11 @@ bool qb_transport_send_request(
     if(snprintf(
         frame,
         sizeof(frame),
-        "Q:%lu:%s:%s:%s\n",
+        "Q:%lu:%s:%s:%s:%s\n",
         (unsigned long)request_id,
         subject,
         mode,
+        level,
         encoded
     ) >= (int)sizeof(frame)) {
         return false;
