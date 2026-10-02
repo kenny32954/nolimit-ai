@@ -3,6 +3,7 @@
 
 #include <gint/clock.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 int Serial_Open(unsigned char *mode);
