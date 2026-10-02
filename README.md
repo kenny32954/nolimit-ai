@@ -306,7 +306,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v2.3
+Current app generation: v2.3.0
 
 Major capabilities now include:
 - phone + PC UI
