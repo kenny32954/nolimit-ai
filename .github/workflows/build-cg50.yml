@@ -35,13 +35,13 @@ jobs:
           curl -L \
             "https://git.planet-casio.com/Lephenixnoir/GiteaPC/raw/branch/master/install.sh" \
             -o /tmp/giteapc-install.sh
-          bash /tmp/giteapc-install.sh
+          yes | bash /tmp/giteapc-install.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install fxSDK and SH toolchain
         run: |
           source "$HOME/.profile" 2>/dev/null || true
-          giteapc install \
+          yes | giteapc install \
             Lephenixnoir/fxsdk:noudisks2 \
             Lephenixnoir/sh-elf-binutils \
             Lephenixnoir/sh-elf-gcc
@@ -49,7 +49,7 @@ jobs:
       - name: Install CG50 libraries
         run: |
           source "$HOME/.profile" 2>/dev/null || true
-          giteapc install \
+          yes | giteapc install \
             Lephenixnoir/OpenLibm \
             Vhex-Kernel-Core/fxlibc \
             Lephenixnoir/gint
