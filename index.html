@@ -489,6 +489,19 @@ html[data-bg-effect="waves"] .ambientFX i:nth-child(1){bottom:-18vh;transform:ro
 .themeLabRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:11px}.themeLabRow .field{margin-bottom:0}.themeLabRow input[type="range"]{padding:0!important;height:38px;accent-color:var(--accent)}
 .customThemeHead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:11px}.customThemeHead>div{display:grid}.customThemeHead b{font-size:12px}.customThemeHead span{font-size:9px;color:var(--muted);margin-top:3px}.customColorGrid{display:grid;grid-template-columns:repeat(7,minmax(64px,1fr));gap:7px}.customColorGrid label{display:grid;gap:5px;font-size:8px;color:#7a767f}.customColorGrid input[type="color"]{width:100%;height:38px;padding:3px!important;border-radius:9px!important;cursor:pointer}.customThemeActions{margin-top:11px}.savedThemeList{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:7px;margin-top:10px}.savedThemeCard{position:relative;padding:9px;border:1px solid rgba(255,255,255,.065);border-radius:11px;background:rgba(255,255,255,.024);text-align:left;overflow:hidden}.savedThemeCard:hover{background:rgba(255,255,255,.05)}.savedThemeCard .swatches{display:flex;height:20px;border-radius:7px;overflow:hidden;margin-bottom:7px}.savedThemeCard .swatches i{flex:1}.savedThemeCard b{display:block;font-size:10px;color:#bbb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.savedThemeCard small{font-size:8px;color:var(--muted)}.savedThemeDelete{position:absolute;right:5px;top:5px;width:24px;height:24px;border-radius:7px;background:rgba(0,0,0,.32);color:#aaa;font-size:11px}.savedThemeDelete:hover{color:#fff;background:rgba(173,65,65,.28)}
 @media(max-width:760px){.backgroundGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.customColorGrid{grid-template-columns:repeat(4,minmax(64px,1fr))}}@media(max-width:480px){.customColorGrid{grid-template-columns:repeat(3,minmax(60px,1fr))}}
+
+/* v3.5 reactive visual effects */
+html[data-theme="matrix"]{--bg0:#020703;--bg:#051008;--bgSoft:#09170d;--panel:#0b1b10;--panel2:#102619;--line:#183d24;--lineStrong:#245b36;--text:#eaffef;--muted:#7faa89;--accent:#40d875;--accent2:#93f5b2;--accentGlow:rgba(64,216,117,.22)}
+html[data-theme="frost"]{--bg0:#071017;--bg:#0d1821;--bgSoft:#14232d;--panel:#172a35;--panel2:#1d3442;--line:#294859;--lineStrong:#3b657a;--text:#f2fbff;--muted:#91aab7;--accent:#65c7f2;--accent2:#b5ebff;--accentGlow:rgba(101,199,242,.22)}
+html[data-theme="void"]{--bg0:#030306;--bg:#08070d;--bgSoft:#0d0b14;--panel:#12101a;--panel2:#1a1525;--line:#292139;--lineStrong:#3d3154;--text:#f8f5ff;--muted:#8f879f;--accent:#8b5cf6;--accent2:#c1a7ff;--accentGlow:rgba(139,92,246,.24)}
+.matrixThumb{background:linear-gradient(135deg,#102619,#020703);box-shadow:inset 0 0 12px #40d87522}.frostThumb{background:linear-gradient(135deg,#1d3442,#071017)}.voidThumb{background:radial-gradient(circle at 70% 25%,#6d46c744,transparent 34%),linear-gradient(135deg,#1a1525,#030306)}
+:root{--glass-blur:16.8px;--pointer-x:50vw;--pointer-y:28vh}
+html[data-realtime="false"]{}
+html[data-reactive-glow="true"] .ambientFX b{display:block;position:fixed;left:var(--pointer-x);top:var(--pointer-y);width:520px;height:520px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,color-mix(in srgb,var(--accent) 12%,transparent),transparent 68%);filter:blur(18px);opacity:.75;transition:left .08s linear,top .08s linear}
+html[data-reactive-glow="false"] .ambientFX b{display:none}
+.side,.top,.composer,.toolstrip,.modal,.toast,.selectionToolbar{backdrop-filter:blur(var(--glass-blur)) saturate(1.16)!important}
+.reactiveToggle{display:flex;align-items:center;gap:7px;align-self:end;min-height:38px;padding:0 10px;border:1px solid rgba(255,255,255,.065);border-radius:11px;background:rgba(255,255,255,.022);font-size:9px;color:#8a868e}.reactiveToggle input{accent-color:var(--accent)}
+@media(hover:none),(pointer:coarse){html[data-reactive-glow="true"] .ambientFX b{display:none}}
 </style>
 </head>
 <body>
@@ -642,7 +655,7 @@ html[data-bg-effect="waves"] .ambientFX i:nth-child(1){bottom:-18vh;transform:ro
 <h3>Workspace</h3>
 <ul><li>The sidebar is now organized into collapsible AI, Workspace, Create, Chat, and App drawers that remember your layout locally.</li><li>High-frequency AI and Workspace drawers stay open by default, while lower-frequency tool groups start collapsed to reduce visual noise.</li><li>Conversation branches, tasks, snapshots, backups, archives, trash, global search, and encrypted workspace exports remain available.</li></ul>
 <h3>Interface</h3>
-<ul><li>The new Theme Lab adds Aurora, Cosmic, Grid, Waves, and clean background modes with live strength control and Calm/Lively/Off motion settings.</li><li>A full custom-theme builder now controls background, panels, text, muted text, and accent colors; users can save up to 12 presets and safely export/import shareable theme JSON files.</li><li>All effects are CSS-generated and respect reduced-motion preferences, while the compact sidebar rail and stacked notification system remain available.</li></ul>
+<ul><li>Theme Lab now includes Aurora, Cosmic, Grid, Waves, and clean backgrounds, plus live strength, glass-blur, and Calm/Lively/Off motion controls.</li><li>Added Matrix, Frost, and Void built-in themes and an optional desktop cursor-reactive ambient glow for a more sci-fi look.</li><li>The custom-theme builder controls background, panels, text, muted text, and accents; up to 12 presets can be saved and safely exported/imported as non-executable theme JSON.</li></ul>
 </div>
 </section>
 
@@ -699,6 +712,9 @@ html[data-bg-effect="waves"] .ambientFX i:nth-child(1){bottom:-18vh;transform:ro
       <button type="button" class="themeTile" data-theme-choice="ember"><span class="themeThumb emberThumb"></span><b>Ember</b></button>
       <button type="button" class="themeTile" data-theme-choice="nebula"><span class="themeThumb nebulaThumb"></span><b>Nebula</b></button>
       <button type="button" class="themeTile" data-theme-choice="cyber"><span class="themeThumb cyberThumb"></span><b>Cyber</b></button>
+      <button type="button" class="themeTile" data-theme-choice="matrix"><span class="themeThumb matrixThumb"></span><b>Matrix</b></button>
+      <button type="button" class="themeTile" data-theme-choice="frost"><span class="themeThumb frostThumb"></span><b>Frost</b></button>
+      <button type="button" class="themeTile" data-theme-choice="void"><span class="themeThumb voidThumb"></span><b>Void</b></button>
       <button type="button" class="themeTile" data-theme-choice="oled"><span class="themeThumb oledThumb"></span><b>OLED</b></button>
     </div>
     <div class="appearanceLabel accentLabel">Accent</div>
@@ -724,8 +740,10 @@ html[data-bg-effect="waves"] .ambientFX i:nth-child(1){bottom:-18vh;transform:ro
     <button type="button" class="backgroundTile" data-bg-choice="none"><span class="bgThumb noneBg"></span><b>None</b><small>Clean solid theme</small></button>
   </div>
   <div class="themeLabRow">
-    <div class="field" style="flex:1;min-width:170px"><label>Motion</label><select id="motionStyle"><option value="calm">Calm</option><option value="lively">Lively</option><option value="off">Off</option></select></div>
-    <div class="field" style="flex:1;min-width:170px"><label>Background strength</label><input id="backgroundStrength" type="range" min="0" max="100" step="5"></div>
+    <div class="field" style="flex:1;min-width:150px"><label>Motion</label><select id="motionStyle"><option value="calm">Calm</option><option value="lively">Lively</option><option value="off">Off</option></select></div>
+    <div class="field" style="flex:1;min-width:150px"><label>Background strength</label><input id="backgroundStrength" type="range" min="0" max="100" step="5"></div>
+    <div class="field" style="flex:1;min-width:150px"><label>Glass strength</label><input id="glassStrength" type="range" min="0" max="100" step="5"></div>
+    <label class="reactiveToggle"><input id="reactiveGlow" type="checkbox"><span>Reactive cursor glow</span></label>
   </div>
 </div>
 <div class="customThemeBuilder">
@@ -750,7 +768,7 @@ html[data-bg-effect="waves"] .ambientFX i:nth-child(1){bottom:-18vh;transform:ro
   <div class="savedThemeList" id="savedThemeList"></div>
 </div>
 <div class="row">
-<div class="field appearanceLegacy" style="flex:1;min-width:160px"><label>Theme</label><select id="themeSelect"><option value="dark">Dark</option><option value="midnight">Midnight</option><option value="ember">Ember</option><option value="nebula">Nebula</option><option value="cyber">Cyber</option><option value="oled">OLED</option><option value="custom">Custom</option></select></div>
+<div class="field appearanceLegacy" style="flex:1;min-width:160px"><label>Theme</label><select id="themeSelect"><option value="dark">Dark</option><option value="midnight">Midnight</option><option value="ember">Ember</option><option value="nebula">Nebula</option><option value="cyber">Cyber</option><option value="matrix">Matrix</option><option value="frost">Frost</option><option value="void">Void</option><option value="oled">OLED</option><option value="custom">Custom</option></select></div>
 <div class="field appearanceLegacy" style="flex:1;min-width:160px"><label>Accent</label><select id="accentSelect"><option value="coral">Coral</option><option value="blue">Blue</option><option value="violet">Violet</option><option value="green">Green</option><option value="cyan">Cyan</option><option value="gold">Gold</option><option value="pink">Pink</option><option value="custom">Custom</option></select></div>
 <div class="field" style="flex:1;min-width:160px"><label>Density</label><select id="densitySelect"><option value="cozy">Cozy</option><option value="compact">Compact</option></select></div>
 <div class="field" style="flex:1;min-width:160px"><label>Custom accent</label><input id="customAccent" type="color" value="#e07b5f"></div>
@@ -1186,7 +1204,7 @@ html[data-bg-effect="waves"] .ambientFX i:nth-child(1){bottom:-18vh;transform:ro
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="3.4.0";
+var APP_VERSION="3.5.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1253,6 +1271,8 @@ var settings=Object.assign({
   backgroundEffect:"aurora",
   backgroundStrength:70,
   motionStyle:"calm",
+  glassStrength:70,
+  reactiveGlow:true,
   customTheme:{bg:"#151517",bg0:"#0f0f11",panel:"#202024",panel2:"#27272c",text:"#f5f3ef",muted:"#99959b",accent:"#e07b5f"},
   customThemes:[]
 },safeJSON(localStorage.getItem(SETSTORE),{}));
@@ -1358,7 +1378,9 @@ function applyAppearance(){
   root.dataset.sidebarRail=settings.sidebarRail?"true":"false";
   root.dataset.bgEffect=settings.backgroundEffect||"aurora";
   root.dataset.motion=settings.motionStyle||"calm";
+  root.dataset.reactiveGlow=settings.reactiveGlow===false?"false":"true";
   root.style.setProperty("--fx-strength",Math.max(0,Math.min(1,(Number(settings.backgroundStrength)||0)/100)));
+  root.style.setProperty("--glass-blur",(Math.max(0,Math.min(100,Number(settings.glassStrength)==null?70:Number(settings.glassStrength)))*0.24).toFixed(1)+"px");
   root.style.setProperty("--content-max",Math.max(680,Math.min(1400,Number(settings.contentWidth)||860))+"px");
   root.style.setProperty("--chat-font",Math.max(14,Math.min(24,Number(settings.chatFontSize)||17))+"px");
   var custom=settings.customTheme||{};
@@ -2257,6 +2279,8 @@ function syncAppearanceStudio(){
   qa("[data-bg-choice]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-bg-choice")===(settings.backgroundEffect||"aurora"))});
   if(q("#motionStyle"))q("#motionStyle").value=settings.motionStyle||"calm";
   if(q("#backgroundStrength"))q("#backgroundStrength").value=String(settings.backgroundStrength==null?70:settings.backgroundStrength);
+  if(q("#glassStrength"))q("#glassStrength").value=String(settings.glassStrength==null?70:settings.glassStrength);
+  if(q("#reactiveGlow"))q("#reactiveGlow").checked=settings.reactiveGlow!==false;
   renderSavedThemes()
 }
 function setupAppearanceStudio(){
@@ -2269,13 +2293,16 @@ function setupAppearanceStudio(){
   qa("[data-bg-choice]").forEach(function(b){b.onclick=function(){settings.backgroundEffect=b.getAttribute("data-bg-choice");save();applyAppearance()}});
   q("#motionStyle").onchange=function(){settings.motionStyle=this.value;save();applyAppearance()};
   q("#backgroundStrength").oninput=function(){settings.backgroundStrength=Math.max(0,Math.min(100,Number(this.value)||0));save();applyAppearance()};
+  q("#glassStrength").oninput=function(){settings.glassStrength=Math.max(0,Math.min(100,Number(this.value)||0));save();applyAppearance()};
+  q("#reactiveGlow").onchange=function(){settings.reactiveGlow=this.checked;save();applyAppearance()};
   ["customBg","customBg0","customPanel","customPanel2","customText","customMuted","customThemeAccent"].forEach(function(id){q("#"+id).oninput=function(){applyThemeFromBuilder(false)}});
   q("#applyCustomTheme").onclick=function(){applyThemeFromBuilder(true)};
   q("#saveCustomTheme").onclick=saveThemePreset;q("#exportCustomTheme").onclick=exportThemePreset;
   q("#importCustomThemeBtn").onclick=function(){q("#importCustomThemeFile").click()};
   q("#importCustomThemeFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importThemePreset(f);e.target.value=""};
   q("#resetCustomTheme").onclick=function(){settings.customTheme=defaultCustomTheme();fillCustomThemeInputs(settings.customTheme);applyThemeFromBuilder(true)};
-  fillCustomThemeInputs(settings.customTheme);syncAppearanceStudio()
+  fillCustomThemeInputs(settings.customTheme);syncAppearanceStudio();
+  document.addEventListener("pointermove",function(e){if(settings.reactiveGlow===false)return;var root=document.documentElement;root.style.setProperty("--pointer-x",e.clientX+"px");root.style.setProperty("--pointer-y",e.clientY+"px")},{passive:true})
 }
 
 function setupSidebarGroups(){
@@ -2501,6 +2528,8 @@ function openSettings(){
   fillCustomThemeInputs(settings.customTheme);
   q("#motionStyle").value=settings.motionStyle||"calm";
   q("#backgroundStrength").value=String(settings.backgroundStrength==null?70:settings.backgroundStrength);
+  q("#glassStrength").value=String(settings.glassStrength==null?70:settings.glassStrength);
+  q("#reactiveGlow").checked=settings.reactiveGlow!==false;
   q("#densitySelect").value=settings.density||"cozy";
   q("#contentWidth").value=String(settings.contentWidth||860);
   q("#chatFontSize").value=String(settings.chatFontSize||17);
