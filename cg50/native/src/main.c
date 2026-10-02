@@ -6,8 +6,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "diagnostics.h"
 #include "editor.h"
 #include "picker.h"
+#include "reference.h"
 #include "transport.h"
 
 static char const *subjects[] = {
@@ -227,10 +229,12 @@ static void draw_chat(app_state_t const *state)
 
     drect(0, DHEIGHT - 31, DWIDTH - 1, DHEIGHT - 1, panel);
     drect(0, DHEIGHT - 32, DWIDTH - 1, DHEIGHT - 31, line);
-    dtext(7, DHEIGHT - 23, muted, "F1 SUBJECT");
-    dtext(100, DHEIGHT - 23, muted, "F2 MODE");
-    dtext(167, DHEIGHT - 23, muted, "F3 ANSWER");
-    dtext(260, DHEIGHT - 23, muted, "EXE ASK");
+    dtext(7, DHEIGHT - 23, muted, "F1 SUBJ");
+    dtext(69, DHEIGHT - 23, muted, "F2 MODE");
+    dtext(137, DHEIGHT - 23, muted, "F3 ANS");
+    dtext(195, DHEIGHT - 23, muted, "F4 REF");
+    dtext(254, DHEIGHT - 23, muted, "F5 LINK");
+    dtext(321, DHEIGHT - 23, muted, "EXE");
 
     if(state->status[0]) {
         dtext(12, DHEIGHT - 48, muted, state->status);
@@ -399,10 +403,14 @@ int main(void)
                 state.scroll = 0;
             }
         }
+        else if(!state.waiting && ev.key == KEY_F4) {
+            qb_reference_show(
+                subjects[state.subject],
+                subject_labels[state.subject]
+            );
+        }
         else if(!state.waiting && ev.key == KEY_F5) {
-            snprintf(state.status, sizeof(state.status), "Connecting...");
-            draw_chat(&state);
-            state.bridge_ready = qb_transport_probe();
+            qb_diagnostics_show(&state.bridge_ready);
             snprintf(state.status, sizeof(state.status),
                      state.bridge_ready ? "Bridge linked" : "Bridge not found");
         }
