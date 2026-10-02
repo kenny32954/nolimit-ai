@@ -40,3 +40,14 @@ jobs:
           python cg50/native/tools/make_icon.py /tmp/qb-sel.png --selected
           test -s /tmp/qb-uns.png
           test -s /tmp/qb-sel.png
+
+      - name: Check native C syntax
+        run: |
+          gcc -std=c11 -Wall -Wextra -Werror -fsyntax-only \
+            -Icg50/native/tests/include \
+            -Icg50/native/src \
+            cg50/native/src/main.c \
+            cg50/native/src/editor.c \
+            cg50/native/src/picker.c \
+            cg50/native/src/base64.c \
+            cg50/native/src/transport.c
