@@ -1,0 +1,6 @@
+# Local bridge settings (non-secret, but machine-specific)
+bridge/qb_bridge_config.json
+
+# Python
+__pycache__/
+*.pyc
