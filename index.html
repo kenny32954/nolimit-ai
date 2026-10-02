@@ -305,6 +305,15 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .taskList{display:grid;gap:7px}.taskRow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px;align-items:center;padding:10px 11px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.025)}.taskRow.done .taskText{text-decoration:line-through;color:#666}.taskText{font-size:12px;line-height:1.4;color:#c8c4c0;overflow-wrap:anywhere}.taskDelete{width:30px;height:30px;border-radius:8px;color:#8d888f}.taskDelete:hover{background:rgba(173,65,65,.14);color:#e7a1a1}.taskEmpty{padding:18px;text-align:center;color:var(--muted);font-size:12px}
 
+.queueSend{display:none;height:42px;min-width:66px;padding:0 13px;border:1px solid rgba(255,255,255,.09);border-radius:13px;background:rgba(255,255,255,.045);color:var(--text);font-weight:700;cursor:pointer;align-items:center;justify-content:center;gap:6px}
+.queueSend.show{display:inline-flex}.queueSend:hover{background:rgba(255,255,255,.075)}.queueSend:disabled{opacity:.45;cursor:default}
+.queuedbar{display:none;max-width:var(--content-max,860px);width:calc(100% - 24px);margin:0 auto 7px;gap:6px;overflow-x:auto;scrollbar-width:none}
+.queuedbar.show{display:flex}.queuedbar::-webkit-scrollbar{display:none}
+.queuechip{display:flex;align-items:center;flex:none;max-width:min(520px,82vw);border:1px solid rgba(255,255,255,.075);background:rgba(255,255,255,.032);border-radius:12px;overflow:hidden}
+.queuechip .queueText{min-width:0;max-width:450px;border:0;background:transparent;color:var(--muted);padding:8px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-align:left}
+.queuechip .queueText:hover{color:var(--text);background:rgba(255,255,255,.035)}
+.queuechip .queueRemove{border:0;border-left:1px solid rgba(255,255,255,.06);background:transparent;color:var(--muted);padding:8px 10px;cursor:pointer}.queuechip .queueRemove:hover{color:var(--text);background:rgba(255,255,255,.04)}
+@media(max-width:520px){.queueSend{min-width:48px;padding:0 10px}.queuechip .queueText{max-width:68vw}}
 </style>
 </head>
 <body>
@@ -386,6 +395,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 </div>
 <div class="slashMenu" id="slashMenu"></div>
 <div class="pending" id="pending"></div>
+<div class="queuedbar" id="queuedBar"></div>
 <div class="composer">
 <textarea id="prompt" placeholder="Message Quantum Breaks AI or type /help"></textarea>
 <div class="crow">
@@ -400,6 +410,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="tool" id="micBtn" title="Record and transcribe">●</button>
 <button class="tool" id="imageBtn" title="Create image">▣</button>
 </div>
+<button class="queueSend" id="queueSend" title="Queue this prompt for the next turn">Queue</button>
 <button class="send" id="send">↑</button>
 </div>
 </div>
@@ -429,6 +440,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <h2>Keyboard shortcuts</h2>
 <div class="shortcutGrid">
 <div class="shortcutRow"><span>Send message</span><kbd>Ctrl / ⌘ + Enter</kbd></div>
+<div class="shortcutRow"><span>Queue next prompt while generating</span><kbd>Alt + Enter</kbd></div>
 <div class="shortcutRow"><span>New chat</span><kbd>Ctrl / ⌘ + N</kbd></div>
 <div class="shortcutRow"><span>Model picker</span><kbd>Ctrl / ⌘ + K</kbd></div>
 <div class="shortcutRow"><span>Command palette</span><kbd>Ctrl / ⌘ + P</kbd></div>
@@ -448,11 +460,11 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <h3>AI quality</h3>
 <ul><li>Per-chat model locks, chat-specific instructions, reasoning and temperature overrides now work alongside project and global defaults.</li><li>Strict JSON Schema output, second-pass AI review, review-driven revision, comparison synthesis, and automatic long-chat summarization remain available.</li><li>Model selection can now learn from your own local 👍/👎 ratings and pick the best-rated compatible model.</li></ul>
 <h3>Reliability</h3>
-<ul><li>Oversized requests are stopped before they hit a model context limit, with the draft and attachments restored automatically.</li><li>A configurable network-stall watchdog can abort requests that stop returning data instead of hanging forever.</li><li>Per-request and daily tracked-spend warnings help catch unexpectedly expensive calls before sending.</li></ul>
+<ul><li>Oversized requests are stopped before they hit a model context limit, with the draft and attachments restored automatically.</li><li>Transient 429/502/503/504 API failures now get a bounded retry sequence with Retry-After support before falling back to a visible error.</li><li>A configurable network-stall watchdog can abort requests that stop returning data instead of hanging forever.</li><li>Per-request and daily tracked-spend warnings help catch unexpectedly expensive calls before sending.</li></ul>
 <h3>Workspace</h3>
 <ul><li>Conversation branch lineage shows parent/child forks and lets you jump across alternate paths.</li><li>Conversation Tasks adds a persistent per-chat to-do board with optional AI task extraction.</li><li>Tasks survive snapshots, branches, chat backups, and imports; media persistence, archives, trash, global search, and encrypted backups remain intact.</li></ul>
 <h3>Interface</h3>
-<ul><li>Keyboard-shortcut help, clickable conversation titles, live tab titles, optional background completion notifications, and expanded model sorting improve daily use.</li></ul>
+<ul><li>You can now type the next prompt while a reply is streaming, queue it with the new Queue button or Alt+Enter, and let Quantum Breaks AI continue into the next turn automatically.</li><li>Queued prompts stay attached to the conversation if a request is stopped or fails, and can be moved back into the composer or removed before they run.</li><li>Keyboard-shortcut help, clickable conversation titles, live tab titles, optional background completion notifications, and expanded model sorting improve daily use.</li></ul>
 </div>
 </section>
 
@@ -926,7 +938,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="2.5.0";
+var APP_VERSION="2.6.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1330,9 +1342,12 @@ function render(){
   q("#send").classList.toggle("busy",activeBusy);
   q("#send").disabled=!!(busy&&!activeBusy);
   q("#send").title=busy&&!activeBusy?"Another chat is generating":(activeBusy?"Stop generation":"Send message");
+  q("#queueSend").classList.toggle("show",activeBusy);
+  q("#queueSend").disabled=!activeBusy;
   renderHistory();
   renderChat();
-  renderPending()
+  renderPending();
+  renderQueued()
 }
 
 function historyBucket(ch){
@@ -1829,13 +1844,56 @@ function renderPending(){
 }
 
 
+function renderQueued(){
+  var box=q("#queuedBar"),c=current();if(!box)return;
+  box.innerHTML="";
+  var arr=c&&Array.isArray(c.queuedPrompts)?c.queuedPrompts:[];
+  box.classList.toggle("show",arr.length>0);
+  arr.slice(0,6).forEach(function(item,i){
+    var chip=document.createElement("div");chip.className="queuechip";
+    var use=document.createElement("button");use.className="queueText";use.type="button";
+    use.textContent=(i===0?"Next · ":"Queued · ")+String(item&&item.text||"").replace(/\s+/g," ").slice(0,180);
+    use.title="Move this queued prompt back into the composer";
+    use.onclick=function(){
+      if(!c||!Array.isArray(c.queuedPrompts)||!c.queuedPrompts[i])return;
+      var picked=c.queuedPrompts.splice(i,1)[0];
+      q("#prompt").value=String(picked.text||"");
+      c.draft=q("#prompt").value;
+      save();resizePrompt();renderQueued();q("#prompt").focus();toast("Queued prompt moved to composer")
+    };
+    var remove=document.createElement("button");remove.className="queueRemove";remove.type="button";remove.textContent="×";remove.title="Remove queued prompt";
+    remove.onclick=function(){if(!c||!Array.isArray(c.queuedPrompts))return;c.queuedPrompts.splice(i,1);save();renderQueued();toast("Queued prompt removed")};
+    chip.appendChild(use);chip.appendChild(remove);box.appendChild(chip)
+  });
+  if(arr.length>6){
+    var extra=document.createElement("div");extra.className="filechip";extra.textContent="+"+(arr.length-6)+" more queued";box.appendChild(extra)
+  }
+}
+function queuePrompt(){
+  var c=ensure(),text=q("#prompt").value.trim();
+  if(!busy||c.id!==busyChatId)return toast("Queue is available while this conversation is generating");
+  if(!text)return toast("Type the next message first");
+  if(pending.length)return toast("Queued turns are text-only right now. Your attachments are still safe in the composer.");
+  c.queuedPrompts=Array.isArray(c.queuedPrompts)?c.queuedPrompts:[];
+  c.queuedPrompts.push({text:text,created:Date.now()});
+  q("#prompt").value="";c.draft="";c.updated=Date.now();save();resizePrompt();renderQueued();toast("Queued for the next turn")
+}
+function runNextQueued(chat){
+  if(!chat||busy||!current()||current().id!==chat.id||pending.length)return;
+  var arr=Array.isArray(chat.queuedPrompts)?chat.queuedPrompts:[];
+  if(!arr.length)return;
+  var item=arr.shift();q("#prompt").value=String(item.text||"");chat.draft=q("#prompt").value;save();resizePrompt();renderQueued();
+  setTimeout(function(){if(!busy&&current()&&current().id===chat.id)send()},180)
+}
+
 function setupAccessibility(){
   q("#prompt").setAttribute("aria-label","Message Quantum Breaks AI");
   q("#send").setAttribute("aria-label","Send message");
+  q("#queueSend").setAttribute("aria-label","Queue message for next turn");
   q("#chat").setAttribute("role","log");q("#chat").setAttribute("aria-label","Conversation");
   q("#status").setAttribute("aria-live","polite");
   q("#buildBadge").textContent="v"+APP_VERSION;
-  var labels={menuBtn:"Open sidebar",closeSide:"Close sidebar",commandBtn:"Open command palette",lightboxClose:"Close image preview",attach:"Attach files",attachFolder:"Attach folder",promptLibBtn:"Prompt library",promptHistoryBtn:"Recent prompts",improvePromptBtn:"Improve prompt",micBtn:"Record audio",imageBtn:"Create image",send:"Send message",scrollBottom:"Jump to latest"};
+  var labels={menuBtn:"Open sidebar",closeSide:"Close sidebar",commandBtn:"Open command palette",lightboxClose:"Close image preview",attach:"Attach files",attachFolder:"Attach folder",promptLibBtn:"Prompt library",promptHistoryBtn:"Recent prompts",improvePromptBtn:"Improve prompt",micBtn:"Record audio",imageBtn:"Create image",queueSend:"Queue message for next turn",send:"Send message",scrollBottom:"Jump to latest"};
   Object.keys(labels).forEach(function(id){var el=q("#"+id);if(el)el.setAttribute("aria-label",labels[id])});
   qa(".modal").forEach(function(m,i){
     m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
@@ -2247,12 +2305,17 @@ function applyStreamPayload(raw,a){
 
 async function fetchChatWithFallback(body,headers,signal){
   try{
-    var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body),signal:signal});
-    if(!r.ok&&[429,502,503,504].indexOf(r.status)>=0){
-      var delay=Math.min(4000,Math.max(700,Number(r.headers.get("retry-after")||1)*1000));toast("Temporary API issue — retrying…");await wait(delay);
-      r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body),signal:signal})
+    var r=null,transientAttempt=0,maxTransientRetries=2;
+    while(true){
+      r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body),signal:signal});
+      if(r.ok)return r;
+      if([429,502,503,504].indexOf(r.status)<0||transientAttempt>=maxTransientRetries)break;
+      transientAttempt++;
+      var retryHeader=Number(r.headers.get("retry-after")||0);
+      var delay=Math.min(5000,Math.max(700,retryHeader>0?retryHeader*1000:700*Math.pow(2,transientAttempt-1)));
+      toast("Temporary API issue — retrying "+transientAttempt+"/"+maxTransientRetries+"…");
+      await wait(delay)
     }
-    if(r.ok)return r;
     var raw=await r.text();
     if(r.status===401)throw new Error("OpenRouter rejected this API key. Reconnect or enter a valid key in Settings.");
     if(r.status===402)throw new Error("OpenRouter reports insufficient credits for this request.");
@@ -2597,6 +2660,7 @@ async function send(){
     return
   }
   var requestMessages=fit.messages;
+  var requestSucceeded=false,requestAborted=false;
   var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:requestModel,contextTrimmed:fit.trimmed||0};c.messages.push(a);save();busy=true;busyChatId=c.id;controller=new AbortController();render();
   var stallTimer=null,stalled=false,stallSeconds=Math.max(0,Number(settings.stallTimeoutSec)||0);
   function resetStallTimer(){
@@ -2633,7 +2697,7 @@ async function send(){
     a.cacheAge=r.headers.get("X-OpenRouter-Cache-Age")||"";
     a.cacheTTL=r.headers.get("X-OpenRouter-Cache-TTL")||"";
     var reader=r.body&&r.body.getReader?r.body.getReader():null;
-    if(!reader){var j=await r.json();finishBuffered(j,a);a.finished=Date.now();save();render();return}
+    if(!reader){var j=await r.json();finishBuffered(j,a);a.finished=Date.now();requestSucceeded=true;save();render();return}
     var dec=new TextDecoder(),buf="";
     while(true){
       var z=await reader.read();if(z.done)break;
@@ -2649,8 +2713,9 @@ async function send(){
     buf+=dec.decode();
     var tail=buf.trim();
     if(tail.indexOf("data:")===0){var tailRaw=tail.slice(5).trim();if(tailRaw&&tailRaw!=="[DONE]")applyStreamPayload(tailRaw,a)}
-    a.finished=Date.now();save()
+    a.finished=Date.now();requestSucceeded=true;save()
   }catch(e){
+    if(e.name==="AbortError")requestAborted=true;
     if(e.name==="AbortError"&&stalled){a.content="Request stopped because no response data arrived for "+stallSeconds+" seconds. You can retry, choose another model, or increase the Network stall timeout in Settings.";a.error=true;a.finished=Date.now()}
     else if(e.name!=="AbortError"){a.content="Request failed: "+e.message;a.error=true}
     else if(!a.content)c.messages.pop();
@@ -2659,7 +2724,10 @@ async function send(){
     if(stallTimer)clearTimeout(stallTimer);
     busy=false;busyChatId="";controller=null;render();if(settings.autoSpeak&&a.content&&!a.error)speak(a.content);
     if(a.content&&!a.error)notifyCompletedReply(c,a);
-    if(settings.review&&a.content&&!a.error)reviewAnswer(c,m.content,a)
+    if(settings.review&&a.content&&!a.error)reviewAnswer(c,m.content,a);
+    if(requestSucceeded&&!requestAborted&&Array.isArray(c.queuedPrompts)&&c.queuedPrompts.length){
+      setTimeout(function(){runNextQueued(c)},260)
+    }
   }
 }
 
@@ -4270,6 +4338,7 @@ q("#attachFolder").onclick=function(){q("#folderFiles").click()};
 q("#files").onchange=function(e){addFiles(Array.prototype.slice.call(e.target.files));e.target.value=""};
 q("#folderFiles").onchange=function(e){addFiles(Array.prototype.slice.call(e.target.files));e.target.value=""};
 q("#send").onclick=send;
+q("#queueSend").onclick=queuePrompt;
 q("#prompt").onkeydown=function(e){
   if(e.altKey&&e.key==="ArrowUp"){e.preventDefault();cyclePromptHistory(-1);return}
   if(e.altKey&&e.key==="ArrowDown"){e.preventDefault();cyclePromptHistory(1);return}
@@ -4281,6 +4350,7 @@ q("#prompt").onkeydown=function(e){
     if(e.key==="Escape"){e.preventDefault();hideSlashMenu();return}
     if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();chooseSlash(slashActiveIndex);return}
   }
+  if(e.key==="Enter"&&e.altKey&&busy&&current()&&current().id===busyChatId){e.preventDefault();queuePrompt();return}
   if(e.key!=="Enter")return;
   if(e.ctrlKey||e.metaKey){e.preventDefault();send();return}
   if(!e.shiftKey&&innerWidth>700){e.preventDefault();send()}
