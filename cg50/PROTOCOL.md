@@ -11,6 +11,22 @@ This protocol connects the native fx-CG50 add-in to the desktop bridge.
 - line-delimited ASCII transport
 - message text is UTF-8 encoded, then Base64 encoded for transport safety
 
+## Handshake
+
+Before sending a question, the calculator probes the desktop bridge:
+
+```text
+H:QBAI:2
+```
+
+The bridge responds:
+
+```text
+K:QBAI:2
+```
+
+The calculator only marks the connection as linked after receiving the matching acknowledgement.
+
 ## Subject-aware request
 
 ```text
