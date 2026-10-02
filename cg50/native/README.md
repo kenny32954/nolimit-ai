@@ -1,30 +1,57 @@
 # Native Quantum Breaks AI client for fx-CG50
 
-This is the native `.g3a` path for Quantum Breaks AI.
+This directory contains the native `.g3a` client for Quantum Breaks AI.
 
-The first milestone is intentionally UI-first. It gives the calculator a real color application shell with subject and tutor-mode controls while keeping the serial layer isolated behind `transport.c`.
+## Current status
 
-## Current native controls
+The native client now has the first complete live-chat path implemented in source:
 
-- **F1** - cycle school subject
-- **F2** - cycle tutor mode
-- **F5** - probe the bridge transport
-- **UP/DOWN** - reserved for transcript scrolling
-- **EXIT** - quit
+- color CG50 chat UI
+- scrollable subject picker
+- scrollable tutor-mode picker
+- calculator keyboard prompt editor
+- upper/lower-case alpha input plus common math symbols
+- Base64 request/response codec
+- 115200-baud Casio serial syscall wrappers
+- desktop-bridge handshake
+- subject-aware request framing
+- nonblocking answer polling
+- ordered response-chunk validation
+- streamed answer assembly
+- answer-focus view
+- timeout, cancel, and retry behavior
+- local answer-size protection
 
-The screen already exposes the same subject/mode model as the desktop bridge.
+The bridge and native C code are automatically syntax/protocol checked in GitHub Actions. A physical calculator + compatible serial connection is still required for the first real hardware end-to-end test.
+
+## Controls
+
+### Chat screen
+
+- **F1** - open subject picker
+- **F2** - open tutor-mode picker
+- **F3** - open/close answer-focus view
+- **F5** - probe/link desktop bridge
+- **F6** - retry the current question
+- **EXE** - write a new question
+- **UP/DOWN** - scroll answer
+- **EXIT** - cancel a local wait, leave answer focus, or quit
+
+### Prompt editor
+
+- **ALPHA** - switch between letters and number/symbol input
+- **SHIFT** - toggle upper/lower case while typing letters
+- **DEL** - delete
+- **EXE** - send
+- **EXIT** - cancel prompt editing
 
 ## Build
 
-Current fxSDK projects use CMake, and CG50 builds use `fxsdk build-cg`.
-
-From this directory:
+Install fxSDK and gint, then from this directory run:
 
 ```bash
 fxsdk build-cg
 ```
-
-The CMake configuration runs `tools/make_icon.py` automatically. That script uses only the Python standard library and generates `src/icon.png`, so no Pillow dependency is needed.
 
 The expected output is:
 
@@ -32,20 +59,49 @@ The expected output is:
 QBAI.g3a
 ```
 
-## Install
+The CMake configuration generates both CG50 menu icons automatically using `tools/make_icon.py`; the generator only uses Python's standard library.
 
-Connect the fx-CG50 over USB, select USB Flash, copy `QBAI.g3a` onto the calculator storage according to your add-in setup, eject cleanly, and launch QBAI from the calculator menu.
+## Architecture
 
-## Next native milestones
+```text
+fx-CG50 QBAI.g3a
+      |
+      | Casio 3-pin serial, 115200 baud
+      v
+desktop qb_bridge.py
+      |
+      | OpenAI-compatible HTTP API
+      v
+Quantum Breaks AI model
+```
 
-1. 3-pin serial initialization and bridge handshake.
-2. Protocol v0.2 request/response framing.
-3. Base64 encode/decode on the calculator.
-4. Text-entry editor using the CG50 keyboard.
-5. Chunked live response rendering.
-6. Scrollback/history.
-7. Subject/mode selector overlay instead of cycling.
-8. Retry, cancel, and connection recovery.
-9. Compact math/science rendering improvements.
+The calculator does not store an API key. API credentials stay on the Internet-connected computer running the bridge.
 
-The current `transport.c` is a deliberate stub so the UI can be built and tested independently of serial hardware.
+## Protocol
+
+The native client uses protocol v0.2 from `../PROTOCOL.md`.
+
+Before a request it can verify the bridge with:
+
+```text
+H:QBAI:2
+K:QBAI:2
+```
+
+A normal request is:
+
+```text
+Q:<id>:<subject>:<mode>:<base64 prompt>
+```
+
+Answers arrive as ordered Base64 chunks and are assembled on the calculator.
+
+## Next milestones
+
+1. Physical CG50 end-to-end serial test.
+2. Fix any hardware-specific serial timing differences found on-device.
+3. Improve text rendering for mathematical notation and non-ASCII language characters.
+4. Persistent calculator-side conversation history.
+5. Compact offline formula/reference tools.
+6. Better keyboard punctuation and symbol entry.
+7. Optional settings screen for timeout, answer size, and bridge behavior.
