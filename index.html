@@ -233,7 +233,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .contextpin{color:#9dc4ff!important}.contextpin.on{color:#6ca7ff!important;background:rgba(108,167,255,.08)!important}
 .scratchcount{font-size:10px;color:var(--muted);margin-left:6px}
 
-</style>
+.historylabel{padding:10px 10px 4px;font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#55525a}.historylabel:first-child{padding-top:4px}\n</style>
 </head>
 <body>
 <div class="app">
@@ -268,6 +268,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="navgroup"><div class="navlabel">Chat</div>
 <button class="sbtn" id="shareSide">Share chat</button>
 <button class="sbtn" id="exportSide">Export Markdown</button>
+<button class="sbtn" id="printSide">Print / Save PDF</button>
 <button class="sbtn" id="backupSide">Backup chat</button>
 <button class="sbtn" id="importSide">Import backup</button><input id="importFile" type="file" accept=".json,application/json" hidden></div>
 
@@ -792,25 +793,40 @@ function render(){
   renderPending()
 }
 
+function historyBucket(ch){
+  if(ch.pinned)return "Pinned";
+  var now=new Date(),d=new Date(ch.updated||ch.created||0);
+  var today=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  var day=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
+  var diff=Math.round((today-day)/86400000);
+  if(diff<=0)return "Today";
+  if(diff===1)return "Yesterday";
+  if(diff<=7)return "Previous 7 days";
+  return "Older"
+}
 function renderHistory(){
   var term=(q("#chatSearch").value||"").toLowerCase();
   var box=q("#history");box.innerHTML="";
-  chats.slice().sort(function(a,b){if(!!a.pinned!==!!b.pinned)return a.pinned?-1:1;return(b.updated||0)-(a.updated||0)}).filter(function(c){
+  var filtered=chats.slice().sort(function(a,b){if(!!a.pinned!==!!b.pinned)return a.pinned?-1:1;return(b.updated||0)-(a.updated||0)}).filter(function(c){
     if(c.trashedAt)return false;
     if(!term)return true;
     if((c.title||"").toLowerCase().includes(term))return true;
     var p=projectForChat(c);if(p&&(p.name||"").toLowerCase().includes(term))return true;
     return (c.messages||[]).some(function(m){return String(m.content||"").toLowerCase().includes(term)})
-  }).forEach(function(c){
+  });
+  var lastBucket="";
+  filtered.forEach(function(c){
+    var bucket=historyBucket(c);
+    if(bucket!==lastBucket){var label=document.createElement("div");label.className="historylabel";label.textContent=bucket;box.appendChild(label);lastBucket=bucket}
     var row=document.createElement("div");row.className="historyitem"+(c.id===active?" on":"");
     var b=document.createElement("button");b.className="hrow";b.textContent=(c.pinned?"◆ ":"")+(c.title||"New chat");
     b.onclick=function(){active=c.id;save();closeSide();render();restoreDraft()};
     var more=document.createElement("button");more.className="chatmore";more.textContent="⋯";
     more.onclick=function(e){e.stopPropagation();manageChatId=c.id;openChatManage()};
     row.appendChild(b);row.appendChild(more);box.appendChild(row)
-  })
+  });
+  if(!filtered.length)box.innerHTML='<div class="notice" style="margin-top:8px">'+(term?"No chats match your search.":"No chats yet.")+"</div>"
 }
-
 function renderFiles(parent,names){
   if(!names||!names.length)return;
   var f=document.createElement("div");f.className="files";
