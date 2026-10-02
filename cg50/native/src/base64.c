@@ -22,16 +22,17 @@ size_t qb_base64_encode(unsigned char const *input, size_t input_size,
                         char *output, size_t output_size)
 {
     size_t need = qb_base64_encoded_size(input_size);
-    size_t i = 0, o = 0;
+    size_t i;
+    size_t o = 0;
 
     if(output_size < need + 1) return 0;
 
-    while(i < input_size) {
-        unsigned int a = input[i++];
-        unsigned int b = i < input_size ? input[i++] : 0;
-        unsigned int c = i < input_size ? input[i++] : 0;
+    for(i = 0; i < input_size; i += 3) {
+        size_t remain = input_size - i;
+        unsigned int a = input[i];
+        unsigned int b = remain > 1 ? input[i + 1] : 0;
+        unsigned int c = remain > 2 ? input[i + 2] : 0;
         unsigned int triple = (a << 16) | (b << 8) | c;
-        size_t remain = input_size - (i >= 3 ? i - 3 : 0);
 
         output[o++] = table[(triple >> 18) & 0x3f];
         output[o++] = table[(triple >> 12) & 0x3f];
@@ -52,8 +53,13 @@ size_t qb_base64_decode(char const *input, unsigned char *output,
 
     while(*input) {
         char c = *input++;
-        if(c == '=' || decode_value(c) >= 0) {
-            vals[n++] = c == '=' ? -2 : decode_value(c);
+        int value = decode_value(c);
+
+        if(c == '=') {
+            vals[n++] = -2;
+        }
+        else if(value >= 0) {
+            vals[n++] = value;
         }
         else {
             continue;
