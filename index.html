@@ -62,7 +62,7 @@
 </div>
 <div class="pending" id="pending"></div>
 <div class="composer">
-<textarea id="prompt" placeholder="Message NoLimit AI"></textarea>
+<textarea id="prompt" placeholder="Message NoLimit AI or type /help"></textarea>
 <div class="crow">
 <div class="leftTools">
 <button class="tool" id="attach">＋</button>
@@ -312,7 +312,7 @@ function render(){
   var c=ensure();
   q("#title").textContent=c.title||"New chat";
   q("#modelBottom").textContent=settings.model;
-  q("#status").textContent=isConnected()?"Connected":"Not connected";
+  q("#status").textContent=!navigator.onLine?"Offline":(isConnected()?"Connected":"Not connected");
   q("#topAuth").textContent=isConnected()?"Connected":"Connect";
   q("#topAuth").classList.toggle("ok",isConnected());
   q("#sideAuth").textContent=isConnected()?"OpenRouter connected":"Connect OpenRouter";
@@ -533,10 +533,37 @@ async function fetchChatWithFallback(body,headers,signal){
   }
 }
 
+function localAssistant(text){
+  var c=ensure();c.messages.push({role:"assistant",content:text,model:"NoLimit AI local"});c.updated=Date.now();save();render()
+}
+
+function handleCommand(text){
+  if(!text||text.charAt(0)!=="/")return false;
+  var cmd=text.split(/s+/)[0].toLowerCase();
+  if(cmd==="/new"){q("#prompt").value="";newChat();return true}
+  if(cmd==="/models"){q("#prompt").value="";loadModels();return true}
+  if(cmd==="/usage"){q("#prompt").value="";openUsage();return true}
+  if(cmd==="/compare"){q("#prompt").value="";openCompare();return true}
+  if(cmd==="/image"){q("#prompt").value="";openImage();return true}
+  if(cmd==="/video"){q("#prompt").value="";openVideo();return true}
+  if(cmd==="/research"){q("#prompt").value="";toggleResearch();return true}
+  if(cmd==="/web"){q("#prompt").value="";settings.web=!settings.web;save();render();toast(settings.web?"Web search enabled":"Web search disabled");return true}
+  if(cmd==="/agent"){q("#prompt").value="";settings.agent=!settings.agent;save();render();toast(settings.agent?"Agent enabled":"Agent disabled");return true}
+  if(cmd==="/advisor"){q("#prompt").value="";settings.advisor=!settings.advisor;save();render();toast(settings.advisor?"Advisor enabled":"Advisor disabled");return true}
+  if(cmd==="/help"){
+    q("#prompt").value="";
+    localAssistant("Available local commands:\n\n/new — new chat\n/models — choose model\n/usage — API key usage\n/compare — compare models\n/image — image generation\n/video — video generation\n/research — toggle research mode\n/web — toggle web search\n/agent — toggle subagent mode\n/advisor — toggle advisor mode\n\nKeyboard: Ctrl/Cmd+Enter sends, Ctrl/Cmd+K opens models, Escape closes dialogs.");
+    return true
+  }
+  toast("Unknown command. Type /help");
+  return true
+}
+
 async function send(){
   if(busy){if(controller)controller.abort();return}
-  if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
   var text=q("#prompt").value.trim();if(!text&&!pending.length)return;
+  if(!pending.length&&handleCommand(text))return;
+  if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
   var c=ensure(),files=pending.slice();pending=[];q("#prompt").value="";
   var aud=files.filter(function(f){return f.kind==="audio"});
   for(var ai=0;ai<aud.length;ai++){try{toast("Transcribing "+aud[ai].name+"…");var tr=await transcribe(aud[ai].file);text+=(text?"\n\n":"")+"[Audio transcript: "+aud[ai].name+"]\n"+tr}catch(e){toast(e.message)}}
@@ -976,7 +1003,10 @@ q("#chatSearch").oninput=renderHistory;
 q("#attach").onclick=function(){q("#files").click()};
 q("#files").onchange=function(e){addFiles(Array.prototype.slice.call(e.target.files));e.target.value=""};
 q("#send").onclick=send;
-q("#prompt").onkeydown=function(e){if(e.key==="Enter"&&!e.shiftKey&&innerWidth>700){e.preventDefault();send()}};
+q("#prompt").onkeydown=function(e){
+  if(e.key==="Enter"&&!e.shiftKey&&innerWidth>700){e.preventDefault();send()}
+  if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();send()}
+};
 q("#topAuth").onclick=q("#sideAuth").onclick=q("#settingsBtn").onclick=openSettings;
 q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
 q("#compareSide").onclick=openCompare;
@@ -1048,6 +1078,15 @@ var composer=q(".composer");
 ["dragleave","drop"].forEach(function(name){composer.addEventListener(name,function(e){e.preventDefault();composer.style.borderColor=""})});
 composer.addEventListener("drop",function(e){var fs=e.dataTransfer&&e.dataTransfer.files?Array.prototype.slice.call(e.dataTransfer.files):[];if(fs.length)addFiles(fs)});
 
+document.addEventListener("keydown",function(e){
+  var mod=e.ctrlKey||e.metaKey;
+  if(e.key==="Escape"){closeModals();closeSide()}
+  if(mod&&e.key.toLowerCase()==="k"){e.preventDefault();loadModels()}
+  if(mod&&e.key.toLowerCase()==="n"){e.preventDefault();newChat()}
+  if(!mod&&!e.altKey&&e.key==="/"&&document.activeElement!==q("#prompt")&&document.activeElement&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();q("#prompt").focus();q("#prompt").value="/"}
+});
+window.addEventListener("online",render);
+window.addEventListener("offline",render);
 window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();installPrompt=e});
 if("serviceWorker" in navigator&&location.protocol==="https:"){
   navigator.serviceWorker.register("./sw.js").catch(function(){})
