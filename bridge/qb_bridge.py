@@ -31,6 +31,7 @@ import urllib.request
 
 try:
     import serial
+    from serial.tools import list_ports
 except ImportError:
     print("Missing dependency: pyserial")
     print("Install with: python -m pip install pyserial")
@@ -249,9 +250,31 @@ def handle_line(ser, line):
         send_line(ser, "E:%s:%s" % (req_id, b64e(message)))
 
 
+def resolve_serial_port(configured_port):
+    if configured_port:
+        return configured_port
+
+    ports = list(list_ports.comports())
+    if len(ports) == 1:
+        chosen = ports[0].device
+        print("Auto-selected serial port: %s" % chosen)
+        return chosen
+
+    if not ports:
+        print("No serial ports found.")
+        print("Connect the CG50 serial adapter or set QB_SERIAL_PORT manually.")
+        return ""
+
+    print("Multiple serial ports found. Set QB_SERIAL_PORT to one of:")
+    for port in ports:
+        description = getattr(port, "description", "") or ""
+        print("  %s  %s" % (port.device, description))
+    return ""
+
+
 def main():
-    if not PORT:
-        print("Set QB_SERIAL_PORT first, for example COM5 or /dev/ttyUSB0.")
+    port = resolve_serial_port(PORT)
+    if not port:
         return 2
     if not API_KEY:
         print("Set QB_API_KEY in your environment. Do not hard-code it.")
@@ -261,14 +284,14 @@ def main():
         return 2
 
     print("Quantum Breaks AI CG50 bridge v0.3")
-    print("Serial: %s @ %d" % (PORT, BAUD))
+    print("Serial: %s @ %d" % (port, BAUD))
     print("API: %s" % API_URL)
     print("Model: %s" % MODEL)
     print("Handshake: QBAI protocol v2")
     print("Subjects: auto + school subject packs")
     print("Modes: answer, explain, steps, check, quiz, summary, flashcards")
 
-    with serial.Serial(PORT, BAUD, timeout=0.25) as ser:
+    with serial.Serial(port, BAUD, timeout=0.25) as ser:
         time.sleep(0.5)
         ser.reset_input_buffer()
         while True:
