@@ -607,7 +607,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field"><label>Name</label><input id="projectName" maxlength="80" placeholder="Project name"></div>
 <div class="field"><label>Default model</label><input id="projectModel" list="modelOptions" placeholder="Leave blank to use the global model"><div class="smallnote">Project chats use this unless the individual chat has a model lock.</div></div>
 <div class="field"><label>Project instructions</label><textarea id="projectInstructions" placeholder="How Quantum Breaks AI should behave inside this project"></textarea></div>
-<div class="field"><label>Project knowledge</label><textarea id="projectKnowledge" placeholder="Paste reference notes, lore, specifications, or other context"></textarea><div class="smallnote">Keep this reasonably sized because it is sent with each project chat.</div></div>
+<div class="field"><label>Project knowledge</label><textarea id="projectKnowledge" placeholder="Paste reference notes, lore, specifications, or other context"></textarea><div class="row" style="margin-top:7px"><button class="secondary" id="projectKnowledgeFiles" type="button">Add text files</button><input id="projectKnowledgeFileInput" type="file" hidden multiple accept=".txt,.md,.json,.csv,.js,.ts,.tsx,.jsx,.html,.css,.py,.java,.cpp,.c,.xml,.yaml,.yml"></div><div class="smallnote">Keep this reasonably sized because it is sent with each project chat.</div></div>
 <div class="field"><label>Project chats</label><div id="projectChatList" class="searchresults"></div></div>
 <div class="row">
 <button class="primary" id="saveProject">Save project</button>
@@ -939,7 +939,7 @@ function current(){return chats.find(function(c){return c.id===active&&!c.trashe
 function effectiveModel(c){var p=projectForChat(c);return c&&c.modelOverride?c.modelOverride:(p&&p.model?p.model:settings.model)}
 function effectiveReasoning(c){return c&&c.reasoningOverride!==undefined&&c.reasoningOverride!==""?c.reasoningOverride:settings.reasoning}
 function effectiveTemperature(c){return c&&c.temperatureOverride!==undefined&&c.temperatureOverride!==""?Math.max(0,Math.min(2,Number(c.temperatureOverride))):Number(settings.temperature)}
-function setActiveModel(id){var c=current();if(c&&c.modelOverride)c.modelOverride=id;else settings.model=id;rememberModel(id);save();render()}
+function setActiveModel(id){var c=current(),p=projectForChat(c);if(c&&(c.modelOverride||(p&&p.model)))c.modelOverride=id;else settings.model=id;rememberModel(id);save();render()}
 function projectForChat(c){return c&&c.projectId?projects.find(function(p){return p.id===c.projectId}):null}
 function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save()}return c}
 function closeSide(){q("#side").classList.remove("open");q("#shade").classList.remove("show")}
@@ -2341,9 +2341,7 @@ async function openCompare(){
   openModal("#compareModal");
   q("#compareModel1").value=effectiveModel(ensure());
   q("#compareOutput").innerHTML="";
-  await ensureModelCatalog();
-  var dl=q("#modelOptions");dl.innerHTML="";
-  models.slice(0,500).forEach(function(m){var o=document.createElement("option");o.value=m.id;dl.appendChild(o)})
+  await ensureModelCatalog();fillModelDatalist()
 }
 
 async function compareOne(model,prompt){
@@ -3018,9 +3016,9 @@ function openChatManage(){
 
 function toggleChatModelLock(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
-  if(q("#lockChatModel").checked)c.modelOverride=c.modelOverride||settings.model;
+  if(q("#lockChatModel").checked)c.modelOverride=c.modelOverride||effectiveModel(c);
   else c.modelOverride="";
-  c.updated=Date.now();save();q("#chatModelLockLabel").textContent=c.modelOverride?"("+c.modelOverride+")":"(currently "+settings.model+")";render();toast(c.modelOverride?"Model locked to this chat":"Chat now follows the global model")
+  c.updated=Date.now();save();q("#chatModelLockLabel").textContent=c.modelOverride?"("+c.modelOverride+")":"(currently "+effectiveModel(c)+")";render();toast(c.modelOverride?"Model locked to this chat":"Chat now follows its project/global model")
 }
 function renameManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
@@ -3271,6 +3269,22 @@ function applyProfile(p){
   save();closeModals();render();toast("Applied profile: "+p.name)
 }
 
+function fillModelDatalist(){
+  var dl=q("#modelOptions");if(!dl)return;dl.innerHTML="";
+  models.slice(0,800).forEach(function(m){var o=document.createElement("option");o.value=m.id;dl.appendChild(o)})
+}
+async function addProjectKnowledgeFiles(files){
+  var chunks=[];
+  for(var i=0;i<files.length;i++){
+    var f=files[i];if(f.size>2*1024*1024){toast(f.name+" is too large for project knowledge");continue}
+    try{chunks.push("[File: "+f.name+"]\n"+await f.text())}catch(e){toast("Could not read "+f.name)}
+  }
+  if(!chunks.length)return;
+  var current=q("#projectKnowledge").value;
+  q("#projectKnowledge").value=(current+(current?"\n\n":"")+chunks.join("\n\n")).slice(0,150000);
+  toast("Added "+chunks.length+" file"+(chunks.length===1?"":"s")+" to project knowledge")
+}
+
 function projectOptions(){
   var s=q("#projectSelect");s.innerHTML="";
   var none=document.createElement("option");none.value="";none.textContent="No project";s.appendChild(none);
@@ -3303,7 +3317,8 @@ function openProjects(){
   var c=ensure(),id=c.projectId||"";
   q("#projectSelect").value=id;
   loadProjectFields(id);
-  openModal("#projectsModal")
+  openModal("#projectsModal");
+  ensureModelCatalog().then(fillModelDatalist)
 }
 
 function createProject(){
@@ -3549,6 +3564,8 @@ q("#newPrompt").onclick=newPromptEntry;
 q("#saveComposerPrompt").onclick=saveComposerAsPrompt;
 q("#projectSelect").onchange=function(){loadProjectFields(q("#projectSelect").value)};
 q("#newProject").onclick=createProject;
+q("#projectKnowledgeFiles").onclick=function(){q("#projectKnowledgeFileInput").click()};
+q("#projectKnowledgeFileInput").onchange=function(e){var fs=Array.prototype.slice.call(e.target.files||[]);if(fs.length)addProjectKnowledgeFiles(fs);e.target.value=""};
 q("#saveProject").onclick=saveProject;
 q("#assignProject").onclick=assignProject;
 q("#newProjectChat").onclick=newProjectChat;
