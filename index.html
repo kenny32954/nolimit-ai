@@ -287,6 +287,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .galleryGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:65vh;overflow:auto}.galleryCard{min-width:0;border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.025)}.galleryCard img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;background:#111;cursor:zoom-in}.galleryMeta{padding:8px}.galleryMeta b{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.galleryMeta span{display:block;margin-top:3px;color:var(--muted);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.galleryActions{display:flex;gap:5px;padding:0 8px 8px}.galleryActions button{height:30px;flex:1;border-radius:8px;background:rgba(255,255,255,.055);font-size:10px;color:#bbb}.galleryEmpty{grid-column:1/-1}
 
+
+.finishwarn{margin:10px 0;padding:9px 11px;border-radius:11px;border:1px solid rgba(235,173,102,.18);background:rgba(235,173,102,.06);color:#d8ad78;font-size:11px}.toolactivity{margin:9px 0;border:1px solid rgba(255,255,255,.06);border-radius:11px;background:rgba(255,255,255,.022)}.toolactivity summary{cursor:pointer;padding:8px 10px;color:#888;font-size:11px}.toolactivityBody{padding:0 10px 9px;color:#777;font-size:11px;white-space:pre-wrap}.continuehot{color:var(--accent2)!important;border-color:color-mix(in srgb,var(--accent) 30%,transparent)!important}
+
 </style>
 </head>
 <body>
@@ -1345,6 +1348,15 @@ function renderChat(){
         var t=document.createElement("div");t.className="md";t.innerHTML=renderMarkdown(m.content||"");a.appendChild(t);
         if(m.images&&m.images.length)m.images.forEach(function(src){var im=document.createElement("img");im.className="generated";im.src=src;im.onclick=function(){openLightbox(src)};a.appendChild(im)});
         renderCitations(a,m.annotations);
+        if(m.finishReason==="length"||m.finishReason==="max_tokens"){
+          var fw=document.createElement("div");fw.className="finishwarn";fw.textContent="This response reached its output limit. Use Continue to finish from where it stopped.";a.appendChild(fw)
+        }
+        if(Array.isArray(m.toolCalls)&&m.toolCalls.length){
+          var ta=document.createElement("details");ta.className="toolactivity";var ts=document.createElement("summary"),tb=document.createElement("div");tb.className="toolactivityBody";
+          var names=m.toolCalls.map(function(x){return x&&x.function&&x.function.name?x.function.name:(x&&x.type?x.type:"tool")});ts.textContent="Tool activity · "+names.join(", ");
+          tb.textContent=m.toolCalls.map(function(x){var name=x&&x.function&&x.function.name?x.function.name:(x&&x.type?x.type:"tool"),args=x&&x.function&&x.function.arguments?x.function.arguments:"";return name+(args?"\n"+args:"")}).join("\n\n");
+          ta.appendChild(ts);ta.appendChild(tb);a.appendChild(ta)
+        }
         if(m.reviewing){var rvw=document.createElement("div");rvw.className="reviewing";rvw.textContent="AI review in progress…";a.appendChild(rvw)}
         if(m.review){
           var details=document.createElement("details"),summary=document.createElement("summary"),body=document.createElement("div");
@@ -1364,7 +1376,7 @@ function renderChat(){
         var rd=document.createElement("button");rd.textContent="Read";rd.onclick=function(){speak(m.content||"")};
         var av=document.createElement("button");av.textContent="AI Voice";av.onclick=function(){openVoice(m.content||"")};
         var rg=document.createElement("button");rg.textContent="Regenerate";rg.onclick=function(){regenerate(idx)};
-        var ct=document.createElement("button");ct.textContent="Continue";ct.onclick=function(){continueResponse(idx)};
+        var ct=document.createElement("button");ct.textContent="Continue";if(m.finishReason==="length"||m.finishReason==="max_tokens")ct.className="continuehot";ct.onclick=function(){continueResponse(idx)};
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
         var cm=document.createElement("button");cm.textContent="Compare";cm.onclick=function(){compareFromMessage(idx)};
         var vr=document.createElement("button");vr.textContent="Review";vr.onclick=function(){reviewMessageAt(idx)};
@@ -1962,7 +1974,16 @@ function addDelta(d,a){
     if(Array.isArray(d.reasoning_details)){a.reasoning_details=(Array.isArray(a.reasoning_details)?a.reasoning_details:[]).concat(d.reasoning_details)}
     else a.reasoning_details=d.reasoning_details
   }
-  if(d.annotations)a.annotations=mergeAnnotations(a.annotations,d.annotations)
+  if(d.annotations)a.annotations=mergeAnnotations(a.annotations,d.annotations);
+  if(Array.isArray(d.tool_calls)){
+    a.toolCalls=Array.isArray(a.toolCalls)?a.toolCalls:[];
+    d.tool_calls.forEach(function(call){
+      var idx=call&&call.index!=null?Number(call.index):a.toolCalls.length,existing=a.toolCalls[idx]||{id:"",type:"",function:{name:"",arguments:""}};
+      if(call.id)existing.id=call.id;if(call.type)existing.type=call.type;
+      if(call.function){existing.function=existing.function||{name:"",arguments:""};if(call.function.name)existing.function.name=call.function.name;if(call.function.arguments)existing.function.arguments=(existing.function.arguments||"")+call.function.arguments}
+      a.toolCalls[idx]=existing
+    })
+  }
 }
 
 function applyStreamPayload(raw,a){
@@ -2303,6 +2324,7 @@ function finishBuffered(j,a){
     a.reasoning=m.reasoning||"";
     a.reasoning_details=m.reasoning_details;
     a.annotations=mergeAnnotations(a.annotations,m.annotations);
+    if(Array.isArray(m.tool_calls))a.toolCalls=m.tool_calls;
     if(Array.isArray(m.images))m.images.forEach(function(x){var src=x&&x.image_url&&x.image_url.url?x.image_url.url:(x&&x.url?x.url:"");if(src){a.images=a.images||[];pushUnique(a.images,src)}})
   }
   if(choice&&choice.finish_reason)a.finishReason=choice.finish_reason;
