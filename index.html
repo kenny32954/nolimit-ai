@@ -1138,8 +1138,8 @@ function renderFiles(parent,names,images){
   }
 }
 
-function renderCitations(parent,annotations){
-  if(!Array.isArray(annotations)||!annotations.length)return;
+function citationLinks(annotations){
+  if(!Array.isArray(annotations)||!annotations.length)return [];
   var seen={},links=[];
   annotations.forEach(function(a){
     var u=a&&a.url_citation?a.url_citation:(a&&a.type==="url_citation"?a.url_citation:null);
@@ -1147,7 +1147,10 @@ function renderCitations(parent,annotations){
     url=safeHttpUrl(url);if(!url||seen[url])return;seen[url]=true;
     links.push({url:url,title:(u&&u.title)||(a&&a.title)||url})
   });
-  if(!links.length)return;
+  return links
+}
+function renderCitations(parent,annotations){
+  var links=citationLinks(annotations);if(!links.length)return;
   var row=document.createElement("div");row.className="files";
   links.slice(0,8).forEach(function(x){
     var a=document.createElement("a");a.className="filechip";a.href=x.url;a.target="_blank";a.rel="noopener";a.style.textDecoration="none";a.textContent=x.title;row.appendChild(a)
@@ -1195,6 +1198,7 @@ function renderChat(){
         }
         var tools=document.createElement("div");tools.className="msgtools";
         var cp=document.createElement("button");cp.textContent="Copy";cp.onclick=function(){navigator.clipboard.writeText(m.content||"").then(function(){toast("Copied")})};
+        var sv=document.createElement("button");sv.textContent="Save";sv.onclick=function(){saveResponseFile(m,idx)};
         var rd=document.createElement("button");rd.textContent="Read";rd.onclick=function(){speak(m.content||"")};
         var av=document.createElement("button");av.textContent="AI Voice";av.onclick=function(){openVoice(m.content||"")};
         var rg=document.createElement("button");rg.textContent="Regenerate";rg.onclick=function(){regenerate(idx)};
@@ -1204,7 +1208,7 @@ function renderChat(){
         var vr=document.createElement("button");vr.textContent="Review";vr.onclick=function(){reviewMessageAt(idx)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
-        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(bm);tools.appendChild(pin);
+        tools.appendChild(cp);tools.appendChild(sv);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(bm);tools.appendChild(pin);
         var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
@@ -2432,9 +2436,20 @@ function speak(text){
   speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(String(text||"").replace(/[\x60*_#>\[\]()]/g," "));speechSynthesis.speak(u)
 }
 
+function responseMarkdown(m,idx){
+  var lines=["# Quantum Breaks AI response","",m.content||""],links=citationLinks(m.annotations);
+  if(links.length){lines.push("","## Sources","");links.forEach(function(x){lines.push("- "+x.title+" — "+x.url)})}
+  if(m.model)lines.push("","Model: "+m.model);
+  if(m.cost!=null)lines.push("Tracked cost: "+money(m.cost));
+  return lines.join("\n")
+}
+function saveResponseFile(m,idx){
+  var a=document.createElement("a"),text=responseMarkdown(m,idx);a.href=URL.createObjectURL(new Blob([text],{type:"text/markdown"}));a.download="quantum-breaks-response-"+(idx+1)+".md";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
+}
+
 async function shareChat(){
   var c=ensure(),lines=[c.title||"Quantum Breaks AI chat",""];
-  c.messages.forEach(function(m){lines.push(m.role==="user"?"You:":"Quantum Breaks AI:");lines.push(m.content||"");lines.push("")});
+  c.messages.forEach(function(m){lines.push(m.role==="user"?"You:":"Quantum Breaks AI:");lines.push(m.content||"");var links=citationLinks(m.annotations);if(links.length){lines.push("Sources:");links.forEach(function(x){lines.push("- "+x.title+" — "+x.url)})}lines.push("")});
   var text=lines.join("\n");
   if(navigator.share){
     try{await navigator.share({title:c.title||"Quantum Breaks AI chat",text:text});return}catch(e){if(e&&e.name==="AbortError")return}
@@ -2467,14 +2482,16 @@ function printChat(){
   parts.push("<h1>"+escapeHTML(c.title||"Quantum Breaks AI chat")+"</h1>");
   parts.push("<div class=\"meta\">"+escapeHTML((project?"Project: "+project.name+" · ":"")+"Exported "+new Date().toLocaleString())+"</div>");
   (c.messages||[]).forEach(function(m){
-    parts.push("<div class=\"msg "+(m.role==="assistant"?"ai":"user")+"\"><div class=\"role\">"+(m.role==="assistant"?"Quantum Breaks AI":"You")+"</div><div class=\"content\">"+escapeHTML(m.content||"(attachment)")+"</div></div>")
+    var links=citationLinks(m.annotations),sources="";
+    if(links.length)sources='<div style="margin-top:10px;font-size:11px;color:#666"><b>Sources:</b><br>'+links.map(function(x){return escapeHTML(x.title)+" — "+escapeHTML(x.url)}).join("<br>")+"</div>";
+    parts.push("<div class=\"msg "+(m.role==="assistant"?"ai":"user")+"\"><div class=\"role\">"+(m.role==="assistant"?"Quantum Breaks AI":"You")+"</div><div class=\"content\">"+escapeHTML(m.content||"(attachment)")+"</div>"+sources+"</div>")
   });
   parts.push("</body></html>");
   var w=window.open("","_blank");if(!w)return toast("Pop-up blocked. Allow pop-ups to print this chat.");
   w.document.open();w.document.write(parts.join(""));w.document.close();w.focus();setTimeout(function(){w.print()},250)
 }
 function exportChat(){
-  var c=ensure(),lines=["# "+c.title,""];c.messages.forEach(function(m){lines.push(m.role==="user"?"## You":"## Quantum Breaks AI");lines.push("");lines.push(m.content||"");lines.push("")});
+  var c=ensure(),lines=["# "+c.title,""];c.messages.forEach(function(m){lines.push(m.role==="user"?"## You":"## Quantum Breaks AI");lines.push("");lines.push(m.content||"");var links=citationLinks(m.annotations);if(links.length){lines.push("","### Sources","");links.forEach(function(x){lines.push("- "+x.title+" — "+x.url)})}lines.push("")});
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/markdown"}));a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".md";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 
