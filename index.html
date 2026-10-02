@@ -474,9 +474,11 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field" style="flex:1;min-width:180px"><label>Response format</label><select id="responseFormat"><option value="text">Normal text</option><option value="json_object">JSON object</option><option value="json_schema">Strict JSON Schema</option></select></div>
 <div class="field" style="flex:1;min-width:180px"><label>Max output tokens</label><input id="maxTokens" type="number" min="0" step="256" placeholder="0 = model default"></div>
 <div class="field" style="flex:1;min-width:180px"><label>History messages sent</label><input id="historyLimit" type="number" min="0" step="1" placeholder="0 = all"><div class="smallnote">Optional context cap. 0 sends the full conversation.</div></div>
+<div class="field" style="flex:1;min-width:180px"><label>Context summary model</label><input id="summaryModel" placeholder="openrouter/auto"></div>
 </div>
 <div class="field"><label>JSON Schema name</label><input id="jsonSchemaName" maxlength="60" placeholder="structured_response"></div>
 <div class="field"><label>JSON Schema</label><textarea id="jsonSchemaText" spellcheck="false" placeholder='{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"],"additionalProperties":false}'></textarea><div class="row" style="margin-top:7px"><button class="secondary" id="schemaExampleBtn" type="button">Load example schema</button></div><div class="smallnote">Used only when Response format is Strict JSON Schema.</div></div>
+<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="autoCompressContext" type="checkbox"> Automatically summarize older context before it must be trimmed <span class="smallnote">(may use an extra model call)</span></label>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="requireParameters" type="checkbox"> Require providers that support requested parameters</label>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="denyDataCollection" type="checkbox"> Prefer providers that deny data collection</label>
 <div class="row">
@@ -830,6 +832,8 @@ var settings=Object.assign({
   requireParameters:false,
   maxTokens:0,
   historyLimit:0,
+  autoCompressContext:false,
+  summaryModel:"openrouter/auto",
   recentModels:[],
   favoriteModels:[],
   theme:"dark",
@@ -1695,6 +1699,8 @@ function openSettings(){
   q("#requireParameters").checked=!!settings.requireParameters;
   q("#maxTokens").value=settings.maxTokens||0;
   q("#historyLimit").value=settings.historyLimit||0;
+  q("#autoCompressContext").checked=!!settings.autoCompressContext;
+  q("#summaryModel").value=settings.summaryModel||"openrouter/auto";
   q("#denyDataCollection").checked=!!settings.denyDataCollection;
   q("#cacheEnabled").checked=!!settings.cache;
   q("#cacheTTL").value=String(settings.cacheTTL||300);
@@ -2084,6 +2090,24 @@ function fitRequestMessages(messages,modelId){
   return {messages:copy,trimmed:trimmed,estimated:total,limit:limit,over:!!(limit&&total>target)}
 }
 
+async function updateCompactSummaryForSend(c){
+  var all=c.messages||[],keep=10,start=Math.max(0,Number(c.compactCount)||0),cutoff=Math.max(start,all.length-keep);
+  if(cutoff<=start)return false;
+  var newer=all.slice(start,cutoff),chunks=[];
+  if(c.compactSummary)chunks.push("EXISTING SUMMARY:\n"+c.compactSummary);
+  chunks.push("NEW OLDER MESSAGES TO FOLD IN:\n"+newer.map(function(m){return (m.role==="user"?"User":"Assistant")+": "+String(m.content||"")}).join("\n\n"));
+  var body={model:settings.summaryModel||"openrouter/auto",messages:[
+    {role:"system",content:"Create an updated dense continuity summary for an ongoing conversation. Preserve explicit requirements, decisions, names, preferences, technical details, unresolved tasks, corrections, and important constraints. Do not invent or infer new facts. Return only the updated summary."},
+    {role:"user",content:chunks.join("\n\n").slice(0,140000)}
+  ],stream:false,temperature:0.1,max_tokens:3000,usage:{include:true}};
+  var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
+  var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Automatic context summary failed"));
+  var m=j.choices&&j.choices[0]&&j.choices[0].message||{},holder={content:"",images:[]};collectOutputContent(m.content,holder);
+  var summary=String(holder.content||"").trim();if(!summary)throw new Error("No context summary was returned");
+  c.compactSummary=summary;c.compactCount=cutoff;c.updated=Date.now();
+  c.lastSummaryUsage=j.usage||{};c.lastSummaryCost=j.usage&&j.usage.cost!=null?j.usage.cost:j.cost;save();return true
+}
+
 async function send(){
   if(busy){if(controller)controller.abort();return}
   hideSlashMenu();
@@ -2099,7 +2123,14 @@ async function send(){
   var m={role:"user",created:Date.now(),content:text||"Please analyze the attached file.",fileNames:files.map(function(x){return x.name}),images:files.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),imageRefs:files.filter(function(x){return x.kind==="image"&&x.mediaId}).map(function(x){return{name:x.name,mediaId:x.mediaId}}),pdfs:files.filter(function(x){return x.kind==="pdf"}).map(function(x){return{name:x.name,data:x.data,mediaId:x.mediaId||""}}),textFiles:files.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
   c.messages.push(m);if(c.title==="New chat")c.title=(text||(files[0]&&files[0].name)||"New chat").replace(/\s+/g," ").slice(0,48);c.updated=Date.now();
   await hydrateChatMedia(c);
-  var requestModel=effectiveModel(c),fit=fitRequestMessages(apiMessages(c),requestModel),requestMessages=fit.messages;
+  var requestModel=effectiveModel(c),fit=fitRequestMessages(apiMessages(c),requestModel);
+  if(fit.trimmed&&settings.autoCompressContext){
+    try{
+      toast("Summarizing older context…");
+      if(await updateCompactSummaryForSend(c))fit=fitRequestMessages(apiMessages(c),requestModel)
+    }catch(summaryError){toast("Context summary skipped: "+summaryError.message)}
+  }
+  var requestMessages=fit.messages;
   var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:requestModel,contextTrimmed:fit.trimmed||0};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";q("#send").classList.add("busy");render();
   if(fit.trimmed)toast("Context fit skipped "+fit.trimmed+" older message"+(fit.trimmed===1?"":"s")+" for this request");
   if(fit.over)toast("This request is still close to or over the selected model's context limit.");
@@ -3032,7 +3063,7 @@ function chatStatsText(c){
   if(tokens)bits.push(formatTokenCount(tokens)+" generated tokens");
   if(cost)bits.push(money(cost)+" tracked cost");
   if(p)bits.push("project: "+p.name);
-  if(c.compactSummary)bits.push("context compressed");
+  if(c.compactSummary)bits.push("context compressed"+(c.lastSummaryCost!=null?" "+money(c.lastSummaryCost):""));
   if(c.archivedAt)bits.push("archived");
   var modelId=effectiveModel(c),mi=models.find(function(m){return m.id===modelId}),approx=approxContextTokens(c);
   if(approx)bits.push("~"+formatTokenCount(approx)+" context"+(mi&&mi.context_length?" / "+formatTokenCount(mi.context_length):""));
@@ -3602,7 +3633,7 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.autoCompressContext=q("#autoCompressContext").checked;settings.summaryModel=q("#summaryModel").value.trim()||"openrouter/auto";settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#commandSearch").oninput=function(){commandActiveIndex=0;renderCommandPalette()};
 q("#commandSearch").onkeydown=function(e){
