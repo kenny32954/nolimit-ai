@@ -18,7 +18,10 @@ fxconv_declare_assets(src/icon.png WITH_METADATA)
 
 add_executable(qbai_cg50
   src/main.c
+  src/editor.c
+  src/base64.c
   src/transport.c
+  src/serial_syscalls.S
 )
 
 target_compile_options(qbai_cg50 PRIVATE -Wall -Wextra -Os)
