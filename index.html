@@ -975,6 +975,8 @@ function render(){
   var ctxText=approx?" · ~"+formatTokenCount(approx)+(limit?"/"+formatTokenCount(limit):"")+" ctx":"";
   q("#status").textContent=!navigator.onLine?"Offline":((isConnected()?"Connected":"Not connected")+ctxText);
   q("#status").classList.toggle("warn",!!(limit&&approx/limit>.8));
+  var promptPrice=modelInfo&&modelInfo.pricing&&modelInfo.pricing.prompt!=null?Number(modelInfo.pricing.prompt):NaN;
+  var tip=[];if(limit)tip.push("Approximate context: "+formatTokenCount(approx)+" of "+formatTokenCount(limit));if(isFinite(promptPrice))tip.push("Estimated current input cost: "+money(promptPrice*approx));q("#status").title=tip.join(" · ");
   q("#topAuth").textContent=isConnected()?"Connected":"Connect";
   q("#topAuth").classList.toggle("ok",isConnected());
   q("#sideAuth").textContent=isConnected()?"OpenRouter connected":"Connect OpenRouter";
@@ -1099,9 +1101,10 @@ function renderChat(){
         var av=document.createElement("button");av.textContent="AI Voice";av.onclick=function(){openVoice(m.content||"")};
         var rg=document.createElement("button");rg.textContent="Regenerate";rg.onclick=function(){regenerate(idx)};
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
+        var cm=document.createElement("button");cm.textContent="Compare";cm.onclick=function(){compareFromMessage(idx)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
-        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(br);tools.appendChild(bm);tools.appendChild(pin);
+        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(bm);tools.appendChild(pin);
         var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
@@ -1675,6 +1678,14 @@ async function refreshUsage(){
     var bits=[];if(d.label)bits.push(d.label);bits.push(d.is_free_tier?"Free tier":"Paid key");if(d.limit_reset)bits.push("limit resets "+d.limit_reset);
     q("#usageNotice").textContent=bits.join(" · ")
   }catch(e){q("#usageNotice").textContent="Usage could not be loaded: "+e.message}
+}
+
+async function compareFromMessage(idx){
+  var c=ensure(),u=idx-1;while(u>=0&&c.messages[u].role!=="user")u--;
+  await openCompare();
+  if(u>=0)q("#comparePrompt").value=c.messages[u].content||"";
+  q("#compareModel1").value=(c.messages[idx]&&c.messages[idx].model)||settings.model;
+  q("#compareModel2").focus()
 }
 
 async function openCompare(){
@@ -2703,7 +2714,7 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();ins
 if("serviceWorker" in navigator&&location.protocol==="https:"){
   navigator.serviceWorker.register("./sw.js").catch(function(){})
 }
-finishAuth().then(function(){render();restoreDraft()})
+finishAuth().then(function(){render();restoreDraft();setTimeout(function(){ensureModelCatalog().then(function(){render()})},250)})
 })();
 </script>
 </body>
