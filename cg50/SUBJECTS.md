@@ -1,30 +1,61 @@
 # School subject coverage
 
-Quantum Breaks AI's CG50 bridge now has subject-aware tutoring profiles.
+Quantum Breaks AI's CG50 bridge uses subject-aware tutoring profiles plus a general fallback, so an uncommon elective still works even if it does not have its own named profile yet.
 
-## Core subjects
+## Mathematics
 
 - General math
 - Algebra
 - Geometry
 - Statistics
 - Calculus
+
+## Science and STEM
+
 - Biology
 - Chemistry
 - Physics
 - Earth/space science
+- Environmental science
+- Computer science/programming
+- Engineering
+
+## English and communication
+
 - English/ELA
 - Literature
 - Writing
+- World languages
+
+## Social sciences
+
 - History
+- Social studies
+- Geography
 - Government/civics
 - Economics
-- Business/marketing
-- Computer science/programming
-- World languages
-- Health/nutrition
+- Psychology
+- Sociology
 
-The architecture is intentionally extensible: adding another subject only requires adding a subject profile and optional detection keywords in `bridge/subject_router.py`.
+## Business and career subjects
+
+- Business/marketing
+- Accounting
+- CTE/career tech
+- Agriculture
+
+## Arts and media
+
+- Visual art
+- Music
+- Media/audio-video/film
+
+## Health and activity
+
+- Health/nutrition
+- Physical education
+
+If a class is not listed, `auto` can route to `general`, so the model can still help with the assignment.
 
 ## Tutor modes
 
