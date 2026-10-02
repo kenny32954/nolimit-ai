@@ -245,6 +245,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .modelrow2{grid-template-columns:minmax(0,1fr) 42px 42px!important}.modelinfo{width:42px;border-radius:11px;background:rgba(255,255,255,.026);border:1px solid rgba(255,255,255,.065);color:#8b878e}.modelinfo:hover{color:#fff;background:rgba(255,255,255,.06)}
 
+
+.userpreviews{display:flex;gap:7px;overflow:auto;margin-top:9px}.userpreview{width:84px;height:84px;flex:none;object-fit:cover;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:#111}.chipthumb{width:28px;height:28px;object-fit:cover;border-radius:7px;border:1px solid rgba(255,255,255,.08);flex:none}.filetypeicon{width:28px;height:28px;display:grid;place-items:center;border-radius:7px;background:rgba(255,255,255,.055);font-size:9px;font-weight:800;letter-spacing:.04em;color:#aaa;flex:none}
+
 </style>
 </head>
 <body>
@@ -933,11 +936,23 @@ function renderHistory(){
   });
   if(!filtered.length)box.innerHTML='<div class="notice" style="margin-top:8px">'+(term?"No chats match your search.":"No chats yet.")+"</div>"
 }
-function renderFiles(parent,names){
-  if(!names||!names.length)return;
-  var f=document.createElement("div");f.className="files";
-  names.forEach(function(n){var chip=document.createElement("div");chip.className="filechip";chip.textContent=n;f.appendChild(chip)});
-  parent.appendChild(f)
+function renderFiles(parent,names,images){
+  if(names&&names.length){
+    var f=document.createElement("div");f.className="files";
+    names.forEach(function(n){
+      var chip=document.createElement("div");chip.className="filechip";
+      var ico=document.createElement("span");ico.className="filetypeicon";
+      var ext=(String(n).split(".").pop()||"FILE").toUpperCase().slice(0,4);ico.textContent=ext;
+      var label=document.createElement("span");label.textContent=n;
+      chip.appendChild(ico);chip.appendChild(label);f.appendChild(chip)
+    });
+    parent.appendChild(f)
+  }
+  if(images&&images.length){
+    var previews=document.createElement("div");previews.className="userpreviews";
+    images.slice(0,8).forEach(function(src){var im=document.createElement("img");im.className="userpreview";im.src=src;im.alt="Attached image";previews.appendChild(im)});
+    parent.appendChild(previews)
+  }
 }
 
 function renderCitations(parent,annotations){
@@ -972,7 +987,7 @@ function renderChat(){
   }else{
     c.messages.forEach(function(m,idx){
       if(m.role==="user"){
-        var w=document.createElement("div");w.className="user";w.dataset.msgIndex=idx;var b=document.createElement("div");b.className="ub";b.textContent=m.content||"";renderFiles(b,m.fileNames);
+        var w=document.createElement("div");w.className="user";w.dataset.msgIndex=idx;var b=document.createElement("div");b.className="ub";b.textContent=m.content||"";renderFiles(b,m.fileNames,m.images);
         var ua=document.createElement("div");ua.className="msgtools";ua.style.justifyContent="flex-end";
         var ed=document.createElement("button");ed.textContent="Edit";ed.onclick=function(){editUserMessage(idx)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
@@ -1119,8 +1134,10 @@ function renderPending(){
   var p=q("#pending");p.innerHTML="";
   pending.forEach(function(f,i){
     var c=document.createElement("div");c.className="filechip";
+    if(f.kind==="image"&&f.data){var im=document.createElement("img");im.className="chipthumb";im.src=f.data;c.appendChild(im)}
+    else{var ico=document.createElement("span");ico.className="filetypeicon";ico.textContent=f.kind==="pdf"?"PDF":(f.kind==="audio"?"AUD":"FILE");c.appendChild(ico)}
     var s=document.createElement("span");s.textContent=f.name+(f.size?" · "+fmtBytes(f.size):"");
-    var x=document.createElement("button");x.textContent="×";x.onclick=function(){pending.splice(i,1);renderPending()};
+    var x=document.createElement("button");x.textContent="×";x.onclick=function(){if(f.mediaId)deleteMedia(f.mediaId);pending.splice(i,1);renderPending()};
     c.appendChild(s);c.appendChild(x);p.appendChild(c)
   })
 }
@@ -1430,6 +1447,7 @@ async function send(){
   if(busy){if(controller)controller.abort();return}
   var text=q("#prompt").value.trim();if(!text&&!pending.length)return;
   if(!pending.length&&handleCommand(text))return;
+  if(!navigator.onLine){saveDraftSoon();toast("You are offline — your draft is saved locally");return}
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
   var c=ensure(),files=pending.slice();pending=[];q("#prompt").value="";c.draft="";
   var aud=files.filter(function(f){return f.kind==="audio"});
@@ -2563,8 +2581,8 @@ document.addEventListener("keydown",function(e){
   if(mod&&e.key.toLowerCase()==="n"){e.preventDefault();newChat()}
   if(!mod&&!e.altKey&&e.key==="/"&&document.activeElement!==q("#prompt")&&document.activeElement&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();q("#prompt").focus();q("#prompt").value="/"}
 });
-window.addEventListener("online",render);
-window.addEventListener("offline",render);
+window.addEventListener("online",function(){render();toast("Back online")});
+window.addEventListener("offline",function(){render();toast("Offline mode — drafts and local tools still work")});
 window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();installPrompt=e});
 if("serviceWorker" in navigator&&location.protocol==="https:"){
   navigator.serviceWorker.register("./sw.js").catch(function(){})
