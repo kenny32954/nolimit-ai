@@ -259,6 +259,10 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .lightbox{position:fixed;inset:0;z-index:140;display:none;background:rgba(0,0,0,.88);backdrop-filter:blur(16px);padding:62px 20px 68px}.lightbox.show{display:flex;flex-direction:column}.lightboxStage{flex:1;min-height:0;display:grid;place-items:center;overflow:auto}.lightboxStage img{max-width:96%;max-height:96%;object-fit:contain;border-radius:12px;box-shadow:0 25px 90px #0008;cursor:zoom-in;transition:max-width .2s,max-height .2s}.lightboxStage img.zoom{max-width:none;max-height:none;cursor:zoom-out}.lightboxClose{position:absolute;right:18px;top:18px;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.09);color:white;font-size:18px}.lightboxActions{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:7px;padding:6px;border-radius:12px;background:rgba(25,25,28,.88);border:1px solid rgba(255,255,255,.08)}.lightboxActions button{height:34px;border-radius:9px;padding:0 11px;color:#ddd}.lightboxActions button:hover{background:rgba(255,255,255,.08)}
 .userpreview,.generated,.imgresult{cursor:zoom-in}
 
+
+.historyitem{height:50px!important}.hrow{height:50px!important;display:flex!important;flex-direction:column;align-items:flex-start!important;justify-content:center;gap:3px}.histtitle{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.histtags{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;color:#66636a;letter-spacing:.02em}.historyitem.on .histtags{color:#8e8992}
+.analyticsBars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;align-items:end;height:150px}.analyticsDay{height:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;min-width:0}.analyticsBar{min-height:3px;border-radius:8px 8px 3px 3px;background:linear-gradient(180deg,var(--accent2),var(--accent));box-shadow:0 6px 18px var(--accentGlow)}.analyticsDay span{font-size:9px;text-align:center;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.analyticsModels{display:grid;gap:7px}.analyticsModel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 12px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.025)}.analyticsModel b{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.analyticsModel span{font-size:11px;color:var(--muted)}
+
 </style>
 </head>
 <body>
@@ -274,6 +278,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="profilesSide">AI profiles</button>
 <button class="sbtn" id="compareSide">Compare models</button>
 <button class="sbtn" id="usageSide">Usage</button>
+<button class="sbtn" id="analyticsSide">Local analytics</button>
 <button class="sbtn" id="diagnosticsSide">Diagnostics</button>
 <button class="sbtn" id="storageSide">Storage</button></div>
 
@@ -541,6 +546,19 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div id="profilesList" class="promptlist"></div>
 </section>
 
+<section class="modal" id="analyticsModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Local analytics</h2>
+<div class="notice">Calculated entirely from conversation data stored in this browser.</div>
+<div id="analyticsGrid" class="usagegrid"></div>
+<div style="height:14px"></div>
+<h3 style="margin:0 0 8px">Recent activity</h3>
+<div id="analyticsActivity" class="analyticsBars"></div>
+<div style="height:14px"></div>
+<h3 style="margin:0 0 8px">Models used</h3>
+<div id="analyticsModels" class="analyticsModels"></div>
+</section>
+
 <section class="modal" id="usageModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>OpenRouter usage</h2>
@@ -568,6 +586,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Conversation</h2>
 <div class="field"><label>Title</label><input id="chatTitleInput" maxlength="80"></div>
+<div class="field"><label>Tags</label><input id="chatTagsInput" maxlength="160" placeholder="coding, research, school"><div class="smallnote">Comma-separated. Tags are searchable from the sidebar and global search.</div></div>
 <div class="notice" id="chatStats"></div>
 <div class="row">
 <button class="primary" id="renameChat">Rename</button>
@@ -1037,6 +1056,7 @@ function renderHistory(){
     if(c.trashedAt||c.archivedAt)return false;
     if(!term)return true;
     if((c.title||"").toLowerCase().includes(term))return true;
+    if((c.tags||[]).join(" ").toLowerCase().includes(term))return true;
     var p=projectForChat(c);if(p&&(p.name||"").toLowerCase().includes(term))return true;
     return (c.messages||[]).some(function(m){return String(m.content||"").toLowerCase().includes(term)})
   });
@@ -1045,7 +1065,9 @@ function renderHistory(){
     var bucket=historyBucket(c);
     if(bucket!==lastBucket){var label=document.createElement("div");label.className="historylabel";label.textContent=bucket;box.appendChild(label);lastBucket=bucket}
     var row=document.createElement("div");row.className="historyitem"+(c.id===active?" on":"");
-    var b=document.createElement("button");b.className="hrow";b.textContent=(c.pinned?"◆ ":"")+(c.title||"New chat");
+    var b=document.createElement("button");b.className="hrow";
+    var ht=document.createElement("span");ht.className="histtitle";ht.textContent=(c.pinned?"◆ ":"")+(c.title||"New chat");b.appendChild(ht);
+    if(c.tags&&c.tags.length){var tg=document.createElement("span");tg.className="histtags";tg.textContent=c.tags.map(function(x){return "#"+x}).join(" ");b.appendChild(tg)}
     b.onclick=function(){active=c.id;save();closeSide();render();restoreDraft()};
     var more=document.createElement("button");more.className="chatmore";more.textContent="⋯";
     more.onclick=function(e){e.stopPropagation();manageChatId=c.id;openChatManage()};
@@ -1151,7 +1173,7 @@ function globalSearch(){
   var results=[];
   chats.forEach(function(ch){
     if(ch.trashedAt)return;
-    if((ch.title||"").toLowerCase().includes(term))results.push({type:"Chat",title:ch.title||"New chat",snippet:"Open conversation",run:function(){active=ch.id;save();closeModals();render();restoreDraft()}});
+    if(((ch.title||"")+" "+(ch.tags||[]).join(" ")).toLowerCase().includes(term))results.push({type:"Chat",title:ch.title||"New chat",snippet:(ch.tags&&ch.tags.length?ch.tags.map(function(x){return "#"+x}).join(" "):"Open conversation"),run:function(){active=ch.id;save();closeModals();render();restoreDraft()}});
     (ch.messages||[]).forEach(function(m,idx){
       var content=String(m.content||"");if(content.toLowerCase().includes(term))results.push({type:m.role==="user"?"Your message":"AI message",title:ch.title||"Chat",snippet:content.replace(/\s+/g," ").slice(0,180),run:function(){jumpToMessage(ch.id,idx)}})
     })
@@ -1288,6 +1310,7 @@ var COMMANDS=[
   {name:"Bookmarks",hint:"Saved messages",run:openBookmarks},
   {name:"Archived chats",hint:"Chats hidden from sidebar",run:openArchive},
   {name:"Usage dashboard",hint:"OpenRouter key usage",run:openUsage},
+  {name:"Local analytics",hint:"Chats, tokens, cost, activity",run:openAnalytics},
   {name:"Diagnostics",hint:"Health check",run:openDiagnostics},
   {name:"Storage manager",hint:"Media persistence + cleanup",run:openStorageManager},
   {name:"Toggle focus mode",hint:"Hide chrome and tools",run:function(){settings.focusMode=!settings.focusMode;save();render()}},
@@ -1683,6 +1706,35 @@ async function loadModels(){
   await ensureModelCatalog();
   if(models.length)showModels();else q("#models").innerHTML='<div class="notice">Could not load the model catalog. Auto Router still works.</div>'
 }
+
+function analyticsData(){
+  var activeChats=chats.filter(function(ch){return !ch.trashedAt}),messages=0,tokens=0,cost=0,attachments=0,modelsUsed={};
+  activeChats.forEach(function(ch){
+    (ch.messages||[]).forEach(function(m){
+      messages++;
+      if(m.usage&&m.usage.total_tokens!=null)tokens+=Number(m.usage.total_tokens)||0;
+      if(m.cost!=null)cost+=Number(m.cost)||0;
+      attachments+=(m.fileNames||[]).length;
+      if(m.role==="assistant"&&m.model){modelsUsed[m.model]=(modelsUsed[m.model]||0)+1}
+    })
+  });
+  return {activeChats:activeChats,messages:messages,tokens:tokens,cost:cost,attachments:attachments,modelsUsed:modelsUsed}
+}
+function renderAnalytics(){
+  var d=analyticsData(),grid=q("#analyticsGrid");grid.innerHTML="";
+  [["Chats",d.activeChats.length],["Messages",d.messages],["Tracked tokens",formatTokenCount(d.tokens)],["Tracked cost",d.cost?money(d.cost):"$0"],["Attachments",d.attachments],["Projects",projects.length],["Saved prompts",savedPrompts.length],["AI profiles",profiles.length]].forEach(function(x){
+    var card=document.createElement("div");card.className="usagecard";var s=document.createElement("span");s.textContent=x[0];var b=document.createElement("b");b.textContent=x[1];card.appendChild(s);card.appendChild(b);grid.appendChild(card)
+  });
+  var days=[],max=1,now=new Date();
+  for(var i=6;i>=0;i--){var date=new Date(now.getFullYear(),now.getMonth(),now.getDate()-i),key=date.toISOString().slice(0,10),count=0;d.activeChats.forEach(function(ch){(ch.messages||[]).forEach(function(m){if(m.created&&new Date(m.created).toISOString().slice(0,10)===key)count++})});days.push({date:date,count:count});if(count>max)max=count}
+  var activity=q("#analyticsActivity");activity.innerHTML="";
+  days.forEach(function(day){var wrap=document.createElement("div");wrap.className="analyticsDay";var bar=document.createElement("div");bar.className="analyticsBar";bar.style.height=Math.max(3,Math.round(day.count/max*110))+"px";bar.title=day.count+" messages";var label=document.createElement("span");label.textContent=day.date.toLocaleDateString([],{weekday:"short"});wrap.appendChild(bar);wrap.appendChild(label);activity.appendChild(wrap)});
+  var modelBox=q("#analyticsModels");modelBox.innerHTML="";
+  var sorted=Object.keys(d.modelsUsed).sort(function(a,b){return d.modelsUsed[b]-d.modelsUsed[a]}).slice(0,10);
+  if(!sorted.length)modelBox.innerHTML='<div class="notice">No model usage recorded yet.</div>';
+  sorted.forEach(function(id){var row=document.createElement("div");row.className="analyticsModel";var b=document.createElement("b");b.textContent=id;var s=document.createElement("span");s.textContent=d.modelsUsed[id]+" replies";row.appendChild(b);row.appendChild(s);modelBox.appendChild(row)})
+}
+function openAnalytics(){openModal("#analyticsModal");renderAnalytics()}
 
 async function openUsage(){
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
@@ -2326,6 +2378,7 @@ function chatStatsText(c){
 function openChatManage(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
   q("#chatTitleInput").value=c.title||"New chat";
+  q("#chatTagsInput").value=(c.tags||[]).join(", ");
   q("#chatStats").textContent=chatStatsText(c);
   q("#pinChat").textContent=c.pinned?"Unpin":"Pin";
   q("#archiveChat").textContent=c.archivedAt?"Unarchive":"Archive";
@@ -2335,7 +2388,7 @@ function openChatManage(){
 
 function renameManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
-  c.title=q("#chatTitleInput").value.trim().slice(0,80)||"New chat";c.updated=Date.now();save();closeModals();render()
+  c.title=q("#chatTitleInput").value.trim().slice(0,80)||"New chat";c.tags=q("#chatTagsInput").value.split(",").map(function(x){return x.trim().replace(/^#/,"").slice(0,24)}).filter(Boolean).slice(0,12);c.updated=Date.now();save();closeModals();render()
 }
 
 async function generateChatTitle(){
@@ -2659,6 +2712,7 @@ q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
 q("#profilesSide").onclick=openProfiles;
 q("#compareSide").onclick=openCompare;
 q("#usageSide").onclick=openUsage;
+q("#analyticsSide").onclick=openAnalytics;
 q("#projectsSide").onclick=openProjects;
 q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
 q("#scratchpadSide").onclick=openScratchpad;
