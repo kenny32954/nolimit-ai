@@ -263,7 +263,8 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="profilesSide">AI profiles</button>
 <button class="sbtn" id="compareSide">Compare models</button>
 <button class="sbtn" id="usageSide">Usage</button>
-<button class="sbtn" id="diagnosticsSide">Diagnostics</button></div>
+<button class="sbtn" id="diagnosticsSide">Diagnostics</button>
+<button class="sbtn" id="storageSide">Storage</button></div>
 
 <div class="navgroup"><div class="navlabel">Workspace</div>
 <button class="sbtn" id="projectsSide">Projects</button>
@@ -358,6 +359,16 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div id="diagGrid" class="diaggrid"></div>
 <div style="height:12px"></div>
 <div class="row"><button class="primary" id="runDiagnostics">Run diagnostics</button><button class="secondary" id="copyDiagnostics">Copy report</button></div>
+</section>
+
+<section class="modal" id="storageModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Local storage</h2>
+<div class="notice" id="storageSummary">Inspect local chat metadata and persistent attachment storage.</div>
+<div id="storageGrid" class="diaggrid"></div>
+<div style="height:12px"></div>
+<div class="row"><button class="primary" id="refreshStorage">Refresh</button><button class="secondary" id="cleanStorage">Clean orphaned media</button><button class="danger" id="clearMediaStorage">Clear all media</button></div>
+<div class="smallnote" style="margin-top:10px">Clearing all media removes locally persisted images and PDFs from old conversations, but keeps text chat history.</div>
 </section>
 
 <section class="modal" id="settingsModal">
@@ -790,6 +801,50 @@ async function deleteMedia(id){
   if(!id)return;
   try{var db=await openMediaDB();await new Promise(function(resolve){var tx=db.transaction("media","readwrite");tx.objectStore("media").delete(id);tx.oncomplete=resolve;tx.onerror=resolve});db.close()}catch(e){}
 }
+async function listMediaRecords(){
+  try{
+    var db=await openMediaDB();
+    var records=await new Promise(function(resolve,reject){var tx=db.transaction("media","readonly"),req=tx.objectStore("media").getAll();req.onsuccess=function(){resolve(req.result||[])};req.onerror=function(){reject(req.error)}});
+    db.close();return records
+  }catch(e){return []}
+}
+function referencedMediaIds(){
+  var ids=new Set();
+  chats.forEach(function(ch){(ch.messages||[]).forEach(function(m){(m.imageRefs||[]).forEach(function(r){if(r.mediaId)ids.add(r.mediaId)});(m.pdfs||[]).forEach(function(f){if(f.mediaId)ids.add(f.mediaId)})})});
+  pending.forEach(function(f){if(f.mediaId)ids.add(f.mediaId)});
+  return ids
+}
+async function storageStats(){
+  var records=await listMediaRecords(),bytes=0;records.forEach(function(r){bytes+=String(r.data||"").length});
+  return {records:records,count:records.length,approxBytes:Math.round(bytes*0.75)}
+}
+async function cleanOrphanedMedia(){
+  var refs=referencedMediaIds(),records=await listMediaRecords(),removed=0;
+  for(var i=0;i<records.length;i++)if(!refs.has(records[i].id)){await deleteMedia(records[i].id);removed++}
+  toast("Removed "+removed+" orphaned media item"+(removed===1?"":"s"));await refreshStorageManager()
+}
+async function clearAllMedia(){
+  if(!confirm("Clear every persisted image and PDF from this browser? Text conversations will stay."))return;
+  try{
+    var db=await openMediaDB();await new Promise(function(resolve){var tx=db.transaction("media","readwrite");tx.objectStore("media").clear();tx.oncomplete=resolve;tx.onerror=resolve});db.close();
+    chats.forEach(function(ch){(ch.messages||[]).forEach(function(m){m.images=(m.images||[]).filter(function(src){return String(src).indexOf("data:")!==0});if(m.pdfs)m.pdfs=m.pdfs.map(function(f){return {name:f.name,mediaId:""}});m.imageRefs=[]})});
+    save();render();toast("Persistent media cleared");await refreshStorageManager()
+  }catch(e){toast("Could not clear media storage")}
+}
+async function refreshStorageManager(){
+  q("#storageSummary").textContent="Scanning browser storage…";q("#storageGrid").innerHTML="";
+  var stats=await storageStats(),rows=[
+    ["Chats",chats.filter(function(ch){return !ch.trashedAt}).length],
+    ["Media items",stats.count],
+    ["Media size",fmtBytes(stats.approxBytes)],
+    ["Metadata",fmtBytes(new Blob([localStorage.getItem(STORE)||""]).size)]
+  ];
+  if(navigator.storage&&navigator.storage.estimate){try{var est=await navigator.storage.estimate();if(est.usage!=null)rows.push(["Browser usage",fmtBytes(est.usage)]);if(est.quota!=null)rows.push(["Browser quota",fmtBytes(est.quota)])}catch(e){}}
+  rows.forEach(function(x){var d=document.createElement("div");d.className="diagcard";var s=document.createElement("span");s.textContent=x[0];var b=document.createElement("b");b.textContent=x[1];d.appendChild(s);d.appendChild(b);q("#storageGrid").appendChild(d)});
+  q("#storageSummary").textContent="Attachments are stored locally in IndexedDB and are never uploaded anywhere except when you explicitly send them to the selected AI model."
+}
+async function openStorageManager(){openModal("#storageModal");await refreshStorageManager()}
+
 async function hydrateMessageMedia(m){
   var changed=false;
   if(Array.isArray(m.imageRefs)&&m.imageRefs.length){
@@ -1165,6 +1220,7 @@ var COMMANDS=[
   {name:"Bookmarks",hint:"Saved messages",run:openBookmarks},
   {name:"Usage dashboard",hint:"OpenRouter key usage",run:openUsage},
   {name:"Diagnostics",hint:"Health check",run:openDiagnostics},
+  {name:"Storage manager",hint:"Media persistence + cleanup",run:openStorageManager},
   {name:"Toggle focus mode",hint:"Hide chrome and tools",run:function(){settings.focusMode=!settings.focusMode;save();render()}},
   {name:"Settings",hint:"Appearance + API",run:openSettings},
   {name:"Toggle temporary chat",hint:"Do not persist after reload",run:function(){var c=ensure();c.temporary=!c.temporary;save();render()}},
@@ -2425,6 +2481,7 @@ q("#status").style.cursor="pointer";
 q("#commandBtn").onclick=openCommandPalette;
 q("#focusBtn").onclick=function(){settings.focusMode=!settings.focusMode;save();render();toast(settings.focusMode?"Focus mode on":"Focus mode off")};
 q("#diagnosticsSide").onclick=openDiagnostics;
+q("#storageSide").onclick=openStorageManager;
 q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
 q("#profilesSide").onclick=openProfiles;
 q("#compareSide").onclick=openCompare;
@@ -2489,6 +2546,9 @@ q("#saveSettings").onclick=function(){
 };
 q("#commandSearch").oninput=renderCommandPalette;
 q("#runDiagnostics").onclick=runDiagnostics;
+q("#refreshStorage").onclick=refreshStorageManager;
+q("#cleanStorage").onclick=cleanOrphanedMedia;
+q("#clearMediaStorage").onclick=clearAllMedia;
 q("#copyDiagnostics").onclick=function(){navigator.clipboard.writeText(lastDiagReport||"No diagnostics run yet.").then(function(){toast("Diagnostics copied")})};
 q("#useModelInfo").onclick=function(){if(!modelInfoCurrent)return;settings.model=modelInfoCurrent.id;rememberModel(modelInfoCurrent.id);closeModals();render();toast("Model changed to "+modelInfoCurrent.id)};
 q("#favoriteModelInfo").onclick=function(){if(!modelInfoCurrent)return;toggleFavoriteModel(modelInfoCurrent.id);q("#favoriteModelInfo").textContent=(settings.favoriteModels||[]).indexOf(modelInfoCurrent.id)>=0?"Unfavorite":"Favorite"};
