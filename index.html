@@ -268,6 +268,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .tool.loading{animation:toolPulse 1s infinite alternate;color:var(--accent2);border-color:color-mix(in srgb,var(--accent) 35%,transparent)}@keyframes toolPulse{from{opacity:.55}to{opacity:1}}
 @media(max-width:520px){.foot #composerMetrics{display:none}.foot{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}}
 
+
+.reviewbox{margin:12px 0 6px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.025);overflow:hidden}.reviewbox summary{cursor:pointer;padding:10px 12px;font-size:12px;color:#aaa}.reviewbox.good summary{color:#95d4aa}.reviewbox.warn summary{color:#e6b37e}.reviewbody{padding:0 12px 11px;font-size:12px;line-height:1.5;color:#aaa}.reviewbody ul{margin:7px 0 0;padding-left:18px}.reviewbody .reviewnote{font-size:10px;color:#666;margin-top:8px}.reviewing{margin:8px 0;font-size:11px;color:#777}
+
 </style>
 </head>
 <body>
@@ -334,6 +337,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="toggle" id="imageToolToggle">▣ Image tool</button>
 <button class="toggle" id="agentToggle">◇ Agent</button>
 <button class="toggle" id="advisorToggle">✦ Advisor</button>
+<button class="toggle" id="reviewToggle">✓ Review</button>
 <button class="toggle" id="fusionToggle">◎ Fusion</button>
 <button class="toggle" id="tempToggle">◐ Temporary</button>
 <button class="toggle" id="modeBtn">⚡ Mode: balanced</button>
@@ -426,6 +430,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field" style="flex:1;min-width:180px"><label>Reasoning effort</label><select id="reasoning"><option value="none">None</option><option value="minimal">Minimal</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">Extra high</option></select></div>
 </div>
 <div class="field"><label>Advisor model</label><input id="advisorModel" placeholder="~anthropic/claude-opus-latest"><div class="smallnote">Used only when the Advisor toggle is enabled.</div></div>
+<div class="field"><label>AI review model</label><input id="reviewModel" placeholder="openrouter/auto"><div class="smallnote">Optional second-pass reviewer. Review is model-generated and not a guarantee of correctness.</div></div>
 <div class="field"><label>Fallback model (optional)</label><input id="fallbackModel" placeholder="e.g. anthropic/claude-sonnet-4"><div class="smallnote">If the primary model fails, OpenRouter can try this model next.</div></div>
 <div class="field"><label>Provider routing</label><select id="providerRouting"><option value="balanced">Balanced</option><option value="price">Lowest price</option><option value="throughput">Highest throughput</option><option value="latency">Lowest latency</option></select></div>
 <div class="row">
@@ -738,6 +743,8 @@ var settings=Object.assign({
   agent:false,
   advisor:false,
   advisorModel:"~anthropic/claude-opus-latest",
+  review:false,
+  reviewModel:"openrouter/auto",
   fallbackModel:"",
   providerRouting:"balanced",
   responseFormat:"text",
@@ -1053,6 +1060,7 @@ function render(){
   q("#imageToolToggle").classList.toggle("on",!!settings.imageTool);
   q("#agentToggle").classList.toggle("on",!!settings.agent);
   q("#advisorToggle").classList.toggle("on",!!settings.advisor);
+  q("#reviewToggle").classList.toggle("on",!!settings.review);
   q("#fusionToggle").classList.toggle("on",!!settings.fusion);
   q("#tempToggle").classList.toggle("on",!!c.temporary);
   q("#modeBtn").textContent="⚡ Mode: "+(settings.modePreset||"balanced");
@@ -1166,6 +1174,17 @@ function renderChat(){
         var t=document.createElement("div");t.className="md";t.innerHTML=renderMarkdown(m.content||"");a.appendChild(t);
         if(m.images&&m.images.length)m.images.forEach(function(src){var im=document.createElement("img");im.className="generated";im.src=src;im.onclick=function(){openLightbox(src)};a.appendChild(im)});
         renderCitations(a,m.annotations);
+        if(m.reviewing){var rvw=document.createElement("div");rvw.className="reviewing";rvw.textContent="AI review in progress…";a.appendChild(rvw)}
+        if(m.review){
+          var details=document.createElement("details"),summary=document.createElement("summary"),body=document.createElement("div");
+          var conf=Math.max(0,Math.min(1,Number(m.review.confidence)||0)),pct=Math.round(conf*100);
+          details.className="reviewbox "+(pct>=75?"good":"warn");summary.textContent="AI review · "+pct+"% confidence · "+(m.review.verdict||"reviewed");
+          body.className="reviewbody";
+          if(m.review.summary){var p=document.createElement("div");p.textContent=m.review.summary;body.appendChild(p)}
+          if(Array.isArray(m.review.issues)&&m.review.issues.length){var ul=document.createElement("ul");m.review.issues.slice(0,6).forEach(function(x){var li=document.createElement("li");li.textContent=x;ul.appendChild(li)});body.appendChild(ul)}
+          var note=document.createElement("div");note.className="reviewnote";note.textContent="This is a second AI model's review, not a factual guarantee."+(m.review.cost!=null?" Review cost: "+money(m.review.cost):"");body.appendChild(note);
+          details.appendChild(summary);details.appendChild(body);a.appendChild(details)
+        }
         var tools=document.createElement("div");tools.className="msgtools";
         var cp=document.createElement("button");cp.textContent="Copy";cp.onclick=function(){navigator.clipboard.writeText(m.content||"").then(function(){toast("Copied")})};
         var rd=document.createElement("button");rd.textContent="Read";rd.onclick=function(){speak(m.content||"")};
@@ -1491,6 +1510,7 @@ function openSettings(){
   q("#temperature").value=settings.temperature;
   q("#reasoning").value=settings.reasoning;
   q("#advisorModel").value=settings.advisorModel||"~anthropic/claude-opus-latest";
+  q("#reviewModel").value=settings.reviewModel||"openrouter/auto";
   q("#fallbackModel").value=settings.fallbackModel||"";
   q("#providerRouting").value=settings.providerRouting||"balanced";
   q("#responseFormat").value=settings.responseFormat||"text";
@@ -1691,6 +1711,25 @@ function handleCommand(text){
   return true
 }
 
+async function reviewAnswer(c,userMessage,assistantMessage){
+  if(!settings.review||!assistantMessage||assistantMessage.error||!assistantMessage.content)return;
+  assistantMessage.reviewing=true;save();render();
+  try{
+    var schema={type:"object",properties:{confidence:{type:"number",description:"Confidence from 0 to 1 that the answer is accurate and adequately addresses the request"},verdict:{type:"string",description:"Short verdict such as strong, mixed, or needs checking"},summary:{type:"string",description:"One short sentence about answer quality"},issues:{type:"array",items:{type:"string"},description:"Specific possible errors, omissions, or uncertainty worth checking"}},required:["confidence","verdict","summary","issues"],additionalProperties:false};
+    var body={model:settings.reviewModel||"openrouter/auto",messages:[
+      {role:"system",content:"Review another AI answer. Be skeptical but fair. Identify concrete possible errors or missing caveats. Do not rewrite the answer. Return only the requested structured review."},
+      {role:"user",content:"User request:\n"+String(userMessage||"").slice(0,30000)+"\n\nAnswer to review:\n"+String(assistantMessage.content||"").slice(0,60000)}
+    ],temperature:0,response_format:{type:"json_schema",json_schema:{name:"answer_review",strict:true,schema:schema}},provider:{require_parameters:true},stream:false,usage:{include:true},max_tokens:1200};
+    var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
+    var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Review failed"));
+    var raw=String(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim(),review=JSON.parse(raw);
+    review.cost=j.usage&&j.usage.cost!=null?j.usage.cost:j.cost;assistantMessage.review=review
+  }catch(e){
+    assistantMessage.reviewError=e.message
+  }
+  assistantMessage.reviewing=false;save();render()
+}
+
 async function improvePrompt(){
   var original=q("#prompt").value.trim();if(!original)return toast("Write a prompt first");
   if(!navigator.onLine)return toast("You are offline");
@@ -1777,7 +1816,8 @@ async function send(){
     if(e.name==="AbortError"&&!a.content)c.messages.pop();
     save()
   }finally{
-    busy=false;controller=null;q("#send").textContent="↑";q("#send").classList.remove("busy");render();if(settings.autoSpeak&&a.content&&!a.error)speak(a.content)
+    busy=false;controller=null;q("#send").textContent="↑";q("#send").classList.remove("busy");render();if(settings.autoSpeak&&a.content&&!a.error)speak(a.content);
+    if(settings.review&&a.content&&!a.error)reviewAnswer(c,m.content,a)
   }
 }
 
@@ -2913,6 +2953,10 @@ q("#freshToggle").onclick=function(){settings.cacheClearNext=true;save();toast(s
 q("#imageToolToggle").onclick=function(){settings.imageTool=!settings.imageTool;save();render()};
 q("#agentToggle").onclick=function(){settings.agent=!settings.agent;save();render();toast(settings.agent?"Agent subcalls enabled":"Agent subcalls disabled")};
 q("#advisorToggle").onclick=function(){settings.advisor=!settings.advisor;save();render();toast(settings.advisor?"Advisor enabled — the model can consult a stronger model":"Advisor disabled")};
+q("#reviewToggle").onclick=function(){
+  if(!settings.review&&!confirm("AI Review makes one additional model call after each answer and can use extra credits. Enable it?"))return;
+  settings.review=!settings.review;save();render();toast(settings.review?"AI Review enabled":"AI Review disabled")
+};
 q("#fusionToggle").onclick=function(){
   if(!settings.fusion&&!confirm("Fusion can call multiple models for one answer and may use more API credits. Enable Fusion?"))return;
   settings.fusion=!settings.fusion;save();render();toast(settings.fusion?"Fusion enabled":"Fusion disabled")
@@ -2933,7 +2977,7 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#commandSearch").oninput=function(){commandActiveIndex=0;renderCommandPalette()};
 q("#commandSearch").onkeydown=function(e){
