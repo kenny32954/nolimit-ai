@@ -136,6 +136,11 @@ bool qb_transport_ready(void)
     return ready && Serial_IsOpen();
 }
 
+bool qb_transport_serial_open(void)
+{
+    return Serial_IsOpen() != 0;
+}
+
 bool qb_transport_probe(void)
 {
     char line[128];
