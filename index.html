@@ -280,6 +280,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="globalSearchSide">Search everything</button>
 <button class="sbtn" id="findSide">Find in chat</button>
 <button class="sbtn" id="bookmarksSide">Bookmarks</button>
+<button class="sbtn" id="archiveSide">Archived</button>
 <button class="sbtn" id="trashSide">Trash</button></div>
 
 <div class="navgroup"><div class="navlabel">Create</div>
@@ -462,6 +463,13 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="row"><button class="primary" id="saveScratchpad">Save notes</button><button class="secondary" id="insertScratchpad">Insert into composer</button><button class="secondary" id="clearScratchpad">Clear</button></div>
 </section>
 
+<section class="modal" id="archiveModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Archived chats</h2>
+<div class="notice">Archive chats you want to keep without cluttering the main sidebar.</div>
+<div id="archiveList" class="searchresults"></div>
+</section>
+
 <section class="modal" id="trashModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Trash</h2>
@@ -556,6 +564,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="secondary" id="aiTitleChat">AI title</button>
 <button class="secondary" id="compressChat">Compress context</button>
 <button class="secondary" id="pinChat">Pin</button>
+<button class="secondary" id="archiveChat">Archive</button>
 <button class="secondary" id="duplicateChat">Duplicate</button>
 <button class="danger" id="deleteChat">Delete</button>
 </div>
@@ -1014,7 +1023,7 @@ function renderHistory(){
   var term=(q("#chatSearch").value||"").toLowerCase();
   var box=q("#history");box.innerHTML="";
   var filtered=chats.slice().sort(function(a,b){if(!!a.pinned!==!!b.pinned)return a.pinned?-1:1;return(b.updated||0)-(a.updated||0)}).filter(function(c){
-    if(c.trashedAt)return false;
+    if(c.trashedAt||c.archivedAt)return false;
     if(!term)return true;
     if((c.title||"").toLowerCase().includes(term))return true;
     var p=projectForChat(c);if(p&&(p.name||"").toLowerCase().includes(term))return true;
@@ -1072,7 +1081,7 @@ function renderCitations(parent,annotations){
 function renderChat(){
   var c=ensure(),box=q("#chat"),distanceBefore=box.scrollHeight-box.scrollTop-box.clientHeight,stickToBottom=distanceBefore<180||box.scrollHeight<=box.clientHeight+20;box.innerHTML="";
   if(!c.messages.length){
-    var liveChats=chats.filter(function(x){return !x.trashedAt&&!x.temporary}).length;
+    var liveChats=chats.filter(function(x){return !x.trashedAt&&!x.archivedAt&&!x.temporary}).length;
     box.innerHTML='<div class="welcome"><div class="logo"></div><h1>Build, research, create.</h1><p>One workspace for multi-model chat, web research, files, images, audio, video, code, and projects.</p><div class="quickgrid"><button class="quickcard" data-quick="research"><b>Research the web</b><span>Search, read pages, and cite sources</span></button><button class="quickcard" data-quick="build"><b>Build something</b><span>Generate code and preview artifacts</span></button><button class="quickcard" data-quick="image"><b>Create an image</b><span>Open the image studio</span></button><button class="quickcard" data-quick="compare"><b>Compare models</b><span>Run the same prompt across models</span></button></div><div class="homestats"><span class="homestat"><b>'+liveChats+'</b> chats</span><span class="homestat"><b>'+projects.length+'</b> projects</span><span class="homestat"><b>'+savedPrompts.length+'</b> prompts</span><span class="homestat"><b>'+((settings.favoriteModels||[]).length)+'</b> favorite models</span></div></div>';
     qa(".quickcard").forEach(function(b){b.onclick=function(){
       var a=b.getAttribute("data-quick");
@@ -1262,6 +1271,7 @@ var COMMANDS=[
   {name:"Search everything",hint:"Chats, projects, prompts, profiles",run:openGlobalSearch},
   {name:"Find in chat",hint:"Search current conversation",run:openFindInChat},
   {name:"Bookmarks",hint:"Saved messages",run:openBookmarks},
+  {name:"Archived chats",hint:"Chats hidden from sidebar",run:openArchive},
   {name:"Usage dashboard",hint:"OpenRouter key usage",run:openUsage},
   {name:"Diagnostics",hint:"Health check",run:openDiagnostics},
   {name:"Storage manager",hint:"Media persistence + cleanup",run:openStorageManager},
@@ -2256,6 +2266,7 @@ function chatStatsText(c){
   if(cost)bits.push(money(cost)+" tracked cost");
   if(p)bits.push("project: "+p.name);
   if(c.compactSummary)bits.push("context compressed");
+  if(c.archivedAt)bits.push("archived");
   if(c.temporary)bits.push("temporary");
   return bits.join(" · ")
 }
@@ -2264,6 +2275,7 @@ function openChatManage(){
   q("#chatTitleInput").value=c.title||"New chat";
   q("#chatStats").textContent=chatStatsText(c);
   q("#pinChat").textContent=c.pinned?"Unpin":"Pin";
+  q("#archiveChat").textContent=c.archivedAt?"Unarchive":"Archive";
   q("#compressChat").textContent=c.compactSummary?"Clear compression":"Compress context";
   openModal("#chatManageModal")
 }
@@ -2335,6 +2347,32 @@ function mediaIdsForChat(ch){
   });return Array.from(new Set(ids))
 }
 function purgeChatMedia(ch){mediaIdsForChat(ch).forEach(function(id){deleteMedia(id)})}
+
+function toggleArchiveManagedChat(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  if(c.archivedAt){
+    c.archivedAt=0;c.updated=Date.now();active=c.id;save();closeModals();render();restoreDraft();toast("Chat restored from archive")
+  }else{
+    c.archivedAt=Date.now();c.pinned=false;
+    if(active===c.id){var next=chats.find(function(x){return !x.trashedAt&&!x.archivedAt&&x.id!==c.id});active=next?next.id:""}
+    save();closeModals();render();toastAction("Chat archived","Undo",function(){c.archivedAt=0;c.updated=Date.now();active=c.id;save();render();restoreDraft()})
+  }
+}
+function renderArchive(){
+  var box=q("#archiveList");box.innerHTML="";
+  var list=chats.filter(function(ch){return ch.archivedAt&&!ch.trashedAt}).sort(function(a,b){return(b.archivedAt||0)-(a.archivedAt||0)});
+  if(!list.length){box.innerHTML='<div class="notice">No archived chats.</div>';return}
+  list.forEach(function(ch){
+    var row=document.createElement("div");row.className="trashrow";
+    var info=document.createElement("div"),b=document.createElement("b"),s=document.createElement("span");b.textContent=ch.title||"New chat";s.textContent="Archived "+new Date(ch.archivedAt).toLocaleString();info.appendChild(b);info.appendChild(s);
+    var actions=document.createElement("div");actions.className="trashactions";
+    var open=document.createElement("button");open.textContent="Open";open.onclick=function(){active=ch.id;save();closeModals();render();restoreDraft()};
+    var restore=document.createElement("button");restore.textContent="Restore";restore.onclick=function(){ch.archivedAt=0;ch.updated=Date.now();save();renderArchive();renderHistory();toast("Chat restored")};
+    var trash=document.createElement("button");trash.textContent="Trash";trash.className="permadelete";trash.onclick=function(){ch.archivedAt=0;ch.trashedAt=Date.now();save();renderArchive();toast("Moved to Trash")};
+    actions.appendChild(open);actions.appendChild(restore);actions.appendChild(trash);row.appendChild(info);row.appendChild(actions);box.appendChild(row)
+  })
+}
+function openArchive(){openModal("#archiveModal");renderArchive()}
 
 function deleteManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
@@ -2566,6 +2604,7 @@ q("#scratchpadSide").onclick=openScratchpad;
 q("#globalSearchSide").onclick=openGlobalSearch;
 q("#findSide").onclick=openFindInChat;
 q("#bookmarksSide").onclick=openBookmarks;
+q("#archiveSide").onclick=openArchive;
 q("#trashSide").onclick=openTrash;
 q("#installSide").onclick=async function(){
   if(installPrompt){
@@ -2670,6 +2709,7 @@ q("#renameChat").onclick=renameManagedChat;
 q("#aiTitleChat").onclick=generateChatTitle;
 q("#compressChat").onclick=compressChatContext;
 q("#pinChat").onclick=togglePinnedChat;
+q("#archiveChat").onclick=toggleArchiveManagedChat;
 q("#duplicateChat").onclick=duplicateManagedChat;
 q("#deleteChat").onclick=deleteManagedChat;
 q("#emptyTrash").onclick=emptyTrash;
