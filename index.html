@@ -3039,17 +3039,18 @@ function deleteProject(){
 }
 
 async function restoreDraftFiles(c){
-  pending=[];
+  var chatId=c.id,next=[];
   var files=Array.isArray(c.draftFiles)?c.draftFiles:[];
   for(var i=0;i<files.length;i++){
     var f=files[i];
-    if(f.kind==="text"){pending.push({kind:"text",name:f.name||"file.txt",size:f.size||0,text:f.text||""});continue}
+    if(f.kind==="text"){next.push({kind:"text",name:f.name||"file.txt",size:f.size||0,text:f.text||""});continue}
     if((f.kind==="image"||f.kind==="pdf")&&f.mediaId){
       var rec=await getMedia(f.mediaId);
-      if(rec&&rec.data)pending.push({kind:f.kind,name:f.name||rec.name||"attachment",size:f.size||0,data:rec.data,mediaId:f.mediaId})
+      if(rec&&rec.data)next.push({kind:f.kind,name:f.name||rec.name||"attachment",size:f.size||0,data:rec.data,mediaId:f.mediaId})
     }
   }
-  renderPending()
+  if(!current()||current().id!==chatId)return;
+  pending=next;renderPending()
 }
 async function restoreDraft(){
   var c=ensure();q("#prompt").value=c.draft||"";resizePrompt();
