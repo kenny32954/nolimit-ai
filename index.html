@@ -932,7 +932,10 @@ async function restoreMediaRecords(records){
 }
 function referencedMediaIds(){
   var ids=new Set();
-  chats.forEach(function(ch){(ch.messages||[]).forEach(function(m){(m.imageRefs||[]).forEach(function(r){if(r.mediaId)ids.add(r.mediaId)});(m.pdfs||[]).forEach(function(f){if(f.mediaId)ids.add(f.mediaId)})})});
+  chats.forEach(function(ch){
+    (ch.messages||[]).forEach(function(m){(m.imageRefs||[]).forEach(function(r){if(r.mediaId)ids.add(r.mediaId)});(m.pdfs||[]).forEach(function(f){if(f.mediaId)ids.add(f.mediaId)})});
+    (ch.draftFiles||[]).forEach(function(f){if(f.mediaId)ids.add(f.mediaId)})
+  });
   pending.forEach(function(f){if(f.mediaId)ids.add(f.mediaId)});
   return ids
 }
@@ -1409,7 +1412,7 @@ function renderPending(){
     if(f.kind==="image"&&f.data){var im=document.createElement("img");im.className="chipthumb";im.src=f.data;c.appendChild(im)}
     else{var ico=document.createElement("span");ico.className="filetypeicon";ico.textContent=f.kind==="pdf"?"PDF":(f.kind==="audio"?"AUD":"FILE");c.appendChild(ico)}
     var s=document.createElement("span");s.textContent=f.name+(f.size?" · "+fmtBytes(f.size):"");
-    var x=document.createElement("button");x.textContent="×";x.onclick=function(){if(f.mediaId)deleteMedia(f.mediaId);pending.splice(i,1);renderPending()};
+    var x=document.createElement("button");x.textContent="×";x.onclick=function(){if(f.mediaId)deleteMedia(f.mediaId);pending.splice(i,1);renderPending();saveDraftSoon()};
     c.appendChild(s);c.appendChild(x);p.appendChild(c)
   });
   updateComposerMetrics()
@@ -1621,7 +1624,7 @@ async function addFiles(list){
     }else if(type.indexOf("audio/")===0)pending.push({name:f.name,size:f.size,kind:"audio",file:f});
     else{try{pending.push({name:f.name,size:f.size,kind:"text",text:await f.text()})}catch(e){toast("Could not read "+f.name)}}
   }
-  renderPending()
+  renderPending();saveDraftSoon()
 }
 
 function contentFor(m){
@@ -1811,7 +1814,7 @@ async function send(){
   if(!navigator.onLine){saveDraftSoon();toast("You are offline — your draft is saved locally");return}
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
   var files=pending.slice();if(!await preflightSend(files))return;
-  var c=ensure();pending=[];q("#prompt").value="";c.draft="";
+  var c=ensure();pending=[];q("#prompt").value="";c.draft="";c.draftFiles=[];
   var aud=files.filter(function(f){return f.kind==="audio"});
   for(var ai=0;ai<aud.length;ai++){try{toast("Transcribing "+aud[ai].name+"…");var tr=await transcribe(aud[ai].file);text+=(text?"\n\n":"")+"[Audio transcript: "+aud[ai].name+"]\n"+tr}catch(e){toast(e.message)}}
   var m={role:"user",created:Date.now(),content:text||"Please analyze the attached file.",fileNames:files.map(function(x){return x.name}),images:files.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),imageRefs:files.filter(function(x){return x.kind==="image"&&x.mediaId}).map(function(x){return{name:x.name,mediaId:x.mediaId}}),pdfs:files.filter(function(x){return x.kind==="pdf"}).map(function(x){return{name:x.name,data:x.data,mediaId:x.mediaId||""}}),textFiles:files.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
@@ -2913,14 +2916,34 @@ function deleteProject(){
   save();projectOptions();q("#projectSelect").value="";loadProjectFields("");render();toast("Project deleted")
 }
 
-function restoreDraft(){
+async function restoreDraftFiles(c){
+  pending=[];
+  var files=Array.isArray(c.draftFiles)?c.draftFiles:[];
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    if(f.kind==="text"){pending.push({kind:"text",name:f.name||"file.txt",size:f.size||0,text:f.text||""});continue}
+    if((f.kind==="image"||f.kind==="pdf")&&f.mediaId){
+      var rec=await getMedia(f.mediaId);
+      if(rec&&rec.data)pending.push({kind:f.kind,name:f.name||rec.name||"attachment",size:f.size||0,data:rec.data,mediaId:f.mediaId})
+    }
+  }
+  renderPending()
+}
+async function restoreDraft(){
   var c=ensure();q("#prompt").value=c.draft||"";resizePrompt();
+  await restoreDraftFiles(c);
   hydrateChatMedia(c).then(function(changed){if(changed&&current()&&current().id===c.id)render()})
+}
+function snapshotDraftFiles(){
+  return pending.filter(function(f){return f.kind!=="audio"}).map(function(f){
+    if(f.kind==="text")return {kind:"text",name:f.name,size:f.size||0,text:String(f.text||"").slice(0,120000)};
+    return {kind:f.kind,name:f.name,size:f.size||0,mediaId:f.mediaId||""}
+  })
 }
 function saveDraftSoon(){
   if(draftTimer)clearTimeout(draftTimer);
   draftTimer=setTimeout(function(){
-    var c=current();if(!c)return;c.draft=q("#prompt").value;save()
+    var c=current();if(!c)return;c.draft=q("#prompt").value;c.draftFiles=snapshotDraftFiles();save()
   },300)
 }
 function applyModePreset(mode){
