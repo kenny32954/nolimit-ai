@@ -701,6 +701,7 @@ var PROJECT_STORE="nolimit_projects_v1";
 var PROMPT_STORE="nolimit_prompts_v1";
 var PROFILE_STORE="quantum_breaks_profiles_v1";
 var MEDIA_DB="quantum_breaks_media_v1";
+var MODEL_CACHE="quantum_breaks_model_cache_v1";
 
 function safeJSON(v,f){try{return JSON.parse(v)||f}catch(e){return f}}
 var chats=safeJSON(localStorage.getItem(STORE),[]);
@@ -767,6 +768,7 @@ var draftTimer=null;
 var selectedText="";
 var lightboxSrc="";
 var commandActiveIndex=0;
+var lastMutationUndo=null;
 function scheduleRender(){
   if(renderTimer)return;
   renderTimer=setTimeout(function(){renderTimer=null;render()},40)
@@ -1290,6 +1292,7 @@ function renderPending(){
 
 var COMMANDS=[
   {name:"New chat",hint:"Ctrl/Cmd+N",run:newChat},
+  {name:"Undo last edit/regeneration",hint:"Restore previous conversation state",run:undoLastMutation},
   {name:"Choose model",hint:"Ctrl/Cmd+K",run:loadModels},
   {name:"AI profiles",hint:"Saved model + tool setups",run:openProfiles},
   {name:"Research mode",hint:"Web + page reading",run:toggleResearch},
@@ -1605,13 +1608,27 @@ function handleCommand(text){
   return true
 }
 
+async function preflightSend(files){
+  var hasImages=files.some(function(f){return f.kind==="image"});if(!hasImages||settings.model==="openrouter/auto")return true;
+  await ensureModelCatalog();
+  var info=models.find(function(m){return m.id===settings.model});
+  if(info&&inputs(info).indexOf("image")<0){
+    if(confirm("The selected model does not advertise image input support. Switch this request to OpenRouter Auto Router?")){
+      settings.model="openrouter/auto";rememberModel(settings.model);save();render();return true
+    }
+    return false
+  }
+  return true
+}
+
 async function send(){
   if(busy){if(controller)controller.abort();return}
   var text=q("#prompt").value.trim();if(!text&&!pending.length)return;
   if(!pending.length&&handleCommand(text))return;
   if(!navigator.onLine){saveDraftSoon();toast("You are offline — your draft is saved locally");return}
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
-  var c=ensure(),files=pending.slice();pending=[];q("#prompt").value="";c.draft="";
+  var files=pending.slice();if(!await preflightSend(files))return;
+  var c=ensure();pending=[];q("#prompt").value="";c.draft="";
   var aud=files.filter(function(f){return f.kind==="audio"});
   for(var ai=0;ai<aud.length;ai++){try{toast("Transcribing "+aud[ai].name+"…");var tr=await transcribe(aud[ai].file);text+=(text?"\n\n":"")+"[Audio transcript: "+aud[ai].name+"]\n"+tr}catch(e){toast(e.message)}}
   var m={role:"user",created:Date.now(),content:text||"Please analyze the attached file.",fileNames:files.map(function(x){return x.name}),images:files.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),imageRefs:files.filter(function(x){return x.kind==="image"&&x.mediaId}).map(function(x){return{name:x.name,mediaId:x.mediaId}}),pdfs:files.filter(function(x){return x.kind==="pdf"}).map(function(x){return{name:x.name,data:x.data,mediaId:x.mediaId||""}}),textFiles:files.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
@@ -1669,17 +1686,35 @@ function restoreAttachments(m){
   renderPending()
 }
 
+function stashMutationUndo(c,label){
+  lastMutationUndo={
+    chatId:c.id,
+    label:label||"change",
+    title:c.title,
+    updated:c.updated,
+    compactSummary:c.compactSummary||"",
+    compactCount:c.compactCount||0,
+    messages:(c.messages||[]).map(serializableMessage)
+  }
+}
+async function undoLastMutation(){
+  if(!lastMutationUndo)return toast("Nothing to undo");
+  var u=lastMutationUndo,c=chats.find(function(ch){return ch.id===u.chatId});if(!c)return toast("That chat is no longer available");
+  c.title=u.title;c.updated=Date.now();c.compactSummary=u.compactSummary;c.compactCount=u.compactCount;c.messages=JSON.parse(JSON.stringify(u.messages));active=c.id;lastMutationUndo=null;
+  save();await hydrateChatMedia(c);render();restoreDraft();toast("Restored "+u.label)
+}
+
 async function regenerate(idx){
   if(busy)return;var c=ensure();if(!c.messages[idx]||c.messages[idx].role!=="assistant")return;
   var u=idx-1;while(u>=0&&c.messages[u].role!=="user")u--;if(u<0)return;
-  var m=c.messages[u];await hydrateMessageMedia(m);q("#prompt").value=m.content||"";restoreAttachments(m);
+  var m=c.messages[u];stashMutationUndo(c,"regenerated conversation");await hydrateMessageMedia(m);q("#prompt").value=m.content||"";restoreAttachments(m);
   c.messages=c.messages.slice(0,u);c.updated=Date.now();save();resizePrompt();send()
 }
 
 async function editUserMessage(idx){
   if(busy)return;
   var c=ensure(),m=c.messages[idx];if(!m||m.role!=="user")return;
-  await hydrateMessageMedia(m);q("#prompt").value=m.content||"";restoreAttachments(m);
+  stashMutationUndo(c,"edited conversation");await hydrateMessageMedia(m);q("#prompt").value=m.content||"";restoreAttachments(m);
   c.messages=c.messages.slice(0,idx);
   c.updated=Date.now();save();render();resizePrompt();q("#prompt").focus();toast("Edit the message and send again")
 }
@@ -1690,14 +1725,25 @@ function branchConversation(idx){
   chats.unshift(copy);active=copy.id;save();render();toast("Created a branch")
 }
 
-async function ensureModelCatalog(){
-  if(models.length)return models;
+async function ensureModelCatalog(force){
+  if(models.length&&!force)return models;
+  if(!force){
+    var cached=safeJSON(localStorage.getItem(MODEL_CACHE),null);
+    if(cached&&Array.isArray(cached.data)&&Date.now()-Number(cached.time||0)<21600000){
+      models=cached.data;return models
+    }
+  }
   try{
-    var r=await fetch(BASE+"/models");
+    var r=await fetch(BASE+"/models",{cache:"no-store"});
     var j=await r.json();
     models=(j.data||[]).sort(function(a,b){return(a.name||a.id).localeCompare(b.name||b.id)});
+    try{localStorage.setItem(MODEL_CACHE,JSON.stringify({time:Date.now(),data:models}))}catch(e){}
     return models
-  }catch(e){return []}
+  }catch(e){
+    var stale=safeJSON(localStorage.getItem(MODEL_CACHE),null);
+    if(stale&&Array.isArray(stale.data)){models=stale.data;return models}
+    return []
+  }
 }
 
 async function loadModels(){
@@ -2890,6 +2936,15 @@ document.addEventListener("keydown",function(e){
 });
 window.addEventListener("online",function(){render();toast("Back online")});
 window.addEventListener("offline",function(){render();toast("Offline mode — drafts and local tools still work")});
+window.addEventListener("storage",function(e){
+  if(e.key===STORE)chats=safeJSON(e.newValue,[]);
+  else if(e.key===SETSTORE)settings=Object.assign(settings,safeJSON(e.newValue,{}));
+  else if(e.key===PROJECT_STORE)projects=safeJSON(e.newValue,[]);
+  else if(e.key===PROMPT_STORE)savedPrompts=safeJSON(e.newValue,[]);
+  else if(e.key===PROFILE_STORE)profiles=safeJSON(e.newValue,[]);
+  else return;
+  render();restoreDraft()
+});
 window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();installPrompt=e});
 if("serviceWorker" in navigator&&location.protocol==="https:"){
   navigator.serviceWorker.register("./sw.js").catch(function(){})
