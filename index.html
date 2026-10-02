@@ -683,12 +683,21 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="primary" id="renameChat">Rename</button>
 <button class="secondary" id="aiTitleChat">AI title</button>
 <button class="secondary" id="compressChat">Compress context</button>
+<button class="secondary" id="contextPreviewChat">Preview context</button>
 <button class="secondary" id="pinChat">Pin</button>
 <button class="secondary" id="archiveChat">Archive</button>
 <button class="secondary" id="snapshotChat">Snapshot</button>
 <button class="secondary" id="duplicateChat">Duplicate</button>
 <button class="danger" id="deleteChat">Delete</button>
 </div>
+</section>
+
+<section class="modal" id="contextPreviewModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Context preview</h2>
+<div class="notice">Shows the text context Quantum Breaks AI is preparing for the selected model. Binary images/PDF data are represented by placeholders.</div>
+<pre id="contextPreviewOutput" style="min-height:240px;max-height:58vh;overflow:auto;background:#111113;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:13px;white-space:pre-wrap;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace"></pre>
+<div class="row" style="margin-top:10px"><button class="secondary" id="copyContextPreview">Copy preview</button></div>
 </section>
 
 <section class="modal" id="runnerModal">
@@ -3025,6 +3034,8 @@ function chatStatsText(c){
   if(p)bits.push("project: "+p.name);
   if(c.compactSummary)bits.push("context compressed");
   if(c.archivedAt)bits.push("archived");
+  var modelId=effectiveModel(c),mi=models.find(function(m){return m.id===modelId}),approx=approxContextTokens(c);
+  if(approx)bits.push("~"+formatTokenCount(approx)+" context"+(mi&&mi.context_length?" / "+formatTokenCount(mi.context_length):""));
   if(c.temporary)bits.push("temporary");
   return bits.join(" · ")
 }
@@ -3098,6 +3109,34 @@ async function compressChatContext(){
     c.compactSummary=summary;c.compactCount=count;c.updated=Date.now();save();q("#compressChat").textContent="Clear compression";q("#chatStats").textContent=chatStatsText(c);render();toast("Older context compressed")
   }catch(e){toast("Compression failed: "+e.message)}
   q("#compressChat").disabled=false
+}
+
+function previewContent(content){
+  if(typeof content==="string")return content;
+  if(!Array.isArray(content))return "";
+  return content.map(function(p){
+    if(!p)return "";
+    if(p.type==="text"||p.type==="input_text"||p.type==="output_text")return String(p.text||"");
+    if(p.type==="image_url")return "[image attachment]";
+    if(p.type==="file")return "[file attachment: "+String(p.file&&p.file.filename||"file")+"]";
+    return "["+String(p.type||"content")+"]"
+  }).filter(Boolean).join("\n")
+}
+function openContextPreview(){
+  var c=ensure(),modelId=effectiveModel(c),raw=apiMessages(c),fit=fitRequestMessages(raw,modelId),tools=toolList(),lines=[];
+  lines.push("MODEL: "+modelId);
+  lines.push("MODE: "+(settings.modePreset||"balanced"));
+  lines.push("REASONING: "+effectiveReasoning(c));
+  lines.push("TEMPERATURE: "+effectiveTemperature(c));
+  lines.push("MESSAGES: "+fit.messages.length+" prepared"+(fit.trimmed?" · "+fit.trimmed+" older messages trimmed":""));
+  lines.push("ESTIMATED CONTEXT: ~"+formatTokenCount(fit.estimated)+(fit.limit?" / "+formatTokenCount(fit.limit):"")+" tokens");
+  lines.push("TOOLS: "+(tools.length?tools.map(function(t){return t.type||t.id||"tool"}).join(", "):"none"));
+  lines.push("");
+  fit.messages.forEach(function(m,i){
+    lines.push("===== "+String(m.role||"message").toUpperCase()+" "+(i+1)+" =====");
+    var body=previewContent(m.content);lines.push(body.length>12000?body.slice(0,12000)+"\n[preview truncated]":body);lines.push("")
+  });
+  q("#contextPreviewOutput").textContent=lines.join("\n");openModal("#contextPreviewModal")
 }
 
 function togglePinnedChat(){
@@ -3629,6 +3668,8 @@ q("#lockChatModel").onchange=toggleChatModelLock;
 q("#renameChat").onclick=renameManagedChat;
 q("#aiTitleChat").onclick=generateChatTitle;
 q("#compressChat").onclick=compressChatContext;
+q("#contextPreviewChat").onclick=openContextPreview;
+q("#copyContextPreview").onclick=function(){navigator.clipboard.writeText(q("#contextPreviewOutput").textContent||"").then(function(){toast("Context preview copied")})};
 q("#pinChat").onclick=togglePinnedChat;
 q("#archiveChat").onclick=toggleArchiveManagedChat;
 q("#snapshotChat").onclick=function(){closeModals();openSnapshots()};
