@@ -57,6 +57,16 @@ Everything else in this repository supports the app with documentation and autom
 - Password-encrypted full workspace backups using PBKDF2 + AES-GCM
 - Text-selection toolbar for copy, quote, explain, prompt saving, and scratchpad capture
 
+### Reliability and workflow
+- One-level undo for destructive edits and regenerations
+- Conversation snapshots with restore points
+- Cached model catalog with stale fallback when the catalog endpoint is unavailable
+- Cross-tab workspace synchronization
+- Image-model compatibility checks before sending attachments
+- Browser storage quota warnings
+- Recoverable deletes, archives, and portable chat backups with media
+- OpenRouter response-cache hit/miss visibility in message metadata
+
 ### Chat
 - Per-chat token/cost stats when usage is available
 - Streaming OpenRouter chat completions
@@ -84,6 +94,13 @@ Everything else in this repository supports the app with documentation and autom
 - Approximate context meter with selected-model context limits and input-cost hints
 - AI-generated conversation titles
 
+### Conversation organization
+- Searchable conversation tags
+- Conversation outline with click-to-jump navigation
+- Local analytics for chats, messages, tokens, tracked cost, activity, attachments, and model usage
+- Single-response Markdown downloads with citation preservation
+- Citations retained in share, print/PDF, and Markdown exports
+
 ### Projects and memory
 - Local persistent memory that is appended to system context
 - Local projects with project-specific instructions and reference knowledge
@@ -91,6 +108,15 @@ Everything else in this repository supports the app with documentation and autom
 - Temporary chats that disappear after reload
 - Search across chat titles, project names, and message content
 - Full workspace export/import for chats, projects, memory, and settings
+
+### Structured responses and review
+- Normal text, JSON object, and strict JSON Schema response formats
+- Provider routing that can require requested parameters
+- Structured-output model filtering and capability badges
+- Example confidence schema generator
+- Optional second-pass AI answer review with confidence, verdict, and issue list
+- On-demand review of any assistant response
+- AI prompt improver before sending
 
 ### Models and routing
 - Recent-model list kept locally
@@ -264,7 +290,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v1.8
+Current app generation: v2.0
 
 Major capabilities now include:
 - phone + PC UI
