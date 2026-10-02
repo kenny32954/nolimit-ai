@@ -729,6 +729,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="primary" id="renameChat">Rename</button>
 <button class="secondary" id="aiTitleChat">AI title</button>
 <button class="secondary" id="aiOrganizeChat">AI organize</button>
+<button class="secondary" id="aiSummaryChat">AI summary</button>
 <button class="secondary" id="compressChat">Compress context</button>
 <button class="secondary" id="contextPreviewChat">Preview context</button>
 <button class="secondary" id="pinChat">Pin</button>
@@ -738,6 +739,15 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="secondary" id="duplicateChat">Duplicate</button>
 <button class="danger" id="deleteChat">Delete</button>
 </div>
+</section>
+
+<section class="modal" id="chatSummaryModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>AI conversation summary</h2>
+<div class="notice" id="chatSummaryMeta">Generate a readable summary of the current conversation.</div>
+<div id="chatSummaryProgress" class="progress hidden"><i></i></div>
+<div id="chatSummaryOutput" class="md" style="max-height:56vh;overflow:auto;padding:4px 2px"></div>
+<div class="row" style="margin-top:12px"><button class="secondary" id="copyChatSummary">Copy</button><button class="secondary" id="summaryToScratchpad">Add to scratchpad</button><button class="secondary" id="summaryToChat">Add to chat</button></div>
 </section>
 
 <section class="modal" id="messageDetailsModal">
@@ -3553,6 +3563,31 @@ async function generateChatTitle(){
   q("#aiTitleChat").disabled=false;q("#aiTitleChat").textContent="AI title"
 }
 
+var lastChatSummary="";
+async function generateReadableChatSummary(){
+  var c=chats.find(function(x){return x.id===manageChatId})||ensure();if(!c)return;
+  if(!isConnected())return toast("Connect OpenRouter first");
+  if(!(c.messages||[]).length)return toast("This conversation is empty");
+  closeModals();openModal("#chatSummaryModal");q("#chatSummaryOutput").innerHTML="";q("#chatSummaryProgress").classList.remove("hidden");q("#chatSummaryMeta").textContent="Summarizing "+c.messages.length+" messages…";lastChatSummary="";
+  try{
+    var transcript=(c.messages||[]).map(function(m){return (m.role==="user"?"User":"Assistant")+": "+String(m.content||"")}).join("\n\n").slice(-150000);
+    var body={model:settings.summaryModel||effectiveModel(c),messages:[
+      {role:"system",content:"Summarize this conversation for the user. Use concise Markdown with sections only when useful. Preserve important decisions, requirements, technical details, corrections, unresolved questions, and next steps. Clearly distinguish completed work from open items. Do not invent facts."},
+      {role:"user",content:transcript}
+    ],stream:false,temperature:0.15,max_tokens:2600,usage:{include:true}};
+    var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"};
+    var rr=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body)}),j=await rr.json();
+    if(!rr.ok)throw new Error(errorText(j,"Summary failed"));
+    var msg=j.choices&&j.choices[0]&&j.choices[0].message||{},holder={content:""};collectOutputContent(msg.content,holder);lastChatSummary=String(holder.content||"").trim();
+    if(!lastChatSummary)throw new Error("No summary was returned");
+    q("#chatSummaryOutput").innerHTML=renderMarkdown(lastChatSummary);
+    q("#chatSummaryMeta").textContent="Summary ready"+(j.usage&&j.usage.cost!=null?" · "+money(j.usage.cost):"")
+  }catch(e){
+    q("#chatSummaryMeta").textContent="Summary failed: "+e.message;q("#chatSummaryOutput").textContent=""
+  }
+  q("#chatSummaryProgress").classList.add("hidden")
+}
+
 async function organizeChatWithAI(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
   if(!isConnected())return toast("Connect OpenRouter first");
@@ -4185,6 +4220,10 @@ q("#lockChatModel").onchange=toggleChatModelLock;
 q("#renameChat").onclick=renameManagedChat;
 q("#aiTitleChat").onclick=generateChatTitle;
 q("#aiOrganizeChat").onclick=organizeChatWithAI;
+q("#aiSummaryChat").onclick=generateReadableChatSummary;
+q("#copyChatSummary").onclick=function(){if(lastChatSummary)navigator.clipboard.writeText(lastChatSummary).then(function(){toast("Summary copied")})};
+q("#summaryToScratchpad").onclick=function(){if(!lastChatSummary)return toast("Generate a summary first");var c=ensure();c.scratchpad=(c.scratchpad?c.scratchpad+"\n\n":"")+lastChatSummary;c.updated=Date.now();save();toast("Summary added to scratchpad")};
+q("#summaryToChat").onclick=function(){if(!lastChatSummary)return toast("Generate a summary first");var c=ensure();c.messages.push({role:"assistant",created:Date.now(),finished:Date.now(),content:lastChatSummary,model:"Quantum Breaks AI summary"});c.updated=Date.now();save();closeModals();render();toast("Summary added to chat")};
 q("#compressChat").onclick=compressChatContext;
 q("#contextPreviewChat").onclick=openContextPreview;
 q("#copyContextPreview").onclick=function(){navigator.clipboard.writeText(q("#contextPreviewOutput").textContent||"").then(function(){toast("Context preview copied")})};
