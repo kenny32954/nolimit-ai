@@ -1,6 +1,6 @@
-# NoLimit AI
+# Quantum Breaks AI
 
-NoLimit AI is a responsive, single-file AI client for phones and PCs.
+Quantum Breaks AI is a responsive, single-file AI client for phones and PCs.
 
 The actual application is still one file:
 
@@ -154,7 +154,7 @@ Never hard-code a private API key into index.html.
 
 The app includes a Content Security Policy restricting network requests to OpenRouter and preventing plugin/object embedding.
 
-HTML artifact previews run in a sandboxed iframe without same-origin access to the main NoLimit AI page.
+HTML artifact previews run in a sandboxed iframe without same-origin access to the main Quantum Breaks AI page.
 
 Generated artifact pages opened in a new tab use an opaque data URL with noopener.
 
@@ -200,7 +200,7 @@ Browser
   -> OpenRouter API
   -> selected model / provider / server tools
 
-There is no NoLimit AI message counter.
+There is no Quantum Breaks AI message counter.
 
 Actual usage is still subject to:
 - OpenRouter balance and rate limits
