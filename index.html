@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icon.svg">
-<title>NoLimit AI</title>
+<title>Quantum Breaks AI</title>
 <style>
 :root{--bg:#171716;--panel:#20201e;--panel2:#2a2927;--line:#3a3935;--text:#f1efe9;--muted:#85827c;--accent:#d87858}
 *{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}button,input,textarea{font:inherit;color:inherit}button{border:0;background:none}.app{height:100dvh;display:grid;grid-template-columns:1fr}.side{position:fixed;inset:0 auto 0 0;width:min(88vw,340px);background:#20201f;border-right:1px solid var(--line);z-index:30;transform:translateX(-102%);transition:.22s;padding:14px 11px;display:flex;flex-direction:column}.side.open{transform:none}.shade{position:fixed;inset:0;background:#0009;z-index:29;display:none}.shade.show{display:block}.shead{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 5px;font-size:18px}.new,.sbtn{height:44px;border-radius:11px;text-align:left;padding:0 12px}.new{background:#2d2c29;margin:8px 0}.search{height:40px;border:1px solid var(--line);border-radius:10px;background:#191918;padding:0 11px;outline:0}.hist{flex:1;overflow:auto;margin-top:8px}.historyitem{height:42px;border-radius:9px;display:flex;align-items:center;overflow:hidden}.historyitem.on{background:#302f2c}.hrow{height:42px;min-width:0;flex:1;text-align:left;padding:0 10px;color:#c8c5be;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.historyitem.on .hrow{color:#fff}.chatmore{width:34px;height:34px;flex:none;border-radius:8px;color:#777}.historyitem:hover .chatmore{color:#bbb}.chatmore:hover{background:#3a3834}.sfoot{border-top:1px solid #302f2d;padding-top:8px;display:grid}.main{height:100dvh;min-width:0;display:flex;flex-direction:column}.top{height:62px;display:grid;grid-template-columns:48px 1fr auto;align-items:center;padding:calc(env(safe-area-inset-top) + 4px) 12px 4px;border-top:2px solid #414146}.icon{width:40px;height:40px;border-radius:12px;color:#ddd}.title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px}.connect{height:38px;padding:0 12px;border-radius:12px;background:#2c2c2a}.connect.ok{color:#bce0c9}.chat{flex:1;overflow:auto;padding:12px 22px 235px;scrollbar-width:none}.welcome{min-height:62vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.logo{width:50px;height:50px;border-radius:16px;background:radial-gradient(circle at 30% 30%,#f0a088,#c96143)}.welcome h1{font:400 31px/1.1 Georgia,serif;margin:20px 0 8px}.welcome p{max-width:420px;color:var(--muted);font-size:14px;line-height:1.5}.user{display:flex;justify-content:flex-end;margin:8px 0 22px}.ub{max-width:88%;background:#2a2927;border:1px solid #393733;border-radius:20px 20px 6px 20px;padding:11px 14px;white-space:pre-wrap;line-height:1.45}.assistant{margin:0 0 28px}.answer{font:400 18px/1.5 Georgia,serif;white-space:pre-wrap;overflow-wrap:anywhere}.meta{font-size:12px;color:#6e6b65;margin-top:8px}.thinking{font:16px Georgia,serif;color:#aaa;padding-bottom:20px}.files{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chip{font-size:12px;background:#363431;border:1px solid #44413c;border-radius:9px;padding:7px 9px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.composeWrap{position:absolute;left:0;right:0;bottom:0;padding:8px 13px calc(env(safe-area-inset-bottom) + 10px);background:linear-gradient(to top,var(--bg) 82%,transparent)}.pending{max-width:860px;margin:0 auto 7px;display:flex;gap:6px;overflow:auto}.pending:empty{display:none}.composer{max-width:860px;margin:auto;min-height:142px;border:1px solid #3c3a36;background:#20201e;border-radius:24px;padding:15px 14px 8px;display:grid;grid-template-rows:1fr 42px}.composer textarea{width:100%;min-height:65px;max-height:140px;resize:none;border:0;outline:0;background:none;font-size:17px;line-height:1.4}.crow{display:flex;align-items:center;justify-content:space-between}.tool,.send{width:38px;height:38px;border-radius:11px}.send{border-radius:50%;background:#eeeae4;color:#171716}.foot{max-width:860px;margin:8px auto 0;padding:0 8px;display:flex;justify-content:space-between;color:#77746e;font-size:12px}.model{max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd}.modalShade{position:fixed;inset:0;background:#0009;z-index:60;display:none}.modalShade.show{display:block}.modal{position:fixed;z-index:61;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,660px);max-height:82dvh;overflow:auto;background:#242422;border:1px solid var(--line);border-radius:22px;padding:18px;display:none}.modal.show{display:block}.modal h2{margin:0 0 14px}.notice{font-size:13px;color:#9a9790;line-height:1.45;background:#1c1c1b;border:1px solid #383631;border-radius:12px;padding:10px;margin-bottom:12px}.field{margin-bottom:12px}.field label{display:block;font-size:12px;color:#8d8a84;margin-bottom:6px}.field input,.field textarea{width:100%;border:1px solid #3b3935;background:#1c1c1b;border-radius:11px;outline:0;padding:10px 11px}.field textarea{min-height:100px;resize:vertical}.primary,.secondary{height:43px;border-radius:11px;padding:0 14px}.primary{background:var(--accent);color:#fff}.secondary{background:#34322f}.row{display:flex;gap:8px;flex-wrap:wrap}.models{display:grid;gap:6px}.mrow{padding:10px;border-radius:10px;text-align:left;background:#1d1d1c;border:1px solid #33322f}.mrow small{display:block;color:#777;margin-top:3px}
@@ -222,7 +222,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <body>
 <div class="app">
 <aside class="side" id="side">
-<div class="shead"><span>NoLimit AI</span><button class="icon" id="closeSide">✕</button></div>
+<div class="shead"><span>Quantum Breaks AI</span><button class="icon" id="closeSide">✕</button></div>
 <button class="new" id="newChat">＋ New chat</button>
 <input class="search" id="chatSearch" placeholder="Search chats">
 <div class="hist" id="history"></div>
@@ -271,7 +271,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 </div>
 <div class="pending" id="pending"></div>
 <div class="composer">
-<textarea id="prompt" placeholder="Message NoLimit AI or type /help"></textarea>
+<textarea id="prompt" placeholder="Message Quantum Breaks AI or type /help"></textarea>
 <div class="crow">
 <div class="leftTools">
 <button class="tool" id="attach">＋</button>
@@ -324,7 +324,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field" style="flex:1;min-width:160px"><label>Density</label><select id="densitySelect"><option value="cozy">Cozy</option><option value="compact">Compact</option></select></div>
 </div>
 <div class="field"><label>System instructions</label><textarea id="systemPrompt"></textarea></div>
-<div class="field"><label>Local memory</label><textarea id="localMemory" placeholder="Facts or preferences you want NoLimit AI to remember across chats on this browser"></textarea><div class="smallnote">Stored only in this browser and appended to your system context.</div></div>
+<div class="field"><label>Local memory</label><textarea id="localMemory" placeholder="Facts or preferences you want Quantum Breaks AI to remember across chats on this browser"></textarea><div class="smallnote">Stored only in this browser and appended to your system context.</div></div>
 <div class="row">
 <div class="field" style="flex:1;min-width:180px"><label>Temperature</label><input id="temperature" type="number" min="0" max="2" step="0.1"></div>
 <div class="field" style="flex:1;min-width:180px"><label>Reasoning effort</label><select id="reasoning"><option value="none">None</option><option value="minimal">Minimal</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">Extra high</option></select></div>
@@ -393,7 +393,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="notice">Projects are local workspaces with their own instructions and reference text. They stay in this browser unless you back them up separately.</div>
 <div class="field"><label>Project</label><select id="projectSelect"></select></div>
 <div class="field"><label>Name</label><input id="projectName" maxlength="80" placeholder="Project name"></div>
-<div class="field"><label>Project instructions</label><textarea id="projectInstructions" placeholder="How NoLimit AI should behave inside this project"></textarea></div>
+<div class="field"><label>Project instructions</label><textarea id="projectInstructions" placeholder="How Quantum Breaks AI should behave inside this project"></textarea></div>
 <div class="field"><label>Project knowledge</label><textarea id="projectKnowledge" placeholder="Paste reference notes, lore, specifications, or other context"></textarea><div class="smallnote">Keep this reasonably sized because it is sent with each project chat.</div></div>
 <div class="row">
 <button class="primary" id="saveProject">Save project</button>
@@ -544,7 +544,7 @@ var chats=safeJSON(localStorage.getItem(STORE),[]);
 var settings=Object.assign({
   model:"openrouter/auto",
   temperature:0.7,
-  system:"You are NoLimit AI, a capable general-purpose assistant. Be accurate, useful, and clear. Use available tools when they materially improve the answer.",
+  system:"You are Quantum Breaks AI, a capable general-purpose assistant. Be accurate, useful, and clear. Use available tools when they materially improve the answer.",
   memory:"",
   reasoning:"medium",
   web:false,
@@ -823,7 +823,7 @@ function renderFindResults(bookmarksOnly){
   if(!results.length){box.innerHTML='<div class="notice">'+(bookmarksOnly?"No bookmarked messages yet.":"No matching messages.")+'</div>';return}
   results.slice(0,120).forEach(function(r){
     var b=document.createElement("button");b.className="searchresult";
-    var h=document.createElement("b");h.textContent=(r.msg.role==="user"?"You":"NoLimit AI")+(bookmarksOnly?" · "+(r.chat.title||"Chat"):"");
+    var h=document.createElement("b");h.textContent=(r.msg.role==="user"?"You":"Quantum Breaks AI")+(bookmarksOnly?" · "+(r.chat.title||"Chat"):"");
     var s=document.createElement("span");s.textContent=(r.msg.content||"(attachment)").replace(/\s+/g," ").slice(0,180);
     b.appendChild(h);b.appendChild(s);b.onclick=function(){jumpToMessage(r.chat.id,r.idx)};box.appendChild(b)
   })
@@ -978,7 +978,7 @@ async function connect(){
   sessionStorage.setItem("nl_verifier",verifier);sessionStorage.setItem("nl_state",state);
   var challenge=await digest(verifier);
   var callback=location.origin+location.pathname;
-  location.href="https://openrouter.ai/auth?callback_url="+encodeURIComponent(callback)+"&code_challenge="+encodeURIComponent(challenge)+"&code_challenge_method=S256&key_label="+encodeURIComponent("NoLimit AI")+"&state="+encodeURIComponent(state)
+  location.href="https://openrouter.ai/auth?callback_url="+encodeURIComponent(callback)+"&code_challenge="+encodeURIComponent(challenge)+"&code_challenge_method=S256&key_label="+encodeURIComponent("Quantum Breaks AI")+"&state="+encodeURIComponent(state)
 }
 
 async function finishAuth(){
@@ -1093,7 +1093,7 @@ async function fetchChatWithFallback(body,headers,signal){
 }
 
 function localAssistant(text){
-  var c=ensure();c.messages.push({role:"assistant",content:text,model:"NoLimit AI local"});c.updated=Date.now();save();render()
+  var c=ensure();c.messages.push({role:"assistant",content:text,model:"Quantum Breaks AI local"});c.updated=Date.now();save();render()
 }
 
 function handleCommand(text){
@@ -1131,7 +1131,7 @@ async function send(){
   var requestMessages=apiMessages(c);
   var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:settings.model};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";q("#send").classList.add("busy");render();
   try{
-    var body={model:settings.model,messages:requestMessages,temperature:Number(settings.temperature),stream:true,usage:{include:true},session_id:"nolimit-"+c.id};
+    var body={model:settings.model,messages:requestMessages,temperature:Number(settings.temperature),stream:true,usage:{include:true},session_id:"quantum-breaks-"+c.id};
     if(settings.fallbackModel){body.models=[settings.model,settings.fallbackModel];delete body.model}
     if(settings.providerRouting&&settings.providerRouting!=="balanced")body.provider={sort:settings.providerRouting};
     if(settings.denyDataCollection){body.provider=body.provider||{};body.provider.data_collection="deny"}
@@ -1140,7 +1140,7 @@ async function send(){
     if(settings.reasoning!=="none")body.reasoning={effort:settings.reasoning,summary:"auto"};
     var tools=toolList();if(tools.length)body.tools=tools;
     if(hasPDF(c))body.plugins=[{id:"file-parser",pdf:{engine:"cloudflare-ai"}}];
-    var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"};
+    var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"};
     if(settings.cache){
       headers["X-OpenRouter-Cache"]="true";
       headers["X-OpenRouter-Cache-TTL"]=String(Math.max(1,Math.min(86400,Number(settings.cacheTTL)||300)));
@@ -1266,7 +1266,7 @@ async function compareOne(model,prompt){
   if(settings.system)body.messages.push({role:"system",content:settings.system});
   body.messages.push({role:"user",content:prompt});
   if(settings.reasoning!=="none")body.reasoning={effort:settings.reasoning,summary:"auto"};
-  var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify(body)});
+  var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
   var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Comparison request failed"));
   var m=j.choices&&j.choices[0]&&j.choices[0].message||{};
   return {requested:model,served:j.model||model,text:m.content||"",usage:j.usage||{},cost:j.usage&&j.usage.cost!=null?j.usage.cost:j.cost}
@@ -1386,7 +1386,7 @@ async function generateImage(){
       if(chosen&&!params.input_references)throw new Error("This image model does not advertise reference-image support. Choose an image-to-image model.");
       imageBody.input_references=[{type:"image_url",image_url:{url:imageReferenceData}}]
     }
-    var r=await fetch(BASE+"/images",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify(imageBody)});
+    var r=await fetch(BASE+"/images",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(imageBody)});
     var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Image generation failed"));
     var outputs=(j.data||[]).map(function(d){
       if(d.b64_json)return "data:"+(d.media_type||("image/"+q("#imageFormat").value))+";base64,"+d.b64_json;
@@ -1403,7 +1403,7 @@ async function generateImage(){
 async function transcribe(blob){
   var type=blob.type||"audio/webm",format="webm";if(type.indexOf("wav")>=0)format="wav";else if(type.indexOf("mpeg")>=0||type.indexOf("mp3")>=0)format="mp3";else if(type.indexOf("ogg")>=0)format="ogg";else if(type.indexOf("mp4")>=0||type.indexOf("m4a")>=0)format="mp4";
   var data=await readDataURL(blob),b64=String(data).split(",")[1]||"";
-  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify({model:"openai/whisper-large-v3",input_audio:{data:b64,format:format}})});
+  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify({model:"openai/whisper-large-v3",input_audio:{data:b64,format:format}})});
   var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Transcription failed"));return j.text||""
 }
 
@@ -1452,7 +1452,7 @@ async function advancedTranscribe(file){
   var body={model:q("#transcribeModel").value,input_audio:{data:b64,format:format}};
   var lang=q("#transcribeLanguage").value.trim();if(lang&&lang.toLowerCase()!=="auto")body.language=lang;
   if(q("#transcribeTimestamps").checked){body.response_format="verbose_json";body.timestamp_granularities=["word"]}
-  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify(body)});
+  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
   var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Transcription failed"));return j
 }
 async function runTranscription(){
@@ -1522,7 +1522,7 @@ async function generateVoice(){
     };
     var r=await fetch(BASE+"/audio/speech",{
       method:"POST",
-      headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},
+      headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},
       body:JSON.stringify(body)
     });
     if(!r.ok)throw new Error(errorRaw(await r.text(),"Speech generation failed"));
@@ -1530,7 +1530,7 @@ async function generateVoice(){
     var url=URL.createObjectURL(blob);
     var audio=document.createElement("audio");audio.controls=true;audio.autoplay=true;audio.className="audioresult";audio.src=url;
     q("#voiceOutput").appendChild(audio);
-    var dl=document.createElement("a");dl.href=url;dl.download="nolimit-ai-speech.mp3";dl.textContent="Download MP3";dl.className="secondary";dl.style.display="inline-grid";dl.style.placeItems="center";dl.style.marginTop="8px";dl.style.textDecoration="none";
+    var dl=document.createElement("a");dl.href=url;dl.download="quantum-breaks-ai-speech.mp3";dl.textContent="Download MP3";dl.className="secondary";dl.style.display="inline-grid";dl.style.placeItems="center";dl.style.marginTop="8px";dl.style.textDecoration="none";
     q("#voiceOutput").appendChild(dl)
   }catch(e){
     q("#voiceOutput").innerHTML='<div class="notice">'+escapeHTML(e.message)+'</div>'
@@ -1605,7 +1605,7 @@ async function generateVideo(){
     }
     var r=await fetch(BASE+"/videos",{
       method:"POST",
-      headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},
+      headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},
       body:JSON.stringify(body)
     });
     var job=await r.json();
@@ -1616,7 +1616,7 @@ async function generateVideo(){
       if(i>0)await wait(15000);
       q("#videoStatus").textContent="Video status: "+(i===0?"pending":"processing")+" · check "+(i+1);
       var pr=await fetch(BASE+"/videos/"+encodeURIComponent(job.id),{
-        headers:{Authorization:"Bearer "+getKey(),"HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"}
+        headers:{Authorization:"Bearer "+getKey(),"HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"}
       });
       var state=await pr.json();
       if(!pr.ok)throw new Error(errorText(state,"Could not check video status"));
@@ -1627,14 +1627,14 @@ async function generateVideo(){
     if(!done)throw new Error("Video is still processing. Wait before submitting another copy.");
     q("#videoStatus").textContent="Downloading finished video…";
     var vr=await fetch(BASE+"/videos/"+encodeURIComponent(job.id)+"/content?index=0",{
-      headers:{Authorization:"Bearer "+getKey(),"HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"}
+      headers:{Authorization:"Bearer "+getKey(),"HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"}
     });
     if(!vr.ok)throw new Error(errorRaw(await vr.text(),"Could not download the generated video"));
     var blob=await vr.blob();
     var url=URL.createObjectURL(blob);
     var video=document.createElement("video");video.className="videoresult";video.controls=true;video.playsInline=true;video.src=url;
     q("#videoOutput").appendChild(video);
-    var dl=document.createElement("a");dl.href=url;dl.download="nolimit-ai-video.mp4";dl.textContent="Download video";dl.className="secondary";dl.style.display="inline-grid";dl.style.placeItems="center";dl.style.marginTop="8px";dl.style.textDecoration="none";
+    var dl=document.createElement("a");dl.href=url;dl.download="quantum-breaks-ai-video.mp4";dl.textContent="Download video";dl.className="secondary";dl.style.display="inline-grid";dl.style.placeItems="center";dl.style.marginTop="8px";dl.style.textDecoration="none";
     q("#videoOutput").appendChild(dl);
     q("#videoStatus").textContent="Video complete"
   }catch(e){
@@ -1651,11 +1651,11 @@ function speak(text){
 }
 
 async function shareChat(){
-  var c=ensure(),lines=[c.title||"NoLimit AI chat",""];
-  c.messages.forEach(function(m){lines.push(m.role==="user"?"You:":"NoLimit AI:");lines.push(m.content||"");lines.push("")});
+  var c=ensure(),lines=[c.title||"Quantum Breaks AI chat",""];
+  c.messages.forEach(function(m){lines.push(m.role==="user"?"You:":"Quantum Breaks AI:");lines.push(m.content||"");lines.push("")});
   var text=lines.join("\n");
   if(navigator.share){
-    try{await navigator.share({title:c.title||"NoLimit AI chat",text:text});return}catch(e){if(e&&e.name==="AbortError")return}
+    try{await navigator.share({title:c.title||"Quantum Breaks AI chat",text:text});return}catch(e){if(e&&e.name==="AbortError")return}
   }
   try{await navigator.clipboard.writeText(text);toast("Chat copied for sharing")}catch(e){toast("Could not share this chat")}
 }
@@ -1665,7 +1665,7 @@ function codeExtension(lang){
   return m[String(lang||"").toLowerCase()]||"txt"
 }
 function downloadCode(code,lang){
-  var ext=codeExtension(lang),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([code],{type:"text/plain"}));a.download="nolimit-code."+ext;a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
+  var ext=codeExtension(lang),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([code],{type:"text/plain"}));a.download="quantum-breaks-code."+ext;a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 function runJavaScript(code){
   var out=q("#runnerOutput");out.textContent="Running…";openModal("#runnerModal");
@@ -1680,20 +1680,20 @@ function runJavaScript(code){
 }
 
 function exportChat(){
-  var c=ensure(),lines=["# "+c.title,""];c.messages.forEach(function(m){lines.push(m.role==="user"?"## You":"## NoLimit AI");lines.push("");lines.push(m.content||"");lines.push("")});
+  var c=ensure(),lines=["# "+c.title,""];c.messages.forEach(function(m){lines.push(m.role==="user"?"## You":"## Quantum Breaks AI");lines.push("");lines.push(m.content||"");lines.push("")});
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/markdown"}));a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".md";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 
 function exportWorkspace(){
   var safeSettings=Object.assign({},settings);
-  var data={type:"nolimit-ai-workspace",version:2,exported_at:new Date().toISOString(),settings:safeSettings,projects:projects,prompts:savedPrompts,chats:chats.filter(function(ch){return !ch.temporary})};
-  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="nolimit-ai-workspace.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
+  var data={type:"quantum-breaks-ai-workspace",version:2,exported_at:new Date().toISOString(),settings:safeSettings,projects:projects,prompts:savedPrompts,chats:chats.filter(function(ch){return !ch.temporary})};
+  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="quantum-breaks-ai-workspace.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 
 async function importWorkspace(file){
   try{
     var raw=await file.text(),data=JSON.parse(raw);
-    if(!data||data.type!=="nolimit-ai-workspace"||!Array.isArray(data.chats))throw new Error("Not a NoLimit AI workspace backup");
+    if(!data||["quantum-breaks-ai-workspace","nolimit-ai-workspace"].indexOf(data.type)<0||!Array.isArray(data.chats))throw new Error("Not a Quantum Breaks AI workspace backup");
     settings=Object.assign(settings,data.settings||{});
     projects=Array.isArray(data.projects)?data.projects:[];
     savedPrompts=Array.isArray(data.prompts)?data.prompts:[];
@@ -1704,7 +1704,7 @@ async function importWorkspace(file){
 
 function backupChat(){
   var c=ensure();
-  var data={type:"nolimit-ai-chat",version:1,exported_at:new Date().toISOString(),chat:c};
+  var data={type:"quantum-breaks-ai-chat",version:1,exported_at:new Date().toISOString(),chat:c};
   var a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
   a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".nolimit.json";
@@ -1715,7 +1715,7 @@ function backupChat(){
 async function importBackup(file){
   try{
     var raw=await file.text(),data=JSON.parse(raw),chat=data&&data.chat?data.chat:data;
-    if(!chat||!Array.isArray(chat.messages))throw new Error("This file does not look like a NoLimit AI chat backup");
+    if(!chat||!Array.isArray(chat.messages))throw new Error("This file does not look like a Quantum Breaks AI chat backup");
     var copy={id:uid(),title:String(chat.title||"Imported chat").slice(0,80),created:Date.now(),updated:Date.now(),messages:chat.messages.map(function(m){
       return {role:m.role==="assistant"?"assistant":"user",content:String(m.content||""),model:m.model,reasoning:m.reasoning,usage:m.usage,cost:m.cost,images:Array.isArray(m.images)?m.images.filter(function(x){return typeof x==="string"&&x.indexOf("data:")!==0}):[]}
     })};
