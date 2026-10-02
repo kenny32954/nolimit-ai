@@ -278,6 +278,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 
 .buildbadge.updateReady{color:var(--accent2)!important;border-color:color-mix(in srgb,var(--accent) 30%,transparent)!important;background:color-mix(in srgb,var(--accent) 8%,transparent)!important}
+
+.slashMenu{display:none;max-width:var(--content-max,860px);width:calc(100% - 24px);margin:0 auto 7px;padding:6px;border-radius:14px;background:rgba(27,27,31,.97);border:1px solid rgba(255,255,255,.08);box-shadow:0 18px 50px rgba(0,0,0,.36);backdrop-filter:blur(18px);max-height:260px;overflow:auto}.slashMenu.show{display:grid;gap:3px}.slashOption{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;width:100%;min-height:38px;padding:7px 9px;border-radius:9px;text-align:left;color:#d4d0cb}.slashOption.active,.slashOption:hover{background:rgba(255,255,255,.065)}.slashOption code{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent2)}.slashOption span{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 </style>
 </head>
 <body>
@@ -354,6 +357,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="toggle" id="modeBtn">⚡ Mode: balanced</button>
 <button class="toggle" id="reasonToggle">◌ Reasoning: medium</button>
 </div>
+<div class="slashMenu" id="slashMenu"></div>
 <div class="pending" id="pending"></div>
 <div class="composer">
 <textarea id="prompt" placeholder="Message Quantum Breaks AI or type /help"></textarea>
@@ -839,6 +843,7 @@ var draftTimer=null;
 var selectedText="";
 var lightboxSrc="";
 var commandActiveIndex=0;
+var slashActiveIndex=0;
 var lastMutationUndo=null;
 var saveWarned=false;
 function scheduleRender(){
@@ -1839,6 +1844,53 @@ async function fetchChatWithFallback(body,headers,signal){
   }
 }
 
+var SLASH_COMMANDS=[
+  ["/new","Start a new chat"],
+  ["/models","Open the model picker"],
+  ["/usage","Open OpenRouter usage"],
+  ["/compare","Compare models"],
+  ["/image","Open image generation"],
+  ["/video","Open video generation"],
+  ["/research","Toggle research mode"],
+  ["/web","Toggle web search"],
+  ["/agent","Toggle agent/subagent mode"],
+  ["/advisor","Toggle advisor mode"],
+  ["/review","Toggle second-pass review"],
+  ["/focus","Toggle focus mode"],
+  ["/search","Search the whole workspace"],
+  ["/project","Open projects"],
+  ["/prompts","Open prompt library"],
+  ["/snapshot","Open snapshots"],
+  ["/mode ","Set balanced, fast, deep, or research mode"],
+  ["/help","Show all commands"]
+];
+function slashMatches(){
+  var value=q("#prompt").value||"";if(value.charAt(0)!=="/"||value.indexOf("\n")>=0)return [];
+  var token=value.toLowerCase();
+  return SLASH_COMMANDS.filter(function(x){return x[0].toLowerCase().indexOf(token)===0||x[0].toLowerCase().includes(token)}).slice(0,10)
+}
+function hideSlashMenu(){q("#slashMenu").classList.remove("show");q("#slashMenu").innerHTML="";slashActiveIndex=0}
+function setSlashActive(index){
+  var items=qa("#slashMenu .slashOption");if(!items.length){slashActiveIndex=0;return}
+  slashActiveIndex=Math.max(0,Math.min(items.length-1,index));
+  items.forEach(function(x,i){x.classList.toggle("active",i===slashActiveIndex)});
+  items[slashActiveIndex].scrollIntoView({block:"nearest"})
+}
+function chooseSlash(index){
+  var matches=slashMatches(),item=matches[index];if(!item)return;
+  q("#prompt").value=item[0];hideSlashMenu();resizePrompt();saveDraftSoon();q("#prompt").focus()
+}
+function renderSlashMenu(){
+  var matches=slashMatches(),box=q("#slashMenu");box.innerHTML="";
+  if(!matches.length){hideSlashMenu();return}
+  box.classList.add("show");if(slashActiveIndex>=matches.length)slashActiveIndex=0;
+  matches.forEach(function(x,i){
+    var b=document.createElement("button");b.className="slashOption"+(i===slashActiveIndex?" active":"");
+    var code=document.createElement("code");code.textContent=x[0];var d=document.createElement("span");d.textContent=x[1];b.appendChild(code);b.appendChild(d);
+    b.onmouseenter=function(){setSlashActive(i)};b.onclick=function(){chooseSlash(i)};box.appendChild(b)
+  })
+}
+
 function localAssistant(text){
   var c=ensure();c.messages.push({role:"assistant",content:text,model:"Quantum Breaks AI local"});c.updated=Date.now();save();render()
 }
@@ -1957,7 +2009,7 @@ function fitRequestMessages(messages,modelId){
       var paired=copy.shift();total-=estimatedMessageTokens(paired);trimmed++
     }
   }
-  while(copy.length>2&&copy[0]&&copy[0].role==="assistant"){
+  while(copy.length>1&&copy[0]&&copy[0].role==="assistant"){
     var orphan=copy.shift();total-=estimatedMessageTokens(orphan);trimmed++
   }
   if(system)copy.unshift(system);
@@ -1966,6 +2018,7 @@ function fitRequestMessages(messages,modelId){
 
 async function send(){
   if(busy){if(controller)controller.abort();return}
+  hideSlashMenu();
   var text=q("#prompt").value.trim();if(!text&&!pending.length)return;
   if(!pending.length&&handleCommand(text))return;
   if(!navigator.onLine){saveDraftSoon();toast("You are offline — your draft is saved locally");return}
@@ -3174,6 +3227,14 @@ q("#attach").onclick=function(){q("#files").click()};
 q("#files").onchange=function(e){addFiles(Array.prototype.slice.call(e.target.files));e.target.value=""};
 q("#send").onclick=send;
 q("#prompt").onkeydown=function(e){
+  var slashOpen=q("#slashMenu").classList.contains("show"),items=qa("#slashMenu .slashOption");
+  if(slashOpen&&items.length){
+    if(e.key==="ArrowDown"){e.preventDefault();setSlashActive(slashActiveIndex+1);return}
+    if(e.key==="ArrowUp"){e.preventDefault();setSlashActive(slashActiveIndex-1);return}
+    if(e.key==="Tab"){e.preventDefault();chooseSlash(slashActiveIndex);return}
+    if(e.key==="Escape"){e.preventDefault();hideSlashMenu();return}
+    if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();chooseSlash(slashActiveIndex);return}
+  }
   if(e.key!=="Enter")return;
   if(e.ctrlKey||e.metaKey){e.preventDefault();send();return}
   if(!e.shiftKey&&innerWidth>700){e.preventDefault();send()}
@@ -3349,7 +3410,7 @@ q("#lightbox").onclick=function(e){if(e.target===q("#lightbox")||e.target===q(".
 q("#lightboxImage").onclick=function(){this.classList.toggle("zoom")};
 q("#lightboxOpen").onclick=function(){if(lightboxSrc)window.open(lightboxSrc,"_blank","noopener")};
 q("#lightboxCopy").onclick=function(){if(!lightboxSrc)return;if(lightboxSrc.indexOf("data:")===0)return toast("This image is stored locally, so it has no public URL");navigator.clipboard.writeText(lightboxSrc).then(function(){toast("Image URL copied")})};
-q("#prompt").addEventListener("input",function(){resizePrompt();saveDraftSoon()});
+q("#prompt").addEventListener("input",function(){resizePrompt();saveDraftSoon();renderSlashMenu()});
 q("#chat").addEventListener("mouseup",function(){setTimeout(updateSelectionToolbar,0)});
 q("#chat").addEventListener("touchend",function(){setTimeout(updateSelectionToolbar,120)},{passive:true});
 q("#chat").addEventListener("scroll",hideSelectionToolbar,{passive:true});
@@ -3374,7 +3435,7 @@ composer.addEventListener("drop",function(e){var fs=e.dataTransfer&&e.dataTransf
 
 document.addEventListener("keydown",function(e){
   var mod=e.ctrlKey||e.metaKey;
-  if(e.key==="Escape"){closeLightbox();closeModals();closeSide()}
+  if(e.key==="Escape"){hideSlashMenu();closeLightbox();closeModals();closeSide()}
   if(mod&&e.key.toLowerCase()==="k"){e.preventDefault();loadModels()}
   if(mod&&e.key.toLowerCase()==="p"){e.preventDefault();openCommandPalette()}
   if(mod&&e.shiftKey&&e.key.toLowerCase()==="f"){e.preventDefault();openGlobalSearch()}
