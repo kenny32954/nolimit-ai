@@ -145,3 +145,57 @@ jobs:
 
       - name: Check service worker syntax
         run: node --check sw.js
+
+
+  cg50-protocol:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install bridge dependencies
+        run: python -m pip install -r bridge/requirements.txt
+
+      - name: Check bridge Python syntax
+        run: |
+          python -m py_compile bridge/qb_bridge.py bridge/subject_router.py
+          python bridge/test_protocol.py
+
+      - name: Build and run calculator Base64 unit test
+        run: |
+          gcc -std=c11 -Wall -Wextra -Werror             cg50/native/tests/base64_test.c             cg50/native/src/base64.c             -Icg50/native/src             -o /tmp/qb_base64_test
+          /tmp/qb_base64_test
+
+      - name: Check protocol/source invariants
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          bridge = Path("bridge/qb_bridge.py").read_text()
+          protocol = Path("cg50/PROTOCOL.md").read_text()
+          transport = Path("cg50/native/src/transport.c").read_text()
+          assembly = Path("cg50/native/src/serial_syscalls.S").read_text()
+
+          # The request format itself lives in calculator C source.
+          if 'H:QBAI:2' not in bridge or 'K:QBAI:2' not in bridge:
+              raise SystemExit("Bridge handshake markers are missing")
+
+          for marker in ['H:QBAI:2', 'K:QBAI:2', '115200']:
+              if marker not in protocol:
+                  raise SystemExit(f"Protocol documentation missing {marker}")
+
+          for marker in ['H:QBAI:2', 'K:QBAI:2', 'Serial_Open', 'Serial_PollRX']:
+              if marker not in transport:
+                  raise SystemExit(f"Native transport missing {marker}")
+
+          for syscall_id in ['0x1BB7', '0x1BB8', '0x1BB9', '0x1BBE', '0x1BBF', '0x1BC0']:
+              if syscall_id not in assembly:
+                  raise SystemExit(f"Serial syscall wrapper missing {syscall_id}")
+
+          print("CG50 protocol/source invariant checks passed")
+          PY
