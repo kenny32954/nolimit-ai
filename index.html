@@ -510,6 +510,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <label style="display:flex;align-items:center;gap:8px"><input id="cacheEnabled" type="checkbox"> Response caching</label>
 <label style="display:flex;align-items:center;gap:8px"><input id="autoSpeak" type="checkbox"> Auto read replies</label>
 <div class="field" style="min-width:170px;flex:1"><label>Cache TTL</label><select id="cacheTTL"><option value="60">1 minute</option><option value="300">5 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select></div>
+<div class="field" style="min-width:190px;flex:1"><label>Network stall timeout</label><input id="stallTimeoutSec" type="number" min="0" max="1800" step="30" placeholder="0 = off"><div class="smallnote">Abort if no response data arrives for this many seconds.</div></div>
 </div>
 <div style="height:12px"></div>
 <button class="primary" id="saveSettings">Save settings</button>
@@ -943,6 +944,7 @@ var settings=Object.assign({
   fusion:false,
   cache:false,
   cacheTTL:300,
+  stallTimeoutSec:300,
   cacheClearNext:false,
   webMaxResults:5,
   webMaxTotal:15,
@@ -1960,6 +1962,7 @@ function openSettings(){
   q("#denyDataCollection").checked=!!settings.denyDataCollection;
   q("#cacheEnabled").checked=!!settings.cache;
   q("#cacheTTL").value=String(settings.cacheTTL||300);
+  q("#stallTimeoutSec").value=settings.stallTimeoutSec===0?0:(settings.stallTimeoutSec||300);
   q("#webMaxResults").value=settings.webMaxResults||5;
   q("#webMaxTotal").value=settings.webMaxTotal||15;
   q("#autoSpeak").checked=!!settings.autoSpeak;
@@ -2493,6 +2496,12 @@ async function send(){
   }
   var requestMessages=fit.messages;
   var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:requestModel,contextTrimmed:fit.trimmed||0};c.messages.push(a);save();busy=true;busyChatId=c.id;controller=new AbortController();render();
+  var stallTimer=null,stalled=false,stallSeconds=Math.max(0,Number(settings.stallTimeoutSec)||0);
+  function resetStallTimer(){
+    if(stallTimer)clearTimeout(stallTimer);
+    if(stallSeconds>0)stallTimer=setTimeout(function(){stalled=true;if(controller)controller.abort()},stallSeconds*1000)
+  }
+  resetStallTimer();
   if(fit.trimmed)toast("Context fit skipped "+fit.trimmed+" older message"+(fit.trimmed===1?"":"s")+" for this request");
   if(fit.over)toast("This request is still close to or over the selected model's context limit.");
   try{
@@ -2517,6 +2526,7 @@ async function send(){
       if(settings.cacheClearNext){headers["X-OpenRouter-Cache-Clear"]="true";settings.cacheClearNext=false;save()}
     }
     var r=await fetchChatWithFallback(body,headers,controller.signal);
+    resetStallTimer();
     a.cacheStatus=r.headers.get("X-OpenRouter-Cache-Status")||"";
     a.cacheAge=r.headers.get("X-OpenRouter-Cache-Age")||"";
     a.cacheTTL=r.headers.get("X-OpenRouter-Cache-TTL")||"";
@@ -2525,6 +2535,7 @@ async function send(){
     var dec=new TextDecoder(),buf="";
     while(true){
       var z=await reader.read();if(z.done)break;
+      resetStallTimer();
       buf+=dec.decode(z.value,{stream:true});
       var lines=buf.split(/\r?\n/);buf=lines.pop()||"";
       for(var li=0;li<lines.length;li++){
@@ -2538,10 +2549,12 @@ async function send(){
     if(tail.indexOf("data:")===0){var tailRaw=tail.slice(5).trim();if(tailRaw&&tailRaw!=="[DONE]")applyStreamPayload(tailRaw,a)}
     a.finished=Date.now();save()
   }catch(e){
-    if(e.name!=="AbortError"){a.content="Request failed: "+e.message;a.error=true}
-    if(e.name==="AbortError"&&!a.content)c.messages.pop();
+    if(e.name==="AbortError"&&stalled){a.content="Request stopped because no response data arrived for "+stallSeconds+" seconds. You can retry, choose another model, or increase the Network stall timeout in Settings.";a.error=true;a.finished=Date.now()}
+    else if(e.name!=="AbortError"){a.content="Request failed: "+e.message;a.error=true}
+    else if(!a.content)c.messages.pop();
     save()
   }finally{
+    if(stallTimer)clearTimeout(stallTimer);
     busy=false;busyChatId="";controller=null;render();if(settings.autoSpeak&&a.content&&!a.error)speak(a.content);
     if(settings.review&&a.content&&!a.error)reviewAnswer(c,m.content,a)
   }
@@ -4231,7 +4244,7 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.costWarnThreshold=Math.max(0,Number(q("#costWarnThreshold").value)||0);settings.dailySpendBudget=Math.max(0,Number(q("#dailySpendBudget").value)||0);settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.autoCompressContext=q("#autoCompressContext").checked;settings.summaryModel=q("#summaryModel").value.trim()||"openrouter/auto";settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.costWarnThreshold=Math.max(0,Number(q("#costWarnThreshold").value)||0);settings.dailySpendBudget=Math.max(0,Number(q("#dailySpendBudget").value)||0);settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.autoCompressContext=q("#autoCompressContext").checked;settings.summaryModel=q("#summaryModel").value.trim()||"openrouter/auto";settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.stallTimeoutSec=Math.max(0,Math.min(1800,Number(q("#stallTimeoutSec").value)||0));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#commandSearch").oninput=function(){commandActiveIndex=0;renderCommandPalette()};
 q("#commandSearch").onkeydown=function(e){
