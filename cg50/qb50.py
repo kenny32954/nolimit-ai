@@ -1,14 +1,38 @@
 # Quantum Breaks AI - fx-CG50 pocket client prototype
 # Designed for Casio's adapted MicroPython 1.9.4.
-# This file intentionally uses only basic built-ins for compatibility.
+# Conservative built-ins only for calculator compatibility.
 
 WIDTH = 21
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 history = []
+subject = "auto"
+mode = "explain"
+
+SUBJECTS = (
+    "auto", "math", "algebra",
+    "geometry", "statistics",
+    "calculus", "biology",
+    "chemistry", "physics",
+    "earth", "ela",
+    "literature", "writing",
+    "history", "government",
+    "economics", "business",
+    "computer_science",
+    "language", "health"
+)
+
+MODES = (
+    "answer", "explain",
+    "steps", "check",
+    "quiz", "summary",
+    "flashcards"
+)
+
 
 def rule(ch="-"):
     print(ch * WIDTH)
+
 
 def wrap(text, width=WIDTH):
     text = str(text)
@@ -23,6 +47,7 @@ def wrap(text, width=WIDTH):
     out.append(text)
     return out
 
+
 def say(prefix, text):
     first = True
     for line in wrap(text):
@@ -32,31 +57,84 @@ def say(prefix, text):
         else:
             print("   " + line)
 
+
 def banner():
     print("QUANTUM BREAKS AI")
-    print("CG50 POCKET CLIENT")
+    print("CG50 SCHOOL CLIENT")
     rule("=")
     print("Prototype " + VERSION)
     print("Type /help")
     rule()
+    show_status()
+
+
+def show_status():
+    say("S: ", subject)
+    say("M: ", mode)
+
+
+def list_subjects():
+    print("Subjects:")
+    i = 0
+    while i < len(SUBJECTS):
+        print(SUBJECTS[i])
+        i += 1
+
+
+def list_modes():
+    print("Tutor modes:")
+    i = 0
+    while i < len(MODES):
+        print(MODES[i])
+        i += 1
+
+
+def set_subject(value):
+    global subject
+    value = value.strip().lower()
+    if value in SUBJECTS:
+        subject = value
+        say("Subject: ", subject)
+    else:
+        print("Unknown subject.")
+        print("Use /subjects")
+
+
+def set_mode(value):
+    global mode
+    value = value.strip().lower()
+    if value in MODES:
+        mode = value
+        say("Mode: ", mode)
+    else:
+        print("Unknown mode.")
+        print("Use /modes")
+
 
 def help_screen():
-    print("/help  commands")
-    print("/about project info")
-    print("/history recent text")
-    print("/clear  clear history")
-    print("/math   quick calc")
-    print("/quit   exit")
+    print("/subject NAME")
+    print("/mode NAME")
+    print("/subjects")
+    print("/modes")
+    print("/status")
+    print("/history")
+    print("/clear")
+    print("/math")
+    print("/about")
+    print("/quit")
     rule()
-    print("Live AI transport is")
-    print("being built as a")
-    print("native CG50 add-in.")
+    print("Live subject-aware")
+    print("AI transport is next.")
+
 
 def about():
     print("Quantum Breaks AI")
-    print("fx-CG50 client.")
-    print("Offline shell now;")
-    print("serial live mode next.")
+    print("fx-CG50 school")
+    print("assistant prototype.")
+    print("All-subject routing")
+    print("is built into the")
+    print("desktop bridge.")
+
 
 def math_mode():
     print("Quick Calc")
@@ -64,11 +142,11 @@ def math_mode():
     print("or (8*7)-3")
     expr = input("expr> ")
     try:
-        # Local calculator input only. No globals or imported modules.
         value = eval(expr, {"__builtins__": {}}, {})
         say("= ", value)
     except:
         print("Could not evaluate.")
+
 
 def show_history():
     if not history:
@@ -82,11 +160,41 @@ def show_history():
         say("> ", history[i])
         i += 1
 
+
 def local_reply(text):
-    # This deliberately does not pretend to be an AI model.
-    if text.endswith("?"):
-        return "Saved locally. Live AI answers will use the serial bridge."
-    return "Saved locally. Live AI mode is the next integration stage."
+    return (
+        "Saved. Live mode will "
+        "send this as " + subject
+        + " / " + mode + "."
+    )
+
+
+def handle_command(text):
+    if text == "/help":
+        help_screen()
+    elif text == "/about":
+        about()
+    elif text == "/history":
+        show_history()
+    elif text == "/clear":
+        history[:] = []
+        print("History cleared.")
+    elif text == "/math":
+        math_mode()
+    elif text == "/subjects":
+        list_subjects()
+    elif text == "/modes":
+        list_modes()
+    elif text == "/status":
+        show_status()
+    elif text.startswith("/subject "):
+        set_subject(text[9:])
+    elif text.startswith("/mode "):
+        set_mode(text[6:])
+    else:
+        print("Unknown command.")
+        print("Use /help")
+
 
 def main():
     banner()
@@ -103,20 +211,12 @@ def main():
         if text == "/quit":
             print("Bye.")
             break
-        elif text == "/help":
-            help_screen()
-        elif text == "/about":
-            about()
-        elif text == "/history":
-            show_history()
-        elif text == "/clear":
-            history[:] = []
-            print("History cleared.")
-        elif text == "/math":
-            math_mode()
+        elif text.startswith("/"):
+            handle_command(text)
         else:
             history.append(text)
             say("Q: ", text)
             say("A: ", local_reply(text))
+
 
 main()
