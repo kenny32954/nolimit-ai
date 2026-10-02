@@ -10,20 +10,22 @@ Everything else in this repository supports the app with documentation and autom
 
 ## Current feature set
 
-### Quantum Breaks AI 2.3 additions
-- Per-chat model locks plus project-level default models
-- Per-chat instructions, reasoning overrides, and temperature overrides
-- Turn-aware automatic context fitting that preserves user/assistant pairs
-- Multi-model fallback chains
-- Context preview inspector showing the text payload prepared for the model
-- Compatible-now model filtering, model sorting, technical free/low-cost quick picks, and local model performance stats
-- Slash-command autocomplete with keyboard navigation
-- Media gallery for locally saved/chat images
-- In-app PDF and text-file previews
-- Project chat browser, direct project-chat creation, project export/import, and text-file project knowledge imports
-- Selection-to-memory and selection-to-project-knowledge actions
-- Model comparison answers can be promoted directly into a conversation
-- In-app PWA update checking with one-click reload
+### Quantum Breaks AI 2.4 additions
+- User-approved, privacy-filtered local memory suggestions that explicitly exclude sensitive categories
+- Review-driven answer improvement with local AI-response version history and restoration
+- Multi-model answer synthesis after model comparisons
+- Optional automatic incremental context summaries before long-chat trimming
+- Per-chat and per-project model, reasoning, temperature, instructions, and context controls
+- Searchable recent prompt history with keyboard recall and workspace-backup support
+- Folder attachments with safe binary filtering and large-text truncation
+- Persistent unsent image/PDF/text draft attachments across reloads
+- Project export/import with associated chats and locally stored media
+- Local response ratings plus model helpfulness analytics
+- Searchable Settings navigation
+- Local response editing with a visible edited marker and restore-original support
+- Request cost estimates and optional cost-warning thresholds
+- Stronger SSE parsing, multimodal response normalization, compatibility retries, and cross-chat generation safety
+- One-click source copying and source counts on cited responses
 
 
 ### UI and organization
@@ -118,6 +120,8 @@ Everything else in this repository supports the app with documentation and autom
 - Citations retained in share, print/PDF, and Markdown exports
 
 ### Projects and memory
+- Project-level model, reasoning, and temperature defaults
+- Portable project export/import with chats and local media
 - Local persistent memory that is appended to system context
 - Local projects with project-specific instructions and reference knowledge
 - Assign chats to projects
@@ -126,6 +130,9 @@ Everything else in this repository supports the app with documentation and autom
 - Full workspace export/import for chats, projects, memory, and settings
 
 ### Structured responses and review
+- Review-driven answer improvement with local version history
+- Multi-model comparison synthesis
+- User-approved privacy-filtered memory suggestions that exclude sensitive information
 - Normal text, JSON object, and strict JSON Schema response formats
 - Provider routing that can require requested parameters
 - Structured-output model filtering and capability badges
@@ -179,6 +186,8 @@ Everything else in this repository supports the app with documentation and autom
 - Password-encrypted workspace backups using PBKDF2-SHA256 and AES-256-GCM
 
 ### Multimodal files
+- Folder attachments with relative paths and unsupported-binary filtering
+- Unsent image/PDF/text draft attachments can survive reloads
 - Image attachments for vision-capable models
 - PDF attachments through OpenRouter PDF parsing
 - Text, code, JSON, CSV, Markdown, HTML, CSS, and other text-file attachments
@@ -306,7 +315,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v2.3.0
+Current app generation: v2.4.0
 
 Major capabilities now include:
 - phone + PC UI
