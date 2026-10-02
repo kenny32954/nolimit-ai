@@ -233,7 +233,12 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .contextpin{color:#9dc4ff!important}.contextpin.on{color:#6ca7ff!important;background:rgba(108,167,255,.08)!important}
 .scratchcount{font-size:10px;color:var(--muted);margin-left:6px}
 
-.historylabel{padding:10px 10px 4px;font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#55525a}.historylabel:first-child{padding-top:4px}\n</style>
+.historylabel{padding:10px 10px 4px;font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#55525a}.historylabel:first-child{padding-top:4px}\n
+.selectionToolbar{position:fixed;z-index:125;display:none;gap:4px;padding:5px;border-radius:12px;background:rgba(25,25,29,.96);border:1px solid rgba(255,255,255,.09);box-shadow:0 16px 45px rgba(0,0,0,.42);backdrop-filter:blur(18px)}
+.selectionToolbar.show{display:flex}.selectionToolbar button{height:30px;padding:0 9px;border-radius:8px;color:#c8c4c0;font-size:11px}.selectionToolbar button:hover{background:rgba(255,255,255,.07);color:#fff}
+@media(max-width:520px){.selectionToolbar{max-width:calc(100vw - 20px);overflow:auto}}
+
+</style>
 </head>
 <body>
 <div class="app">
@@ -319,6 +324,12 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 </main>
 </div>
 
+<div class="selectionToolbar" id="selectionToolbar">
+<button id="selCopy">Copy</button>
+<button id="selQuote">Quote</button>
+<button id="selExplain">Explain</button>
+<button id="selSavePrompt">Save prompt</button>
+</div>
 <div class="modalShade" id="modalShade"></div>
 
 <section class="modal" id="commandModal">
@@ -667,6 +678,7 @@ var videoFrameData="";
 var videoReferenceData="";
 var renderTimer=null;
 var draftTimer=null;
+var selectedText="";
 function scheduleRender(){
   if(renderTimer)return;
   renderTimer=setTimeout(function(){renderTimer=null;render()},40)
@@ -985,6 +997,28 @@ function openFindInChat(){
 }
 function openBookmarks(){
   q("#findTitle").textContent="Bookmarks";q("#findInput").classList.add("hidden");q("#findInput").value="";openModal("#findModal");renderFindResults(true)
+}
+
+
+function hideSelectionToolbar(){q("#selectionToolbar").classList.remove("show");selectedText=""}
+function updateSelectionToolbar(){
+  var sel=window.getSelection&&window.getSelection();if(!sel||sel.isCollapsed)return hideSelectionToolbar();
+  var text=String(sel.toString()||"").trim();if(!text||text.length<2)return hideSelectionToolbar();
+  var node=sel.anchorNode&&sel.anchorNode.nodeType===3?sel.anchorNode.parentElement:sel.anchorNode;
+  if(!node||!q("#chat").contains(node))return hideSelectionToolbar();
+  selectedText=text.slice(0,12000);
+  var range=sel.getRangeAt(0),rect=range.getBoundingClientRect(),bar=q("#selectionToolbar");
+  bar.classList.add("show");
+  var left=Math.max(10,Math.min(window.innerWidth-bar.offsetWidth-10,rect.left+rect.width/2-bar.offsetWidth/2));
+  var top=Math.max(10,rect.top-bar.offsetHeight-9);
+  if(top<10)top=Math.min(window.innerHeight-bar.offsetHeight-10,rect.bottom+9);
+  bar.style.left=left+"px";bar.style.top=top+"px"
+}
+function quoteSelection(prefix){
+  if(!selectedText)return;
+  var quoted=selectedText.split("\n").map(function(line){return "> "+line}).join("\n");
+  q("#prompt").value=(q("#prompt").value?q("#prompt").value+"\n\n":"")+(prefix||"")+quoted;
+  resizePrompt();saveDraftSoon();q("#prompt").focus();hideSelectionToolbar()
 }
 
 function renderPending(){
@@ -2197,6 +2231,8 @@ q("#prompt").onkeydown=function(e){
   if(!e.shiftKey&&innerWidth>700){e.preventDefault();send()}
 };
 q("#topAuth").onclick=q("#sideAuth").onclick=q("#settingsBtn").onclick=openSettings;
+q("#status").onclick=openDiagnostics;
+q("#status").style.cursor="pointer";
 q("#commandBtn").onclick=openCommandPalette;
 q("#focusBtn").onclick=function(){settings.focusMode=!settings.focusMode;save();render();toast(settings.focusMode?"Focus mode on":"Focus mode off")};
 q("#diagnosticsSide").onclick=openDiagnostics;
@@ -2320,6 +2356,13 @@ q("#themeSelect").onchange=function(){settings.theme=this.value;save();applyAppe
 q("#accentSelect").onchange=function(){settings.accent=this.value;save();applyAppearance()};
 q("#densitySelect").onchange=function(){settings.density=this.value;save();applyAppearance()};
 q("#prompt").addEventListener("input",function(){resizePrompt();saveDraftSoon()});
+q("#chat").addEventListener("mouseup",function(){setTimeout(updateSelectionToolbar,0)});
+q("#chat").addEventListener("touchend",function(){setTimeout(updateSelectionToolbar,120)},{passive:true});
+q("#chat").addEventListener("scroll",hideSelectionToolbar,{passive:true});
+q("#selCopy").onclick=function(){if(selectedText)navigator.clipboard.writeText(selectedText).then(function(){toast("Selection copied");hideSelectionToolbar()})};
+q("#selQuote").onclick=function(){quoteSelection("")};
+q("#selExplain").onclick=function(){quoteSelection("Explain this selection clearly:\n\n")};
+q("#selSavePrompt").onclick=function(){if(!selectedText)return;editingPromptId="";q("#promptName").value=selectedText.slice(0,40);q("#promptBody").value=selectedText;hideSelectionToolbar();openModal("#promptsModal");renderPromptLibrary()};
 q("#chat").addEventListener("scroll",updateScrollButton,{passive:true});
 q("#scrollBottom").onclick=function(){q("#chat").scrollTo({top:q("#chat").scrollHeight,behavior:"smooth"})};
 q("#prompt").addEventListener("paste",function(e){
