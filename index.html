@@ -1094,9 +1094,11 @@ async function clearAllMedia(){
 }
 async function refreshStorageManager(){
   q("#storageSummary").textContent="Scanning browser storage…";q("#storageGrid").innerHTML="";
-  var stats=await storageStats(),rows=[
+  var stats=await storageStats(),refs=referencedMediaIds(),orphans=stats.records.filter(function(rec){return !refs.has(rec.id)}).length,rows=[
     ["Chats",chats.filter(function(ch){return !ch.trashedAt}).length],
     ["Media items",stats.count],
+    ["Referenced media",Math.max(0,stats.count-orphans)],
+    ["Orphaned media",orphans],
     ["Media size",fmtBytes(stats.approxBytes)],
     ["Metadata",fmtBytes(new Blob([localStorage.getItem(STORE)||""]).size)]
   ];
@@ -1700,9 +1702,13 @@ var lastDiagReport="";
 async function runDiagnostics(){
   var cards=[],issues=[];
   function add(k,v){cards.push([k,v])}
+  add("App version","v"+APP_VERSION);
   add("Online",navigator.onLine?"Yes":"No");
   add("Origin",location.protocol+"//"+location.host);
   add("API key",isConnected()?"Connected":"Not connected");
+  add("Effective model",effectiveModel(current()));
+  add("Model catalog",models.length?models.length+" loaded":"Not loaded yet");
+  add("PWA update",updateAvailable?"Ready to install":"No pending update");
   add("Service worker","serviceWorker" in navigator?"Supported":"Unavailable");
   add("Microphone",navigator.mediaDevices&&navigator.mediaDevices.getUserMedia?"Supported":"Unavailable");
   add("Web Share",navigator.share?"Supported":"Unavailable");
@@ -1711,7 +1717,6 @@ async function runDiagnostics(){
   if(navigator.storage&&navigator.storage.estimate){
     try{var est=await navigator.storage.estimate();if(est.usage!=null)add("Browser storage",fmtBytes(est.usage)+(est.quota?" / "+fmtBytes(est.quota):""))}catch(e){}
   }
-  add("Model",effectiveModel(current()));
   if(location.protocol!=="https:")issues.push("App is not running over HTTPS.");
   if(!navigator.onLine)issues.push("Browser reports that it is offline.");
   if(isConnected()){
