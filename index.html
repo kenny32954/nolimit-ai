@@ -479,6 +479,8 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="notice" id="chatStats"></div>
 <div class="row">
 <button class="primary" id="renameChat">Rename</button>
+<button class="secondary" id="aiTitleChat">AI title</button>
+<button class="secondary" id="compressChat">Compress context</button>
 <button class="secondary" id="pinChat">Pin</button>
 <button class="secondary" id="duplicateChat">Duplicate</button>
 <button class="danger" id="deleteChat">Delete</button>
@@ -1098,12 +1100,14 @@ function apiMessages(c){
   var out=[],systemParts=[];
   if(settings.system)systemParts.push(settings.system);
   if(settings.memory)systemParts.push("Persistent local memory:\n"+settings.memory);
+  if(c.compactSummary)systemParts.push("Summary of earlier conversation:\n"+c.compactSummary);
   if(c.scratchpadInContext&&c.scratchpad)systemParts.push("Chat scratchpad notes:\n"+c.scratchpad);
   var p=projectForChat(c);
   if(p&&p.instructions)systemParts.push("Project instructions:\n"+p.instructions);
   if(p&&p.knowledge)systemParts.push("Project reference knowledge:\n"+p.knowledge);
   if(systemParts.length)out.push({role:"system",content:systemParts.join("\n\n")});
   var allHistory=c.messages||[],history=allHistory,limit=Math.max(0,Number(settings.historyLimit)||0);
+  if(c.compactSummary&&Number(c.compactCount)>0)history=allHistory.slice(Math.min(allHistory.length,Number(c.compactCount)||0));
   if(limit>0&&history.length>limit){
     history=history.slice(-limit);
     var visibleSet=new Set(history);
@@ -1817,6 +1821,7 @@ function chatStatsText(c){
   if(tokens)bits.push(formatTokenCount(tokens)+" generated tokens");
   if(cost)bits.push(money(cost)+" tracked cost");
   if(p)bits.push("project: "+p.name);
+  if(c.compactSummary)bits.push("context compressed");
   if(c.temporary)bits.push("temporary");
   return bits.join(" · ")
 }
@@ -1825,12 +1830,58 @@ function openChatManage(){
   q("#chatTitleInput").value=c.title||"New chat";
   q("#chatStats").textContent=chatStatsText(c);
   q("#pinChat").textContent=c.pinned?"Unpin":"Pin";
+  q("#compressChat").textContent=c.compactSummary?"Clear compression":"Compress context";
   openModal("#chatManageModal")
 }
 
 function renameManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
   c.title=q("#chatTitleInput").value.trim().slice(0,80)||"New chat";c.updated=Date.now();save();closeModals();render()
+}
+
+async function generateChatTitle(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  if(!isConnected())return toast("Connect OpenRouter first");
+  var material=(c.messages||[]).slice(0,8).map(function(m){return (m.role==="user"?"User: ":"Assistant: ")+String(m.content||"").slice(0,1000)}).join("\n");
+  if(!material.trim())return toast("There is not enough conversation to title yet");
+  q("#aiTitleChat").disabled=true;q("#aiTitleChat").textContent="Naming…";
+  try{
+    var body={model:settings.model,messages:[
+      {role:"system",content:"Create a short, specific title for this conversation. Return only the title, no quotes, maximum 6 words."},
+      {role:"user",content:material}
+    ],stream:false,temperature:0.3,max_tokens:32};
+    var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
+    var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Could not generate title"));
+    var title=String(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").replace(/^["']|["']$/g,"").trim().replace(/\s+/g," ").slice(0,80);
+    if(!title)throw new Error("No title was returned");
+    c.title=title;c.updated=Date.now();q("#chatTitleInput").value=title;save();render();toast("AI title applied")
+  }catch(e){toast("Title failed: "+e.message)}
+  q("#aiTitleChat").disabled=false;q("#aiTitleChat").textContent="AI title"
+}
+
+async function compressChatContext(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  if(c.compactSummary){
+    c.compactSummary="";c.compactCount=0;c.updated=Date.now();save();q("#compressChat").textContent="Compress context";q("#chatStats").textContent=chatStatsText(c);toast("Context compression cleared");return
+  }
+  if(!isConnected())return toast("Connect OpenRouter first");
+  var msgs=c.messages||[];if(msgs.length<12)return toast("This chat is still short; compression is not needed yet");
+  var keep=8,count=Math.max(1,msgs.length-keep),older=msgs.slice(0,count);
+  if(!confirm("Summarize "+count+" older messages into compact context? This uses one model call."))return;
+  q("#compressChat").disabled=true;q("#compressChat").textContent="Compressing…";
+  try{
+    var transcript=older.map(function(m){return (m.role==="user"?"User":"Assistant")+": "+String(m.content||"")}).join("\n\n").slice(0,120000);
+    var body={model:settings.model,messages:[
+      {role:"system",content:"Compress the conversation into a dense continuity summary. Preserve decisions, requirements, names, technical details, unresolved tasks, user preferences, and anything needed to continue accurately. Do not add facts."},
+      {role:"user",content:transcript}
+    ],stream:false,temperature:0.2,max_tokens:2500};
+    var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
+    var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Context compression failed"));
+    var summary=String(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim();
+    if(!summary)throw new Error("No summary was returned");
+    c.compactSummary=summary;c.compactCount=count;c.updated=Date.now();save();q("#compressChat").textContent="Clear compression";q("#chatStats").textContent=chatStatsText(c);render();toast("Older context compressed")
+  }catch(e){toast("Compression failed: "+e.message)}
+  q("#compressChat").disabled=false
 }
 
 function togglePinnedChat(){
@@ -2094,6 +2145,8 @@ q("#generateVoice").onclick=generateVoice;
 q("#voiceModel").onchange=function(){q("#voiceName").value=defaultVoiceFor(q("#voiceModel").value)};
 q("#generateVideo").onclick=generateVideo;
 q("#renameChat").onclick=renameManagedChat;
+q("#aiTitleChat").onclick=generateChatTitle;
+q("#compressChat").onclick=compressChatContext;
 q("#pinChat").onclick=togglePinnedChat;
 q("#duplicateChat").onclick=duplicateManagedChat;
 q("#deleteChat").onclick=deleteManagedChat;
