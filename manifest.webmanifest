@@ -1,12 +1,12 @@
 {
   "name": "Quantum Breaks AI",
   "short_name": "Quantum Breaks",
-  "description": "Quantum Breaks AI — a responsive multi-model AI workspace powered by OpenRouter.",
+  "description": "Quantum Breaks AI — a polished multi-model AI workspace for chat, research, files, media, code, and projects.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#171716",
-  "theme_color": "#171716",
+  "background_color": "#0f0f11",
+  "theme_color": "#0f0f11",
   "orientation": "any",
   "icons": [
     {
@@ -53,5 +53,9 @@
         }
       ]
     }
+  ],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
   ]
 }
