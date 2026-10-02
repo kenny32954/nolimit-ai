@@ -23,6 +23,8 @@ int Serial_ClearTX(void);
 static bool ready = false;
 static char rx_line[RX_LINE_CAP];
 static size_t rx_len = 0;
+static uint32_t active_request_id = 0;
+static unsigned long expected_seq = 0;
 
 static bool serial_send(char const *text)
 {
@@ -43,6 +45,7 @@ static bool serial_send(char const *text)
         if(Serial_Write((unsigned char const *)(text + offset), chunk) < 0) {
             return false;
         }
+
         offset += (size_t)chunk;
     }
 
@@ -80,12 +83,35 @@ static bool read_line(char *out, size_t out_size)
     return false;
 }
 
+static char *next_field(char **cursor)
+{
+    char *start;
+    char *sep;
+
+    if(!cursor || !*cursor) return NULL;
+
+    start = *cursor;
+    sep = strchr(start, ':');
+
+    if(sep) {
+        *sep = '\0';
+        *cursor = sep + 1;
+    }
+    else {
+        *cursor = NULL;
+    }
+
+    return start;
+}
+
 void qb_transport_init(void)
 {
     unsigned char mode[6] = {0, 9, 0, 0, 0, 0}; /* 115200 baud, 8N1 */
 
     rx_len = 0;
     ready = false;
+    active_request_id = 0;
+    expected_seq = 0;
 
     if(Serial_Open(mode) == 0 || Serial_IsOpen()) {
         Serial_ClearRX();
@@ -101,6 +127,8 @@ void qb_transport_close(void)
 
     rx_len = 0;
     ready = false;
+    active_request_id = 0;
+    expected_seq = 0;
 }
 
 bool qb_transport_ready(void)
@@ -137,6 +165,7 @@ bool qb_transport_probe(void)
                 return true;
             }
         }
+
         sleep_us_spin(2000);
     }
 
@@ -178,7 +207,11 @@ bool qb_transport_send_request(
         return false;
     }
 
-    return serial_send(frame);
+    if(!serial_send(frame)) return false;
+
+    active_request_id = request_id;
+    expected_seq = 0;
+    return true;
 }
 
 qb_transport_event_t qb_transport_poll(
@@ -188,12 +221,14 @@ qb_transport_event_t qb_transport_poll(
 )
 {
     char line[RX_LINE_CAP];
+    char *cursor;
     char *kind;
     char *id_text;
     char *seq_text;
     char *done_text;
     char *payload;
     unsigned long frame_id;
+    unsigned long seq;
     size_t decoded;
 
     if(text_size == 0) return QB_TRANSPORT_NONE;
@@ -203,23 +238,34 @@ qb_transport_event_t qb_transport_poll(
         return QB_TRANSPORT_NONE;
     }
 
-    kind = strtok(line, ":");
-    id_text = strtok(NULL, ":");
+    cursor = line;
+    kind = next_field(&cursor);
+    id_text = next_field(&cursor);
 
     if(!kind || !id_text) return QB_TRANSPORT_NONE;
 
     frame_id = strtoul(id_text, NULL, 10);
-    if(frame_id != (unsigned long)request_id) {
+    if(frame_id != (unsigned long)request_id ||
+       frame_id != (unsigned long)active_request_id) {
         return QB_TRANSPORT_NONE;
     }
 
     if(strcmp(kind, "E") == 0) {
-        payload = strtok(NULL, "");
-        if(!payload) return QB_TRANSPORT_ERROR;
+        payload = cursor;
+        if(!payload || !*payload) {
+            snprintf(text, text_size, "Malformed bridge error frame");
+            return QB_TRANSPORT_ERROR;
+        }
 
         decoded = qb_base64_decode(payload, (unsigned char *)text, text_size - 1);
-        if(decoded >= text_size) decoded = text_size - 1;
+        if(decoded == 0 && payload[0]) {
+            snprintf(text, text_size, "Could not decode bridge error");
+            return QB_TRANSPORT_ERROR;
+        }
+
         text[decoded] = '\0';
+        active_request_id = 0;
+        expected_seq = 0;
         return QB_TRANSPORT_ERROR;
     }
 
@@ -227,17 +273,41 @@ qb_transport_event_t qb_transport_poll(
         return QB_TRANSPORT_NONE;
     }
 
-    seq_text = strtok(NULL, ":");
-    done_text = strtok(NULL, ":");
-    payload = strtok(NULL, "");
+    seq_text = next_field(&cursor);
+    done_text = next_field(&cursor);
+    payload = cursor;
 
-    (void)seq_text;
+    if(!seq_text || !done_text || !payload) {
+        snprintf(text, text_size, "Malformed answer frame");
+        active_request_id = 0;
+        expected_seq = 0;
+        return QB_TRANSPORT_ERROR;
+    }
 
-    if(!done_text || !payload) return QB_TRANSPORT_NONE;
+    seq = strtoul(seq_text, NULL, 10);
+    if(seq != expected_seq) {
+        snprintf(text, text_size, "Serial sequence mismatch");
+        active_request_id = 0;
+        expected_seq = 0;
+        return QB_TRANSPORT_ERROR;
+    }
 
     decoded = qb_base64_decode(payload, (unsigned char *)text, text_size - 1);
-    if(decoded >= text_size) decoded = text_size - 1;
-    text[decoded] = '\0';
+    if(decoded == 0 && payload[0]) {
+        snprintf(text, text_size, "Could not decode answer frame");
+        active_request_id = 0;
+        expected_seq = 0;
+        return QB_TRANSPORT_ERROR;
+    }
 
-    return done_text[0] == '1' ? QB_TRANSPORT_DONE : QB_TRANSPORT_CHUNK;
+    text[decoded] = '\0';
+    expected_seq++;
+
+    if(done_text[0] == '1') {
+        active_request_id = 0;
+        expected_seq = 0;
+        return QB_TRANSPORT_DONE;
+    }
+
+    return QB_TRANSPORT_CHUNK;
 }
