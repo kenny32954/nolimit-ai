@@ -365,6 +365,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="leftTools">
 <button class="tool" id="attach">＋</button>
 <button class="tool" id="promptLibBtn" title="Prompt library">★</button>
+<button class="tool" id="promptHistoryBtn" title="Recent prompts">↺</button>
 <button class="tool" id="improvePromptBtn" title="Improve prompt with AI">✧</button>
 <input id="files" type="file" hidden multiple accept="image/*,application/pdf,audio/*,.txt,.md,.json,.csv,.js,.html,.css,.py,.java,.cpp,.c,.ts,.tsx,.jsx,.xml,.yaml,.yml">
 <button class="tool" id="micBtn" title="Record and transcribe">●</button>
@@ -571,6 +572,14 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div id="findResults" class="searchresults"></div>
 </section>
 
+<section class="modal" id="promptHistoryModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Recent prompts</h2>
+<div class="field"><input id="promptHistorySearch" placeholder="Search recently sent prompts"></div>
+<div id="promptHistoryList" class="promptlist"></div>
+<div class="smallnote">Tip: Alt+↑ and Alt+↓ cycle through prompt history in the composer.</div>
+</section>
+
 <section class="modal" id="promptsModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Prompt library</h2>
@@ -772,6 +781,7 @@ var PROMPT_STORE="nolimit_prompts_v1";
 var PROFILE_STORE="quantum_breaks_profiles_v1";
 var MEDIA_DB="quantum_breaks_media_v1";
 var MODEL_CACHE="quantum_breaks_model_cache_v1";
+var PROMPT_HISTORY_STORE="quantum_breaks_prompt_history_v1";
 
 function safeJSON(v,f){try{return JSON.parse(v)||f}catch(e){return f}}
 var chats=safeJSON(localStorage.getItem(STORE),[]);chats.forEach(function(ch){(ch.messages||[]).forEach(function(m){if(m.reviewing)m.reviewing=false})});
@@ -820,6 +830,8 @@ var active=localStorage.getItem(ACTIVE)||"";
 var projects=safeJSON(localStorage.getItem(PROJECT_STORE),[]);
 var savedPrompts=safeJSON(localStorage.getItem(PROMPT_STORE),[]);
 var profiles=safeJSON(localStorage.getItem(PROFILE_STORE),[]);
+var promptHistory=safeJSON(localStorage.getItem(PROMPT_HISTORY_STORE),[]);
+var promptHistoryIndex=-1;
 var pending=[];
 var models=[];
 var imageModels=[];
@@ -2031,6 +2043,7 @@ async function send(){
   if(!navigator.onLine){saveDraftSoon();toast("You are offline — your draft is saved locally");return}
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
   var files=pending.slice();if(!await preflightSend(files))return;
+  if(text)rememberSentPrompt(text);
   var c=ensure();pending=[];q("#prompt").value="";c.draft="";c.draftFiles=[];
   var aud=files.filter(function(f){return f.kind==="audio"});
   for(var ai=0;ai<aud.length;ai++){try{toast("Transcribing "+aud[ai].name+"…");var tr=await transcribe(aud[ai].file);text+=(text?"\n\n":"")+"[Audio transcript: "+aud[ai].name+"]\n"+tr}catch(e){toast(e.message)}}
@@ -3067,6 +3080,35 @@ function emptyTrash(){
 }
 
 
+function savePromptHistory(){try{localStorage.setItem(PROMPT_HISTORY_STORE,JSON.stringify(promptHistory.slice(0,60)))}catch(e){}}
+function rememberSentPrompt(text){
+  text=String(text||"").trim();if(!text)return;
+  promptHistory=promptHistory.filter(function(x){return x&&x.text!==text});
+  promptHistory.unshift({text:text,time:Date.now()});promptHistory=promptHistory.slice(0,60);promptHistoryIndex=-1;savePromptHistory()
+}
+function renderPromptHistory(){
+  var term=(q("#promptHistorySearch").value||"").toLowerCase(),box=q("#promptHistoryList");box.innerHTML="";
+  var list=promptHistory.filter(function(x){return x&&x.text&&(!term||x.text.toLowerCase().includes(term))});
+  if(!list.length){box.innerHTML='<div class="notice">No matching prompt history yet.</div>';return}
+  list.forEach(function(item){
+    var card=document.createElement("div");card.className="promptcard";
+    var info=document.createElement("div"),h=document.createElement("h3"),p=document.createElement("p");
+    h.textContent=new Date(item.time||Date.now()).toLocaleString();p.textContent=item.text;info.appendChild(h);info.appendChild(p);
+    var actions=document.createElement("div");actions.className="promptactions";
+    var use=document.createElement("button");use.textContent="Use";use.onclick=function(){q("#prompt").value=item.text;closeModals();resizePrompt();saveDraftSoon();q("#prompt").focus()};
+    var save=document.createElement("button");save.textContent="Save";save.onclick=function(){editingPromptId="";q("#promptName").value=item.text.slice(0,40);q("#promptBody").value=item.text;openModal("#promptsModal");renderPromptLibrary()};
+    var del=document.createElement("button");del.textContent="Delete";del.onclick=function(){promptHistory=promptHistory.filter(function(x){return x!==item});savePromptHistory();renderPromptHistory()};
+    actions.appendChild(use);actions.appendChild(save);actions.appendChild(del);card.appendChild(info);card.appendChild(actions);box.appendChild(card)
+  })
+}
+function openPromptHistory(){q("#promptHistorySearch").value="";renderPromptHistory();openModal("#promptHistoryModal");setTimeout(function(){q("#promptHistorySearch").focus()},30)}
+function cyclePromptHistory(direction){
+  if(!promptHistory.length)return;
+  if(direction<0)promptHistoryIndex=Math.min(promptHistory.length-1,promptHistoryIndex+1);
+  else promptHistoryIndex=Math.max(-1,promptHistoryIndex-1);
+  q("#prompt").value=promptHistoryIndex<0?"":promptHistory[promptHistoryIndex].text;resizePrompt();saveDraftSoon()
+}
+
 var editingPromptId="";
 function openPromptLibrary(){
   editingPromptId="";q("#promptName").value="";q("#promptBody").value="";q("#promptSearch").value="";
@@ -3264,6 +3306,8 @@ q("#attach").onclick=function(){q("#files").click()};
 q("#files").onchange=function(e){addFiles(Array.prototype.slice.call(e.target.files));e.target.value=""};
 q("#send").onclick=send;
 q("#prompt").onkeydown=function(e){
+  if(e.altKey&&e.key==="ArrowUp"){e.preventDefault();cyclePromptHistory(-1);return}
+  if(e.altKey&&e.key==="ArrowDown"){e.preventDefault();cyclePromptHistory(1);return}
   var slashOpen=q("#slashMenu").classList.contains("show"),items=qa("#slashMenu .slashOption");
   if(slashOpen&&items.length){
     if(e.key==="ArrowDown"){e.preventDefault();setSlashActive(slashActiveIndex+1);return}
@@ -3290,6 +3334,7 @@ q("#usageSide").onclick=openUsage;
 q("#analyticsSide").onclick=openAnalytics;
 q("#projectsSide").onclick=openProjects;
 q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
+q("#promptHistoryBtn").onclick=openPromptHistory;
 q("#improvePromptBtn").onclick=improvePrompt;
 q("#scratchpadSide").onclick=openScratchpad;
 q("#snapshotsSide").onclick=openSnapshots;
@@ -3376,6 +3421,7 @@ q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
 q("#globalSearchInput").oninput=globalSearch;
 q("#findInput").oninput=function(){renderFindResults(false)};
+q("#promptHistorySearch").oninput=renderPromptHistory;
 q("#promptSearch").oninput=renderPromptLibrary;
 q("#savePrompt").onclick=savePromptEntry;
 q("#newPrompt").onclick=newPromptEntry;
