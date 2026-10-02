@@ -3,7 +3,7 @@
 # Conservative built-ins only for calculator compatibility.
 
 WIDTH = 21
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 history = []
 subject = "auto"
@@ -11,21 +11,38 @@ mode = "explain"
 level = "auto"
 
 SUBJECTS = (
-    "auto", "math", "algebra", "geometry", "statistics", "calculus",
+    "auto",
+    "pre_algebra", "algebra_1", "geometry", "algebra_2", "trigonometry",
+    "precalculus", "statistics", "calculus", "consumer_math", "financial_math",
     "linear_algebra", "discrete_math", "differential_equations",
     "number_theory", "real_analysis", "abstract_algebra",
-    "biology", "genetics", "microbiology", "anatomy_physiology",
-    "chemistry", "organic_chemistry", "biochemistry",
-    "physics", "thermodynamics", "circuits",
-    "earth", "environmental_science",
-    "ela", "literature", "writing",
-    "history", "social_studies", "geography", "government", "political_science",
-    "economics", "finance", "business", "accounting",
-    "computer_science", "data_structures", "algorithms", "databases",
-    "computer_architecture", "engineering", "statics_dynamics",
-    "materials_science", "cte", "agriculture",
-    "psychology", "research_methods", "sociology", "philosophy_logic",
-    "art", "music", "media", "language", "health", "physical_education"
+    "physical_science", "biology", "genetics", "microbiology",
+    "anatomy_physiology", "chemistry", "organic_chemistry", "biochemistry",
+    "physics", "thermodynamics", "circuits", "earth", "astronomy",
+    "environmental_science", "forensic_science", "marine_science",
+    "ela", "composition", "american_literature", "british_literature",
+    "world_literature", "literature", "creative_writing", "journalism",
+    "speech_debate", "media_literacy",
+    "history", "world_history", "us_history", "european_history",
+    "social_studies", "geography", "government", "civics", "political_science",
+    "economics", "personal_finance", "finance", "psychology", "sociology",
+    "anthropology", "research_methods", "philosophy_logic",
+    "business", "marketing", "entrepreneurship", "accounting", "business_law",
+    "computer_science", "web_development", "data_structures", "algorithms",
+    "databases", "computer_architecture", "cybersecurity",
+    "information_technology", "engineering", "robotics", "electronics",
+    "cad_drafting", "statics_dynamics", "materials_science",
+    "cte", "career_readiness", "agriculture", "animal_science", "plant_science",
+    "construction_trades", "automotive_technology", "culinary_arts",
+    "family_consumer_science", "child_development",
+    "art", "drawing_painting", "graphic_design", "photography",
+    "ceramics_sculpture", "art_history",
+    "music", "music_theory", "band_orchestra", "choir", "theater", "dance",
+    "media", "film_studies",
+    "language", "spanish", "french", "german", "latin", "asl",
+    "health", "nutrition", "physical_education", "sports_medicine",
+    "exercise_science", "drivers_education", "jrotc_leadership",
+    "yearbook", "study_skills"
 )
 
 MODES = (
