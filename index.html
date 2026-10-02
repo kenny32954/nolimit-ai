@@ -252,6 +252,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .composer,.toolstrip,.pending,.foot{max-width:var(--content-max,860px)!important}.md{font-size:var(--chat-font,17px)!important}.ub{font-size:calc(var(--chat-font,17px) - 1px)}
 @media(min-width:900px){.chat{padding-left:max(50px,calc((100vw - 300px - var(--content-max,860px))/2))!important;padding-right:max(50px,calc((100vw - 300px - var(--content-max,860px))/2))!important}}
 
+
+.artifactSource{margin-top:10px;border:1px solid rgba(255,255,255,.065);border-radius:12px;background:rgba(255,255,255,.02);overflow:hidden}.artifactSource summary{padding:10px 12px;cursor:pointer;color:#aaa;font-size:12px}.artifactSource textarea{display:block;width:100%;min-height:220px;max-height:38vh;resize:vertical;border:0;border-top:1px solid rgba(255,255,255,.05);outline:0;background:#0c0c0e;color:#ddd;padding:12px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+
 </style>
 </head>
 <body>
@@ -569,9 +572,10 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <section class="modal" id="artifactModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Artifact preview</h2>
-<div class="notice">Runs only inside a sandboxed iframe in your browser.</div>
-<iframe id="artifactFrame" sandbox="allow-scripts" style="width:100%;height:58vh;border:1px solid #3b3935;border-radius:12px;background:white"></iframe>
-<div class="row" style="margin-top:10px"><button class="secondary" id="artifactOpen">Open in new tab</button><button class="secondary" id="artifactCopy">Copy HTML</button></div>
+<div class="notice">Runs only inside a sandboxed iframe in your browser. You can edit the source and rerun the preview without leaving Quantum Breaks AI.</div>
+<iframe id="artifactFrame" sandbox="allow-scripts" style="width:100%;height:46vh;border:1px solid #3b3935;border-radius:12px;background:white"></iframe>
+<details class="artifactSource"><summary>Edit source</summary><textarea id="artifactEditor" spellcheck="false"></textarea></details>
+<div class="row" style="margin-top:10px"><button class="primary" id="artifactRun">Run preview</button><button class="secondary" id="artifactOpen">Open in new tab</button><button class="secondary" id="artifactCopy">Copy HTML</button><button class="secondary" id="artifactDownload">Download HTML</button></div>
 </section>
 
 <section class="modal" id="transcribeModal">
@@ -1108,6 +1112,7 @@ function renderChat(){
   qa(".codepreview").forEach(function(b){b.onclick=function(){
     artifactCode=decodeURIComponent(b.getAttribute("data-code")||"");
     q("#artifactFrame").srcdoc=artifactCode;
+    q("#artifactEditor").value=artifactCode;
     openModal("#artifactModal")
   }});
   qa(".codedownload").forEach(function(b){b.onclick=function(){downloadCode(decodeURIComponent(b.getAttribute("data-code")||""),decodeURIComponent(b.getAttribute("data-lang")||""))}});
@@ -2644,9 +2649,11 @@ q("#insertScratchpad").onclick=insertScratchpad;
 q("#clearScratchpad").onclick=clearScratchpad;
 q("#micBtn").onclick=toggleMic;
 q("#clearRunner").onclick=function(){q("#runnerOutput").textContent=""};
-q("#artifactCopy").onclick=function(){if(!artifactCode)return;navigator.clipboard.writeText(artifactCode).then(function(){toast("Artifact HTML copied")})};
+q("#artifactRun").onclick=function(){artifactCode=q("#artifactEditor").value;q("#artifactFrame").srcdoc=artifactCode;toast("Preview refreshed")};
+q("#artifactDownload").onclick=function(){artifactCode=q("#artifactEditor").value;downloadCode(artifactCode,"html")};
+q("#artifactCopy").onclick=function(){artifactCode=q("#artifactEditor").value;if(!artifactCode)return;navigator.clipboard.writeText(artifactCode).then(function(){toast("Artifact HTML copied")})};
 q("#artifactOpen").onclick=function(){
-  if(!artifactCode)return;
+  artifactCode=q("#artifactEditor").value;if(!artifactCode)return;
   var url="data:text/html;charset=utf-8,"+encodeURIComponent(artifactCode);
   window.open(url,"_blank","noopener")
 };
