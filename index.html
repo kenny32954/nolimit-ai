@@ -761,6 +761,7 @@ function apiMessages(c){
   var history=c.messages||[],limit=Math.max(0,Number(settings.historyLimit)||0);
   if(limit>0&&history.length>limit)history=history.slice(-limit);
   history.forEach(function(m){
+    if(m.error)return;
     if(m.role==="assistant"){
       var a={role:"assistant",content:m.content||""};if(m.reasoning_details)a.reasoning_details=m.reasoning_details;if(m.annotations)a.annotations=m.annotations;out.push(a)
     }else out.push({role:"user",content:contentFor(m)})
@@ -807,7 +808,7 @@ async function fetchChatWithFallback(body,headers,signal){
     var raw=await r.text();
     if(r.status!==400&&r.status!==422)throw new Error(errorRaw(raw,"HTTP "+r.status));
     var simpler=Object.assign({},body);
-    delete simpler.reasoning;delete simpler.tools;delete simpler.provider;delete simpler.session_id;
+    delete simpler.reasoning;delete simpler.tools;delete simpler.provider;delete simpler.session_id;delete simpler.response_format;delete simpler.max_tokens;delete simpler.plugins;delete simpler.usage;
     if(simpler.models){delete simpler.models;simpler.model=settings.model}
     if(simpler.plugins&&simpler.plugins.length===0)delete simpler.plugins;
     toast("Retrying with compatibility mode…");
@@ -826,7 +827,7 @@ function localAssistant(text){
 
 function handleCommand(text){
   if(!text||text.charAt(0)!=="/")return false;
-  var cmd=text.split(/s+/)[0].toLowerCase();
+  var cmd=text.split(/\s+/)[0].toLowerCase();
   if(cmd==="/new"){q("#prompt").value="";newChat();return true}
   if(cmd==="/models"){q("#prompt").value="";loadModels();return true}
   if(cmd==="/usage"){q("#prompt").value="";openUsage();return true}
@@ -856,9 +857,10 @@ async function send(){
   for(var ai=0;ai<aud.length;ai++){try{toast("Transcribing "+aud[ai].name+"…");var tr=await transcribe(aud[ai].file);text+=(text?"\n\n":"")+"[Audio transcript: "+aud[ai].name+"]\n"+tr}catch(e){toast(e.message)}}
   var m={role:"user",content:text||"Please analyze the attached file.",fileNames:files.map(function(x){return x.name}),images:files.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),pdfs:files.filter(function(x){return x.kind==="pdf"}).map(function(x){return{name:x.name,data:x.data}}),textFiles:files.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
   c.messages.push(m);if(c.title==="New chat")c.title=(text||(files[0]&&files[0].name)||"New chat").replace(/\s+/g," ").slice(0,48);c.updated=Date.now();
-  var a={role:"assistant",content:"",model:settings.model};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";render();
+  var requestMessages=apiMessages(c);
+  var a={role:"assistant",content:"",model:settings.model};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";q("#send").classList.add("busy");render();
   try{
-    var body={model:settings.model,messages:apiMessages(c).slice(0,-1),temperature:Number(settings.temperature),stream:true,usage:{include:true},session_id:"nolimit-"+c.id};
+    var body={model:settings.model,messages:requestMessages,temperature:Number(settings.temperature),stream:true,usage:{include:true},session_id:"nolimit-"+c.id};
     if(settings.fallbackModel){body.models=[settings.model,settings.fallbackModel];delete body.model}
     if(settings.providerRouting&&settings.providerRouting!=="balanced")body.provider={sort:settings.providerRouting};
     if(settings.denyDataCollection){body.provider=body.provider||{};body.provider.data_collection="deny"}
@@ -882,11 +884,11 @@ async function send(){
     }
     save()
   }catch(e){
-    if(e.name!=="AbortError")a.content="Request failed: "+e.message;
+    if(e.name!=="AbortError"){a.content="Request failed: "+e.message;a.error=true}
     if(e.name==="AbortError"&&!a.content)c.messages.pop();
     save()
   }finally{
-    busy=false;controller=null;q("#send").textContent="↑";render();if(settings.autoSpeak&&a.content)speak(a.content)
+    busy=false;controller=null;q("#send").textContent="↑";q("#send").classList.remove("busy");render();if(settings.autoSpeak&&a.content&&!a.error)speak(a.content)
   }
 }
 
@@ -1466,8 +1468,9 @@ q("#attach").onclick=function(){q("#files").click()};
 q("#files").onchange=function(e){addFiles(Array.prototype.slice.call(e.target.files));e.target.value=""};
 q("#send").onclick=send;
 q("#prompt").onkeydown=function(e){
-  if(e.key==="Enter"&&!e.shiftKey&&innerWidth>700){e.preventDefault();send()}
-  if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();send()}
+  if(e.key!=="Enter")return;
+  if(e.ctrlKey||e.metaKey){e.preventDefault();send();return}
+  if(!e.shiftKey&&innerWidth>700){e.preventDefault();send()}
 };
 q("#topAuth").onclick=q("#sideAuth").onclick=q("#settingsBtn").onclick=openSettings;
 q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
