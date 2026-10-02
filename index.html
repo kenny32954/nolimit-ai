@@ -330,6 +330,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 }
 .recoverywarn{margin:10px 0;padding:9px 11px;border-radius:11px;border:1px solid rgba(232,137,137,.18);background:rgba(232,137,137,.055);color:#dba1a1;font-size:11px;line-height:1.45}
 .perfbit{color:#77737b}
+.autoContinueMarker{max-width:var(--content-max,860px);margin:0 auto 18px;color:#66636b;font-size:10px;letter-spacing:.04em;text-transform:uppercase;display:flex;align-items:center;gap:8px}.autoContinueMarker:before,.autoContinueMarker:after{content:"";height:1px;background:rgba(255,255,255,.055);flex:1}
 </style>
 </head>
 <body>
@@ -400,6 +401,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="toggle" id="webToggle">⌕ Web</button>
 <button class="toggle" id="fetchToggle">↗ Read pages</button>
 <button class="toggle" id="freshToggle" title="Force a fresh uncached response once">↻ Fresh</button>
+<button class="toggle" id="autoContinueToggle" title="Automatically continue replies that hit the model output limit">∞ Auto-continue</button>
 <button class="toggle" id="imageToolToggle">▣ Image tool</button>
 <button class="toggle" id="agentToggle">◇ Agent</button>
 <button class="toggle" id="advisorToggle">✦ Advisor</button>
@@ -474,7 +476,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="notice" id="whatsNewVersion"></div>
 <div class="changelog">
 <h3>AI quality</h3>
-<ul><li>Per-chat model locks, chat-specific instructions, reasoning and temperature overrides now work alongside project and global defaults.</li><li>Strict JSON Schema output, second-pass AI review, review-driven revision, comparison synthesis, and automatic long-chat summarization remain available.</li><li>Model selection can now learn from your own local 👍/👎 ratings and pick the best-rated compatible model.</li></ul>
+<ul><li>Optional Auto-Continue can carry responses through output-limit stops without repeated clicks, with a configurable hard cap to prevent runaway continuation.</li><li>Auto-Continue finishes before queued follow-up prompts run, so long answers stay in order.</li><li>Per-chat model locks, strict JSON Schema output, second-pass AI review, comparison synthesis, automatic long-chat summarization, and locally learned model helpfulness remain available.</li></ul>
 <h3>Reliability</h3>
 <ul><li>Interrupted streams now preserve any answer text already received instead of replacing useful partial output with an error message.</li><li>Failed, cancelled, or stalled replies expose clearer recovery state and one-click retry/continue controls.</li><li>Transient 429/502/503/504 API failures use bounded retries with Retry-After support, while the network-stall watchdog still prevents indefinite hangs.</li><li>Per-request and daily tracked-spend warnings help catch unexpectedly expensive calls before sending.</li></ul>
 <h3>Workspace</h3>
@@ -552,6 +554,10 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field"><label>JSON Schema name</label><input id="jsonSchemaName" maxlength="60" placeholder="structured_response"></div>
 <div class="field"><label>JSON Schema</label><textarea id="jsonSchemaText" spellcheck="false" placeholder='{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"],"additionalProperties":false}'></textarea><div class="row" style="margin-top:7px"><button class="secondary" id="schemaExampleBtn" type="button">Load example schema</button></div><div class="smallnote">Used only when Response format is Strict JSON Schema.</div></div>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="autoCompressContext" type="checkbox"> Automatically summarize older context before it must be trimmed <span class="smallnote">(may use an extra model call)</span></label>
+<div class="row">
+<label style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px"><input id="autoContinue" type="checkbox"> Automatically continue replies that hit the output limit</label>
+<div class="field" style="min-width:170px;flex:1"><label>Auto-continue cap</label><input id="autoContinueLimit" type="number" min="1" max="6" step="1"><div class="smallnote">Maximum extra continuation turns for one long answer.</div></div>
+</div>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="requireParameters" type="checkbox"> Require providers that support requested parameters</label>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="denyDataCollection" type="checkbox"> Prefer providers that deny data collection</label>
 <div class="row">
@@ -956,7 +962,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="2.8.0";
+var APP_VERSION="2.9.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -995,6 +1001,8 @@ var settings=Object.assign({
   dailySpendBudget:0,
   historyLimit:0,
   autoCompressContext:false,
+  autoContinue:false,
+  autoContinueLimit:2,
   summaryModel:"openrouter/auto",
   recentModels:[],
   favoriteModels:[],
@@ -1064,6 +1072,7 @@ var lastMutationUndo=null;
 var saveWarned=false;
 var cachedContextChatId="";
 var cachedContextTokens=0;
+var autoContinuePendingCount=0;
 function scheduleRender(){
   if(!renderTimer)renderTimer=setTimeout(function(){renderTimer=null;render()},40);
   if(!streamSaveTimer)streamSaveTimer=setTimeout(function(){streamSaveTimer=null;save()},900)
@@ -1342,6 +1351,7 @@ function render(){
   q("#sideAuth").textContent=isConnected()?"OpenRouter connected":"Connect OpenRouter";
   q("#webToggle").classList.toggle("on",!!settings.web);
   q("#fetchToggle").classList.toggle("on",!!settings.fetch);
+  q("#autoContinueToggle").classList.toggle("on",!!settings.autoContinue);
   q("#imageToolToggle").classList.toggle("on",!!settings.imageTool);
   q("#agentToggle").classList.toggle("on",!!settings.agent);
   q("#advisorToggle").classList.toggle("on",!!settings.advisor);
@@ -1464,6 +1474,7 @@ function renderChat(){
   }else{
     c.messages.forEach(function(m,idx){
       if(m.role==="user"){
+        if(m.autoContinuation){var marker=document.createElement("div");marker.className="autoContinueMarker";marker.textContent="Auto-continued part "+String(m.autoContinueCount||1);box.appendChild(marker);return}
         var w=document.createElement("div");w.className="user";w.dataset.msgIndex=idx;var b=document.createElement("div");b.className="ub";b.textContent=m.content||"";renderFiles(b,m.fileNames,m.images,m.pdfs,m.textFiles);
         var ua=document.createElement("div");ua.className="msgtools";ua.style.justifyContent="flex-end";
         var ed=document.createElement("button");ed.textContent="Edit";ed.onclick=function(){editUserMessage(idx)};
@@ -2147,6 +2158,8 @@ function openSettings(){
   q("#dailySpendBudget").value=settings.dailySpendBudget||0;
   q("#historyLimit").value=settings.historyLimit||0;
   q("#autoCompressContext").checked=!!settings.autoCompressContext;
+  q("#autoContinue").checked=!!settings.autoContinue;
+  q("#autoContinueLimit").value=Math.max(1,Math.min(6,Number(settings.autoContinueLimit)||2));
   q("#summaryModel").value=settings.summaryModel||"openrouter/auto";
   q("#denyDataCollection").checked=!!settings.denyDataCollection;
   q("#cacheEnabled").checked=!!settings.cache;
@@ -2403,6 +2416,7 @@ var SLASH_COMMANDS=[
   ["/history","Open recently sent prompts"],
   ["/memory","Suggest safe local memory from this chat"],
   ["/snapshot","Open snapshots"],
+  ["/autocontinue","Toggle automatic output continuation"],
   ["/mode ","Set balanced, fast, deep, or research mode"],
   ["/help","Show all commands"]
 ];
@@ -2458,6 +2472,7 @@ function handleCommand(text){
   if(cmd==="/history"){q("#prompt").value="";openPromptHistory();return true}
   if(cmd==="/memory"){q("#prompt").value="";suggestMemoryFromChat();return true}
   if(cmd==="/snapshot"){q("#prompt").value="";openSnapshots();return true}
+  if(cmd==="/autocontinue"){q("#prompt").value="";settings.autoContinue=!settings.autoContinue;save();render();toast(settings.autoContinue?"Auto-continue enabled":"Auto-continue disabled");return true}
   if(cmd==="/mode"){
     var mode=(text.split(/\s+/)[1]||"").toLowerCase();
     q("#prompt").value="";
@@ -2466,7 +2481,7 @@ function handleCommand(text){
   }
   if(cmd==="/help"){
     q("#prompt").value="";
-    localAssistant("Available local commands:\n\n/new — new chat\n/models — choose model\n/usage — API key usage\n/compare — compare models\n/image — image generation\n/video — video generation\n/research — toggle research mode\n/web — toggle web search\n/agent — toggle subagent mode\n/advisor — toggle advisor mode\n/review — toggle second-pass review\n/focus — toggle focus mode\n/search — search the workspace\n/project — open projects\n/prompts — open prompt library\n/history — recent sent prompts\n/memory — suggest safe local memory from this chat\n/snapshot — open conversation snapshots\n/mode fast|balanced|deep|research — switch workflow mode\n\nKeyboard: Ctrl/Cmd+Enter sends, Ctrl/Cmd+K opens models, Ctrl/Cmd+P opens commands, Ctrl/Cmd+Shift+F searches everything, Escape closes dialogs.");
+    localAssistant("Available local commands:\n\n/new — new chat\n/models — choose model\n/usage — API key usage\n/compare — compare models\n/image — image generation\n/video — video generation\n/research — toggle research mode\n/web — toggle web search\n/agent — toggle subagent mode\n/advisor — toggle advisor mode\n/review — toggle second-pass review\n/focus — toggle focus mode\n/search — search the workspace\n/project — open projects\n/prompts — open prompt library\n/history — recent sent prompts\n/memory — suggest safe local memory from this chat\n/snapshot — open conversation snapshots\n/autocontinue — toggle automatic output continuation\n/mode fast|balanced|deep|research — switch workflow mode\n\nKeyboard: Ctrl/Cmd+Enter sends, Ctrl/Cmd+K opens models, Ctrl/Cmd+P opens commands, Ctrl/Cmd+Shift+F searches everything, Escape closes dialogs.");
     return true
   }
   toast("Unknown command. Type /help");
@@ -2689,6 +2704,8 @@ async function send(){
   var aud=files.filter(function(f){return f.kind==="audio"});
   for(var ai=0;ai<aud.length;ai++){try{toast("Transcribing "+aud[ai].name+"…");var tr=await transcribe(aud[ai].file);text+=(text?"\n\n":"")+"[Audio transcript: "+aud[ai].name+"]\n"+tr}catch(e){toast(e.message)}}
   var m={role:"user",created:Date.now(),content:text||"Please analyze the attached file.",fileNames:files.map(function(x){return x.name}),images:files.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),imageRefs:files.filter(function(x){return x.kind==="image"&&x.mediaId}).map(function(x){return{name:x.name,mediaId:x.mediaId}}),pdfs:files.filter(function(x){return x.kind==="pdf"}).map(function(x){return{name:x.name,data:x.data,mediaId:x.mediaId||""}}),textFiles:files.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
+  if(autoContinuePendingCount>0){m.autoContinuation=true;m.autoContinueCount=autoContinuePendingCount}
+  autoContinuePendingCount=0;
   c.messages.push(m);if(c.title==="New chat")c.title=(text||(files[0]&&files[0].name)||"New chat").replace(/\s+/g," ").slice(0,48);c.updated=Date.now();
   await hydrateChatMedia(c);
   var requestModel=effectiveModel(c),fit=fitRequestMessages(apiMessages(c),requestModel);
@@ -2710,7 +2727,7 @@ async function send(){
   }
   var requestMessages=fit.messages;
   var requestSucceeded=false,requestAborted=false;
-  var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:requestModel,contextTrimmed:fit.trimmed||0};c.messages.push(a);save();busy=true;busyChatId=c.id;controller=new AbortController();render();
+  var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:requestModel,contextTrimmed:fit.trimmed||0,autoContinueCount:Number(m.autoContinueCount)||0};c.messages.push(a);save();busy=true;busyChatId=c.id;controller=new AbortController();render();
   var stallTimer=null,stalled=false,stallSeconds=Math.max(0,Number(settings.stallTimeoutSec)||0);
   function resetStallTimer(){
     if(stallTimer)clearTimeout(stallTimer);
@@ -2781,10 +2798,16 @@ async function send(){
     save()
   }finally{
     if(stallTimer)clearTimeout(stallTimer);
-    busy=false;busyChatId="";controller=null;render();if(settings.autoSpeak&&a.content&&!a.error)speak(a.content);
-    if(a.content&&!a.error)notifyCompletedReply(c,a);
-    if(settings.review&&a.content&&!a.error)reviewAnswer(c,m.content,a);
-    if(requestSucceeded&&!requestAborted&&!c.queuePaused&&Array.isArray(c.queuedPrompts)&&c.queuedPrompts.length){
+    busy=false;busyChatId="";controller=null;render();
+    var autoLimit=Math.max(1,Math.min(6,Number(settings.autoContinueLimit)||2));
+    var willAutoContinue=!!(requestSucceeded&&!requestAborted&&!a.error&&settings.autoContinue&&(a.finishReason==="length"||a.finishReason==="max_tokens")&&(Number(a.autoContinueCount)||0)<autoLimit);
+    if(settings.autoSpeak&&a.content&&!a.error&&!willAutoContinue)speak(a.content);
+    if(a.content&&!a.error&&!willAutoContinue)notifyCompletedReply(c,a);
+    if(settings.review&&a.content&&!a.error&&!willAutoContinue)reviewAnswer(c,m.content,a);
+    if(willAutoContinue){
+      var autoIdx=c.messages.indexOf(a);toast("Output limit reached — auto-continuing "+((Number(a.autoContinueCount)||0)+1)+"/"+autoLimit+"…");
+      setTimeout(function(){if(!busy&&current()&&current().id===c.id)continueResponse(autoIdx,true)},320)
+    }else if(requestSucceeded&&!requestAborted&&!c.queuePaused&&Array.isArray(c.queuedPrompts)&&c.queuedPrompts.length){
       setTimeout(function(){runNextQueued(c)},260)
     }
   }
@@ -2831,8 +2854,9 @@ async function undoLastMutation(){
   save();await hydrateChatMedia(c);render();restoreDraft();toast("Restored "+u.label)
 }
 
-function continueResponse(idx){
+function continueResponse(idx,auto){
   if(busy)return;var c=ensure(),m=c.messages[idx];if(!m||m.role!=="assistant")return;
+  autoContinuePendingCount=auto?Math.max(1,(Number(m.autoContinueCount)||0)+1):0;
   q("#prompt").value="Continue exactly where you left off. Do not repeat earlier content.";resizePrompt();send()
 }
 
@@ -4215,6 +4239,8 @@ function profileSnapshot(){
     maxTokens:settings.maxTokens,
     historyLimit:settings.historyLimit,
     autoCompressContext:settings.autoCompressContext,
+    autoContinue:settings.autoContinue,
+    autoContinueLimit:settings.autoContinueLimit,
     summaryModel:settings.summaryModel,
     providerRouting:settings.providerRouting,
     denyDataCollection:settings.denyDataCollection,
@@ -4500,6 +4526,7 @@ q("#modeBtn").onclick=cycleMode;
 q("#webToggle").onclick=function(){settings.web=!settings.web;save();render()};
 q("#fetchToggle").onclick=function(){settings.fetch=!settings.fetch;save();render()};
 q("#freshToggle").onclick=function(){settings.cacheClearNext=true;save();toast(settings.cache?"Next request will bypass the response cache":"Fresh flag armed; enable response caching if you want cache refresh behavior")};
+q("#autoContinueToggle").onclick=function(){settings.autoContinue=!settings.autoContinue;save();render();toast(settings.autoContinue?"Auto-continue enabled":"Auto-continue disabled")};
 q("#imageToolToggle").onclick=function(){settings.imageTool=!settings.imageTool;save();render()};
 q("#agentToggle").onclick=function(){settings.agent=!settings.agent;save();render();toast(settings.agent?"Agent subcalls enabled":"Agent subcalls disabled")};
 q("#advisorToggle").onclick=function(){settings.advisor=!settings.advisor;save();render();toast(settings.advisor?"Advisor enabled — the model can consult a stronger model":"Advisor disabled")};
@@ -4527,7 +4554,7 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.costWarnThreshold=Math.max(0,Number(q("#costWarnThreshold").value)||0);settings.dailySpendBudget=Math.max(0,Number(q("#dailySpendBudget").value)||0);settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.autoCompressContext=q("#autoCompressContext").checked;settings.summaryModel=q("#summaryModel").value.trim()||"openrouter/auto";settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.stallTimeoutSec=Math.max(0,Math.min(1800,Number(q("#stallTimeoutSec").value)||0));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;settings.backgroundNotify=q("#backgroundNotify").checked;save();closeModals();render();toast("Settings saved")
+  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.reviewModel=q("#reviewModel").value.trim()||"openrouter/auto";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.costWarnThreshold=Math.max(0,Number(q("#costWarnThreshold").value)||0);settings.dailySpendBudget=Math.max(0,Number(q("#dailySpendBudget").value)||0);settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.autoCompressContext=q("#autoCompressContext").checked;settings.autoContinue=q("#autoContinue").checked;settings.autoContinueLimit=Math.max(1,Math.min(6,Math.floor(Number(q("#autoContinueLimit").value)||2)));settings.summaryModel=q("#summaryModel").value.trim()||"openrouter/auto";settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.stallTimeoutSec=Math.max(0,Math.min(1800,Number(q("#stallTimeoutSec").value)||0));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;settings.backgroundNotify=q("#backgroundNotify").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#commandSearch").oninput=function(){commandActiveIndex=0;renderCommandPalette()};
 q("#commandSearch").onkeydown=function(e){
