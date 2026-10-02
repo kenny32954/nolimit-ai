@@ -474,6 +474,9 @@ var settings=Object.assign({
   maxTokens:0,
   historyLimit:0,
   recentModels:[],
+  theme:"dark",
+  accent:"coral",
+  density:"cozy",
   denyDataCollection:false,
   fusion:false,
   cache:false,
@@ -504,13 +507,18 @@ function uid(){return Math.random().toString(36).slice(2)+Date.now().toString(36
 function getKey(){return localStorage.getItem(KEYSTORE)||""}
 function isConnected(){return !!getKey()}
 function save(){var light=chats.filter(function(c){return !c.temporary}).map(function(c){return Object.assign({},c,{messages:(c.messages||[]).map(function(m){var x=Object.assign({},m);if(x.role==="user"){if(x.images&&x.images.length)x.images=[];if(x.pdfs&&x.pdfs.length)x.pdfs=[];if(x.textFiles&&x.textFiles.length)x.textFiles=x.textFiles.map(function(f){return{name:f.name,text:(f.text||"").slice(0,120000)}})}if(x.images)x.images=x.images.filter(function(src){return typeof src==="string"&&src.indexOf("data:")!==0});return x})})});try{localStorage.setItem(STORE,JSON.stringify(light));localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));localStorage.setItem(ACTIVE,active)}catch(e){try{localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));localStorage.setItem(ACTIVE,active)}catch(_){}}}
+function applyAppearance(){
+  document.documentElement.dataset.theme=settings.theme||"dark";
+  document.documentElement.dataset.accent=settings.accent||"coral";
+  document.documentElement.dataset.density=settings.density||"cozy";
+}
 function current(){return chats.find(function(c){return c.id===active})}
 function projectForChat(c){return c&&c.projectId?projects.find(function(p){return p.id===c.projectId}):null}
 function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save()}return c}
 function closeSide(){q("#side").classList.remove("open");q("#shade").classList.remove("show")}
 function openModal(id){q("#modalShade").classList.add("show");q(id).classList.add("show")}
 function closeModals(){q("#modalShade").classList.remove("show");qa(".modal").forEach(function(m){m.classList.remove("show")})}
-function toast(t){var d=document.createElement("div");d.textContent=t;d.style.cssText="position:fixed;left:50%;bottom:220px;transform:translateX(-50%);z-index:100;background:#363430;color:#fff;padding:9px 12px;border:1px solid #4b4741;border-radius:10px;font-size:13px;max-width:90vw;text-align:center;box-shadow:0 12px 40px #0008";document.body.appendChild(d);setTimeout(function(){d.remove()},2500)}
+function toast(t){var d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(function(){d.remove()},2500)}
 function fmtBytes(n){if(!n)return "";if(n<1024)return n+" B";if(n<1048576)return (n/1024).toFixed(1)+" KB";return (n/1048576).toFixed(1)+" MB"}
 function money(n){if(n==null||isNaN(Number(n)))return "";var x=Number(n);return x<0.001?"$"+x.toFixed(5):"$"+x.toFixed(3)}
 function readDataURL(f){return new Promise(function(res,rej){var rd=new FileReader();rd.onload=function(){res(rd.result)};rd.onerror=rej;rd.readAsDataURL(f)})}
@@ -556,6 +564,7 @@ function renderMarkdown(text){
 }
 
 function render(){
+  applyAppearance();
   var c=ensure();
   var cp=projectForChat(c);
   q("#title").textContent=(c.title||"New chat")+(cp?" · "+cp.name:"");
@@ -634,7 +643,7 @@ function renderChat(){
         var ed=document.createElement("button");ed.textContent="Edit";ed.onclick=function(){editUserMessage(idx)};
         ua.appendChild(ed);b.appendChild(ua);w.appendChild(b);box.appendChild(w)
       }else{
-        var a=document.createElement("div");a.className="assistant";
+        var a=document.createElement("div");a.className="assistant"+(m.error?" error":"");
         if(m.reasoning){var rb=document.createElement("div");rb.className="reasonbox";rb.textContent=m.reasoning;a.appendChild(rb)}
         var t=document.createElement("div");t.className="md";t.innerHTML=renderMarkdown(m.content||"");a.appendChild(t);
         if(m.images&&m.images.length)m.images.forEach(function(src){var im=document.createElement("img");im.className="generated";im.src=src;a.appendChild(im)});
