@@ -10,6 +10,22 @@ Everything else in this repository supports the app with documentation and autom
 
 ## Current feature set
 
+### Quantum Breaks AI 2.3 additions
+- Per-chat model locks plus project-level default models
+- Per-chat instructions, reasoning overrides, and temperature overrides
+- Turn-aware automatic context fitting that preserves user/assistant pairs
+- Multi-model fallback chains
+- Context preview inspector showing the text payload prepared for the model
+- Compatible-now model filtering, model sorting, technical free/low-cost quick picks, and local model performance stats
+- Slash-command autocomplete with keyboard navigation
+- Media gallery for locally saved/chat images
+- In-app PDF and text-file previews
+- Project chat browser, direct project-chat creation, project export/import, and text-file project knowledge imports
+- Selection-to-memory and selection-to-project-knowledge actions
+- Model comparison answers can be promoted directly into a conversation
+- In-app PWA update checking with one-click reload
+
+
 ### UI and organization
 - Glassy responsive desktop and mobile interface
 - Dark, Midnight, Ember, and OLED themes
@@ -290,7 +306,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v2.0
+Current app generation: v2.3
 
 Major capabilities now include:
 - phone + PC UI
