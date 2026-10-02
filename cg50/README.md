@@ -1,43 +1,46 @@
 # Quantum Breaks AI on the Casio fx-CG50
 
-This directory starts the calculator side of Quantum Breaks AI.
+This directory contains the calculator side of Quantum Breaks AI.
 
-## What works now
+## Two calculator clients
 
-`qb50.py` is a conservative MicroPython prototype that can be copied directly onto an fx-CG50. It provides:
+### `qb50.py`
 
-- Quantum Breaks AI pocket-client shell
-- prompt/history UI prototype
-- compact 21-character text wrapping
-- local quick calculation command
-- command menu
+A conservative built-in MicroPython prototype that can be copied directly onto the fx-CG50. It provides the school-assistant shell, subject controls, tutor-mode controls, local history, and a quick calculator mode.
 
-It intentionally does **not** fake AI answers while offline.
+### `native/`
+
+The real live-AI client. It is an fxSDK/gint `.g3a` add-in with a color UI, keyboard editor, subject/mode pickers, serial transport, bridge handshake, request framing, streamed response assembly, scrolling, retry, and answer-focus mode.
 
 ## Install the Python prototype
 
 1. Connect the fx-CG50 to a computer over USB.
 2. Choose **USB Flash** on the calculator.
-3. Copy `qb50.py` to the calculator storage.
+3. Copy `qb50.py` to calculator storage.
 4. Eject the calculator cleanly.
 5. Open **Python** on the fx-CG50 and run `qb50.py`.
 
-## Live AI plan
+The Python prototype is useful offline but does not pretend to provide cloud AI responses.
 
-The built-in Python environment is Casio's adapted MicroPython 1.9.4 and does not provide the normal desktop networking stack. For live Quantum Breaks AI, the project uses a separate native add-in plus the PC bridge in `../bridge/`.
+## Live AI architecture
 
-The native add-in will handle:
+```text
+QBAI.g3a on fx-CG50
+        |
+        | 3-pin serial
+        v
+PC running bridge/qb_bridge.py
+        |
+        | Internet
+        v
+AI model/API
+```
 
-- calculator keyboard input
-- scrollable chat rendering
-- serial request/response framing
-- response chunk assembly
-- connection indicator
-- history
-- cancel/retry controls
+The native client keeps API keys off the calculator and out of committed source.
 
-See `PROTOCOL.md` for the transport protocol.
+See:
 
-## Branch status
-
-This is the first CG50 integration milestone. The existing web app is intentionally unchanged on this branch.
+- `native/README.md` for the native build/client details.
+- `PROTOCOL.md` for calculator-to-bridge framing.
+- `SUBJECTS.md` for school subject coverage.
+- `../bridge/README.md` for the desktop bridge.
