@@ -727,6 +727,7 @@ var videoReferenceData="";
 var renderTimer=null;
 var draftTimer=null;
 var selectedText="";
+var commandActiveIndex=0;
 function scheduleRender(){
   if(renderTimer)return;
   renderTimer=setTimeout(function(){renderTimer=null;render()},40)
@@ -1272,19 +1273,30 @@ var COMMANDS=[
   {name:"Backup chat",hint:"JSON backup",run:backupChat}
 ];
 
+function commandMatches(){
+  var term=(q("#commandSearch").value||"").toLowerCase();
+  return COMMANDS.filter(function(x){return !term||(x.name+" "+x.hint).toLowerCase().includes(term)})
+}
+function setCommandActive(index){
+  var items=qa("#commandList .commandItem");if(!items.length){commandActiveIndex=0;return}
+  commandActiveIndex=Math.max(0,Math.min(items.length-1,index));
+  items.forEach(function(item,i){item.classList.toggle("active",i===commandActiveIndex)});
+  items[commandActiveIndex].scrollIntoView({block:"nearest"})
+}
 function renderCommandPalette(){
-  var term=(q("#commandSearch").value||"").toLowerCase(),box=q("#commandList");box.innerHTML="";
-  COMMANDS.filter(function(x){return !term||(x.name+" "+x.hint).toLowerCase().includes(term)}).forEach(function(x){
-    var b=document.createElement("button");b.className="commandItem";
+  var box=q("#commandList");box.innerHTML="";var matches=commandMatches();
+  matches.forEach(function(x,i){
+    var b=document.createElement("button");b.className="commandItem"+(i===commandActiveIndex?" active":"");
     var left=document.createElement("span");left.textContent=x.name;
     var right=document.createElement("small");right.textContent=x.hint||"";
     b.appendChild(left);b.appendChild(right);b.onclick=function(){closeModals();x.run()};
-    box.appendChild(b)
-  })
+    b.onmouseenter=function(){setCommandActive(i)};box.appendChild(b)
+  });
+  if(commandActiveIndex>=matches.length)commandActiveIndex=Math.max(0,matches.length-1);
+  setCommandActive(commandActiveIndex)
 }
-
 function openCommandPalette(){
-  q("#commandSearch").value="";renderCommandPalette();openModal("#commandModal");
+  commandActiveIndex=0;q("#commandSearch").value="";renderCommandPalette();openModal("#commandModal");
   setTimeout(function(){q("#commandSearch").focus()},30)
 }
 
@@ -2606,7 +2618,13 @@ q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
   settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
-q("#commandSearch").oninput=renderCommandPalette;
+q("#commandSearch").oninput=function(){commandActiveIndex=0;renderCommandPalette()};
+q("#commandSearch").onkeydown=function(e){
+  var items=qa("#commandList .commandItem");if(!items.length)return;
+  if(e.key==="ArrowDown"){e.preventDefault();setCommandActive(commandActiveIndex+1)}
+  else if(e.key==="ArrowUp"){e.preventDefault();setCommandActive(commandActiveIndex-1)}
+  else if(e.key==="Enter"){e.preventDefault();items[commandActiveIndex].click()}
+};
 q("#runDiagnostics").onclick=runDiagnostics;
 q("#refreshStorage").onclick=refreshStorageManager;
 q("#cleanStorage").onclick=cleanOrphanedMedia;
