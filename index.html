@@ -293,6 +293,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .settingsSearchResults{display:none;gap:5px;margin-top:7px}.settingsSearchResults.show{display:grid}.settingsSearchResult{padding:8px 10px;border-radius:9px;text-align:left;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);font-size:12px;color:#bbb}.settingsSearchResult:hover{background:rgba(255,255,255,.065);color:#fff}.settingsFlash{animation:settingsFlash 1.1s ease}@keyframes settingsFlash{0%{box-shadow:0 0 0 0 var(--accentGlow)}35%{box-shadow:0 0 0 4px var(--accentGlow)}100%{box-shadow:none}}
 
+
+.followups{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.followupChip{max-width:100%;padding:7px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.035);color:#aaa;font-size:11px;text-align:left}.followupChip:hover{color:#eee;border-color:color-mix(in srgb,var(--accent) 30%,transparent);background:color-mix(in srgb,var(--accent) 7%,transparent)}.followupLoading{font-size:11px;color:#777;margin:8px 0}
+
 </style>
 </head>
 <body>
@@ -1378,6 +1381,14 @@ function renderChat(){
           tb.textContent=m.toolCalls.map(function(x){var name=x&&x.function&&x.function.name?x.function.name:(x&&x.type?x.type:"tool"),args=x&&x.function&&x.function.arguments?x.function.arguments:"";return name+(args?"\n"+args:"")}).join("\n\n");
           ta.appendChild(ts);ta.appendChild(tb);a.appendChild(ta)
         }
+        if(m.followupLoading){var fl=document.createElement("div");fl.className="followupLoading";fl.textContent="Generating follow-up ideas…";a.appendChild(fl)}
+        if(Array.isArray(m.followups)&&m.followups.length){
+          var fu=document.createElement("div");fu.className="followups";
+          m.followups.slice(0,5).forEach(function(question){
+            var chip=document.createElement("button");chip.className="followupChip";chip.textContent=question;chip.onclick=function(){q("#prompt").value=question;resizePrompt();saveDraftSoon();q("#prompt").focus()};fu.appendChild(chip)
+          });
+          a.appendChild(fu)
+        }
         if(m.reviewing){var rvw=document.createElement("div");rvw.className="reviewing";rvw.textContent="AI review in progress…";a.appendChild(rvw)}
         if(m.review){
           var details=document.createElement("details"),summary=document.createElement("summary"),body=document.createElement("div");
@@ -1402,11 +1413,12 @@ function renderChat(){
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
         var cm=document.createElement("button");cm.textContent="Compare";cm.onclick=function(){compareFromMessage(idx)};
         var vr=document.createElement("button");vr.textContent="Review";vr.onclick=function(){reviewMessageAt(idx)};
+        var fq=document.createElement("button");fq.textContent="Follow-ups";fq.title="Generate suggested next questions";fq.onclick=function(){generateFollowups(idx)};
         var up=document.createElement("button");up.textContent="👍";up.title="Helpful";up.className="ratingbtn"+(m.rating===1?" on":"");up.onclick=function(){rateMessage(idx,1)};
         var down=document.createElement("button");down.textContent="👎";down.title="Not helpful";down.className="ratingbtn"+(m.rating===-1?" on":"");down.onclick=function(){rateMessage(idx,-1)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
-        tools.appendChild(cp);tools.appendChild(srcs);tools.appendChild(eda);tools.appendChild(sv);tools.appendChild(dt);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(up);tools.appendChild(down);tools.appendChild(bm);tools.appendChild(pin);
+        tools.appendChild(cp);tools.appendChild(srcs);tools.appendChild(eda);tools.appendChild(sv);tools.appendChild(dt);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(fq);tools.appendChild(up);tools.appendChild(down);tools.appendChild(bm);tools.appendChild(pin);
         var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");var sourceCount=citationLinks(m.annotations).length;if(sourceCount)bits.push(sourceCount+" source"+(sourceCount===1?"":"s"));if(m.editedByUser)bits.push("locally edited");if(m.finishReason&&m.finishReason!=="stop")bits.push("finish "+m.finishReason);if(m.cacheStatus)bits.push("cache "+String(m.cacheStatus).toLowerCase()+(m.cacheAge?" "+m.cacheAge+"s":""));if(m.contextTrimmed)bits.push("fit -"+m.contextTrimmed+" msgs");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
@@ -1440,6 +1452,33 @@ function renderOutline(){
   })
 }
 function openOutline(){openModal("#outlineModal");renderOutline()}
+
+async function generateFollowups(idx){
+  var c=ensure(),a=c.messages[idx];if(!a||a.role!=="assistant"||!a.content)return;
+  if(!isConnected())return toast("Connect OpenRouter first");
+  if(a.followupLoading)return;
+  var u=idx-1;while(u>=0&&c.messages[u].role!=="user")u--;
+  var request=u>=0?c.messages[u].content:"";
+  a.followupLoading=true;save();render();
+  try{
+    var schema={type:"object",properties:{questions:{type:"array",items:{type:"string"},minItems:3,maxItems:5}},required:["questions"],additionalProperties:false};
+    var body={model:effectiveModel(c),messages:[
+      {role:"system",content:"Suggest 3 to 5 useful next questions the user could ask after this answer. Make them specific, concise, and non-redundant. Do not answer them."},
+      {role:"user",content:"Original request:\n"+String(request||"").slice(0,18000)+"\n\nAnswer:\n"+String(a.content||"").slice(0,36000)}
+    ],stream:false,temperature:0.5,max_tokens:320,response_format:{type:"json_schema",json_schema:{name:"followup_questions",strict:true,schema:schema}},provider:{require_parameters:true}};
+    var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"};
+    var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body)}),j=await r.json();
+    if(!r.ok&&[400,422].indexOf(r.status)>=0){
+      delete body.response_format;delete body.provider;body.messages[0].content+=" Return valid JSON with a questions array.";
+      r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body)});j=await r.json()
+    }
+    if(!r.ok)throw new Error(errorText(j,"Follow-up generation failed"));
+    var raw=String(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim().replace(/^\`\`\`(?:json)?\s*/i,"").replace(/\s*\`\`\`$/,""),data=JSON.parse(raw);
+    a.followups=(Array.isArray(data.questions)?data.questions:[]).map(function(x){return String(x||"").trim()}).filter(Boolean).slice(0,5);
+    if(!a.followups.length)throw new Error("No follow-up questions returned")
+  }catch(e){toast("Follow-ups failed: "+e.message)}
+  a.followupLoading=false;save();render()
+}
 
 async function reviewMessageAt(idx){
   var c=ensure(),a=c.messages[idx];if(!a||a.role!=="assistant"||!a.content)return;
