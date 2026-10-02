@@ -391,9 +391,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="notice" id="whatsNewVersion"></div>
 <div class="changelog">
 <h3>Reliability</h3>
-<ul><li>Draft attachments now survive reloads.</li><li>Portable backups preserve local media references safely.</li><li>Model catalog caching and compatibility preflight reduce avoidable request failures.</li></ul>
+<ul><li>Turn-aware automatic context fitting avoids splitting conversation pairs.</li><li>Fallback chains can try multiple models in order.</li><li>Draft attachments, portable media backups, and cached model catalogs reduce avoidable failures.</li></ul>
 <h3>AI workflow</h3>
-<ul><li>Strict JSON Schema responses.</li><li>Optional second-pass answer review.</li><li>Prompt improver, snapshots, context compression, tags, and conversation outline.</li></ul>
+<ul><li>Per-chat model locks and per-chat instructions.</li><li>Strict JSON Schema responses plus optional second-pass answer review.</li><li>Prompt improver, snapshots, context compression, tags, conversation outline, and expanded slash commands.</li></ul>
 <h3>Workspace</h3>
 <ul><li>Persistent image/PDF storage, encrypted backups, analytics, archives, trash, global search, and local profiles.</li></ul>
 </div>
@@ -453,7 +453,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 </div>
 <div class="field"><label>Advisor model</label><input id="advisorModel" placeholder="~anthropic/claude-opus-latest"><div class="smallnote">Used only when the Advisor toggle is enabled.</div></div>
 <div class="field"><label>AI review model</label><input id="reviewModel" placeholder="openrouter/auto"><div class="smallnote">Optional second-pass reviewer. Review is model-generated and not a guarantee of correctness.</div></div>
-<div class="field"><label>Fallback model (optional)</label><input id="fallbackModel" placeholder="e.g. anthropic/claude-sonnet-4"><div class="smallnote">If the primary model fails, OpenRouter can try this model next.</div></div>
+<div class="field"><label>Fallback model chain (optional)</label><input id="fallbackModel" placeholder="model/a, model/b, model/c"><div class="smallnote">Comma-separated. OpenRouter can try these in order after the primary model.</div></div>
 <div class="field"><label>Provider routing</label><select id="providerRouting"><option value="balanced">Balanced</option><option value="price">Lowest price</option><option value="throughput">Highest throughput</option><option value="latency">Lowest latency</option></select></div>
 <div class="row">
 <div class="field" style="flex:1;min-width:180px"><label>Response format</label><select id="responseFormat"><option value="text">Normal text</option><option value="json_object">JSON object</option><option value="json_schema">Strict JSON Schema</option></select></div>
@@ -751,7 +751,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="2.1.0";
+var APP_VERSION="2.2.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -763,7 +763,7 @@ var MEDIA_DB="quantum_breaks_media_v1";
 var MODEL_CACHE="quantum_breaks_model_cache_v1";
 
 function safeJSON(v,f){try{return JSON.parse(v)||f}catch(e){return f}}
-var chats=safeJSON(localStorage.getItem(STORE),[]);
+var chats=safeJSON(localStorage.getItem(STORE),[]);chats.forEach(function(ch){(ch.messages||[]).forEach(function(m){if(m.reviewing)m.reviewing=false})});
 var settings=Object.assign({
   model:"openrouter/auto",
   temperature:0.7,
@@ -1814,9 +1814,21 @@ function handleCommand(text){
   if(cmd==="/web"){q("#prompt").value="";settings.web=!settings.web;save();render();toast(settings.web?"Web search enabled":"Web search disabled");return true}
   if(cmd==="/agent"){q("#prompt").value="";settings.agent=!settings.agent;save();render();toast(settings.agent?"Agent enabled":"Agent disabled");return true}
   if(cmd==="/advisor"){q("#prompt").value="";settings.advisor=!settings.advisor;save();render();toast(settings.advisor?"Advisor enabled":"Advisor disabled");return true}
+  if(cmd==="/review"){q("#prompt").value="";settings.review=!settings.review;save();render();toast(settings.review?"AI Review enabled":"AI Review disabled");return true}
+  if(cmd==="/focus"){q("#prompt").value="";settings.focusMode=!settings.focusMode;save();render();toast(settings.focusMode?"Focus mode on":"Focus mode off");return true}
+  if(cmd==="/search"){q("#prompt").value="";openGlobalSearch();return true}
+  if(cmd==="/project"){q("#prompt").value="";openProjects();return true}
+  if(cmd==="/prompts"){q("#prompt").value="";openPromptLibrary();return true}
+  if(cmd==="/snapshot"){q("#prompt").value="";openSnapshots();return true}
+  if(cmd==="/mode"){
+    var mode=(text.split(/\s+/)[1]||"").toLowerCase();
+    q("#prompt").value="";
+    if(["balanced","fast","deep","research"].indexOf(mode)<0){toast("Use /mode balanced, fast, deep, or research");return true}
+    applyModePreset(mode);return true
+  }
   if(cmd==="/help"){
     q("#prompt").value="";
-    localAssistant("Available local commands:\n\n/new — new chat\n/models — choose model\n/usage — API key usage\n/compare — compare models\n/image — image generation\n/video — video generation\n/research — toggle research mode\n/web — toggle web search\n/agent — toggle subagent mode\n/advisor — toggle advisor mode\n\nKeyboard: Ctrl/Cmd+Enter sends, Ctrl/Cmd+K opens models, Escape closes dialogs.");
+    localAssistant("Available local commands:\n\n/new — new chat\n/models — choose model\n/usage — API key usage\n/compare — compare models\n/image — image generation\n/video — video generation\n/research — toggle research mode\n/web — toggle web search\n/agent — toggle subagent mode\n/advisor — toggle advisor mode\n/review — toggle second-pass review\n/focus — toggle focus mode\n/search — search the workspace\n/project — open projects\n/prompts — open prompt library\n/snapshot — open conversation snapshots\n/mode fast|balanced|deep|research — switch workflow mode\n\nKeyboard: Ctrl/Cmd+Enter sends, Ctrl/Cmd+K opens models, Ctrl/Cmd+P opens commands, Ctrl/Cmd+Shift+F searches everything, Escape closes dialogs.");
     return true
   }
   toast("Unknown command. Type /help");
@@ -1893,14 +1905,21 @@ function apiPartChars(content){
 function estimatedMessageTokens(m){return Math.ceil((apiPartChars(m&&m.content)+24)/4)}
 function fitRequestMessages(messages,modelId){
   var info=models.find(function(m){return m.id===modelId}),limit=info&&Number(info.context_length)||0;
-  if(!limit||!Array.isArray(messages)||messages.length<3)return {messages:messages,trimmed:0,estimated:messages.reduce(function(n,m){return n+estimatedMessageTokens(m)},0),limit:limit};
-  var reserve=Math.max(2048,Math.min(16000,Math.floor(limit*.18))),target=Math.max(2048,limit-reserve),copy=messages.slice(),total=copy.reduce(function(n,m){return n+estimatedMessageTokens(m)},0),trimmed=0;
+  var estimate=function(list){return list.reduce(function(n,m){return n+estimatedMessageTokens(m)},0)};
+  if(!limit||!Array.isArray(messages)||messages.length<3)return {messages:messages,trimmed:0,estimated:estimate(messages||[]),limit:limit,over:false};
+  var reserve=Math.max(2048,Math.min(16000,Math.floor(limit*.18))),target=Math.max(2048,limit-reserve),copy=messages.slice(),total=estimate(copy),trimmed=0;
   var system=copy.length&&copy[0].role==="system"?copy.shift():null;
   while(total>target&&copy.length>2){
-    var removed=copy.shift();total-=estimatedMessageTokens(removed);trimmed++
+    var removed=copy.shift();total-=estimatedMessageTokens(removed);trimmed++;
+    if(removed&&removed.role==="user"&&copy.length>2&&copy[0]&&copy[0].role==="assistant"){
+      var paired=copy.shift();total-=estimatedMessageTokens(paired);trimmed++
+    }
+  }
+  while(copy.length>2&&copy[0]&&copy[0].role==="assistant"){
+    var orphan=copy.shift();total-=estimatedMessageTokens(orphan);trimmed++
   }
   if(system)copy.unshift(system);
-  return {messages:copy,trimmed:trimmed,estimated:total,limit:limit}
+  return {messages:copy,trimmed:trimmed,estimated:total,limit:limit,over:!!(limit&&total>target)}
 }
 
 async function send(){
@@ -1919,9 +1938,13 @@ async function send(){
   var requestModel=effectiveModel(c),fit=fitRequestMessages(apiMessages(c),requestModel),requestMessages=fit.messages;
   var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:requestModel,contextTrimmed:fit.trimmed||0};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";q("#send").classList.add("busy");render();
   if(fit.trimmed)toast("Context fit skipped "+fit.trimmed+" older message"+(fit.trimmed===1?"":"s")+" for this request");
+  if(fit.over)toast("This request is still close to or over the selected model's context limit.");
   try{
     var body={model:requestModel,messages:requestMessages,temperature:Number(settings.temperature),stream:true,usage:{include:true},session_id:"quantum-breaks-"+c.id};
-    if(settings.fallbackModel){body.models=[requestModel,settings.fallbackModel];delete body.model}
+    if(settings.fallbackModel){
+      var fallbacks=settings.fallbackModel.split(",").map(function(x){return x.trim()}).filter(Boolean).filter(function(x,i,a){return x!==requestModel&&a.indexOf(x)===i}).slice(0,4);
+      if(fallbacks.length){body.models=[requestModel].concat(fallbacks);delete body.model}
+    }
     if(settings.providerRouting&&settings.providerRouting!=="balanced")body.provider={sort:settings.providerRouting};
     if(settings.denyDataCollection){body.provider=body.provider||{};body.provider.data_collection="deny"}
     if(settings.requireParameters||settings.responseFormat==="json_schema"){body.provider=body.provider||{};body.provider.require_parameters=true}
