@@ -182,14 +182,16 @@ jobs:
           assembly = Path("cg50/native/src/serial_syscalls.S").read_text()
 
           # The request format itself lives in calculator C source.
+          if 'H:QBAI:3' not in bridge or 'K:QBAI:3' not in bridge:
+              raise SystemExit("Bridge v3 handshake markers are missing")
           if 'H:QBAI:2' not in bridge or 'K:QBAI:2' not in bridge:
-              raise SystemExit("Bridge handshake markers are missing")
+              raise SystemExit("Bridge v2 compatibility markers are missing")
 
-          for marker in ['H:QBAI:2', 'K:QBAI:2', '115200']:
+          for marker in ['H:QBAI:3', 'K:QBAI:3', 'college', 'advanced', '115200']:
               if marker not in protocol:
                   raise SystemExit(f"Protocol documentation missing {marker}")
 
-          for marker in ['H:QBAI:2', 'K:QBAI:2', 'Serial_Open', 'Serial_PollRX']:
+          for marker in ['H:QBAI:3', 'K:QBAI:3', 'Serial_Open', 'Serial_PollRX']:
               if marker not in transport:
                   raise SystemExit(f"Native transport missing {marker}")
 
