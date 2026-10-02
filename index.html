@@ -2198,7 +2198,10 @@ function b64ToBytes(s){
   var raw=atob(s),out=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out
 }
 async function workspacePayload(includeMedia){
-  var data={type:"quantum-breaks-ai-workspace",version:4,exported_at:new Date().toISOString(),settings:Object.assign({},settings),projects:projects,prompts:savedPrompts,profiles:profiles,chats:chats.filter(function(ch){return !ch.temporary})};
+  var exportChats=chats.filter(function(ch){return !ch.temporary}).map(function(ch){
+    return Object.assign({},ch,{messages:(ch.messages||[]).map(serializableMessage)})
+  });
+  var data={type:"quantum-breaks-ai-workspace",version:5,exported_at:new Date().toISOString(),settings:Object.assign({},settings),projects:projects,prompts:savedPrompts,profiles:profiles,chats:exportChats};
   if(includeMedia){
     var records=await listMediaRecords(),refs=referencedMediaIds();
     data.media=records.filter(function(rec){return refs.has(rec.id)})
@@ -2252,12 +2255,13 @@ async function importWorkspace(file){
   }catch(e){toast("Workspace import failed: "+e.message)}
 }
 
-function backupChat(){
-  var c=ensure();
-  var data={type:"quantum-breaks-ai-chat",version:1,exported_at:new Date().toISOString(),chat:c};
+async function backupChat(){
+  var ch=ensure(),chat=Object.assign({},ch,{messages:(ch.messages||[]).map(serializableMessage)});
+  var ids=new Set(mediaIdsForChat(ch)),records=await listMediaRecords();
+  var data={type:"quantum-breaks-ai-chat",version:2,exported_at:new Date().toISOString(),chat:chat,media:records.filter(function(rec){return ids.has(rec.id)})};
   var a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
-  a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".nolimit.json";
+  a.download=(ch.title||"chat").replace(/[^\w-]+/g,"_")+".quantum.json";
   a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
@@ -2266,10 +2270,44 @@ async function importBackup(file){
   try{
     var raw=await file.text(),data=JSON.parse(raw),chat=data&&data.chat?data.chat:data;
     if(!chat||!Array.isArray(chat.messages))throw new Error("This file does not look like a Quantum Breaks AI chat backup");
-    var copy={id:uid(),title:String(chat.title||"Imported chat").slice(0,80),created:Date.now(),updated:Date.now(),messages:chat.messages.map(function(m){
-      return {role:m.role==="assistant"?"assistant":"user",content:String(m.content||""),model:m.model,reasoning:m.reasoning,usage:m.usage,cost:m.cost,images:Array.isArray(m.images)?m.images.filter(function(x){return typeof x==="string"&&x.indexOf("data:")!==0}):[]}
-    })};
-    chats.unshift(copy);active=copy.id;save();render();toast("Chat imported")
+    if(Array.isArray(data.media))await restoreMediaRecords(data.media);
+    var copy={
+      id:uid(),
+      title:String(chat.title||"Imported chat").slice(0,80),
+      created:Date.now(),
+      updated:Date.now(),
+      messages:chat.messages.map(function(m){
+        return {
+          role:m.role==="assistant"?"assistant":"user",
+          created:m.created||Date.now(),
+          started:m.started,
+          finished:m.finished,
+          content:String(m.content||""),
+          model:m.model,
+          reasoning:m.reasoning,
+          reasoning_details:m.reasoning_details,
+          annotations:m.annotations,
+          usage:m.usage,
+          cost:m.cost,
+          bookmarked:!!m.bookmarked,
+          contextPinned:!!m.contextPinned,
+          fileNames:Array.isArray(m.fileNames)?m.fileNames:[],
+          imageRefs:Array.isArray(m.imageRefs)?m.imageRefs:[],
+          images:Array.isArray(m.images)?m.images.filter(function(x){return typeof x==="string"&&x.indexOf("data:")!==0}):[],
+          pdfs:Array.isArray(m.pdfs)?m.pdfs.map(function(f){return {name:f.name||"document.pdf",mediaId:f.mediaId||""}}):[],
+          textFiles:Array.isArray(m.textFiles)?m.textFiles.map(function(f){return {name:f.name||"file.txt",text:String(f.text||"").slice(0,120000)}}):[]
+        }
+      }),
+      projectId:"",
+      scratchpad:String(chat.scratchpad||""),
+      scratchpadInContext:!!chat.scratchpadInContext,
+      compactSummary:String(chat.compactSummary||""),
+      compactCount:Number(chat.compactCount)||0,
+      pinned:false,
+      archivedAt:0,
+      trashedAt:0
+    };
+    chats.unshift(copy);active=copy.id;save();await hydrateChatMedia(copy);render();restoreDraft();toast("Chat imported"+(Array.isArray(data.media)&&data.media.length?" with media":""))
   }catch(e){toast("Import failed: "+e.message)}
 }
 
@@ -2361,7 +2399,15 @@ function mediaIdsForChat(ch){
     (m.pdfs||[]).forEach(function(f){if(f.mediaId)ids.push(f.mediaId)})
   });return Array.from(new Set(ids))
 }
-function purgeChatMedia(ch){mediaIdsForChat(ch).forEach(function(id){deleteMedia(id)})}
+function purgeChatMedia(ch){
+  var targetIds=mediaIdsForChat(ch),otherRefs=new Set();
+  chats.forEach(function(other){
+    if(other===ch)return;
+    mediaIdsForChat(other).forEach(function(id){otherRefs.add(id)})
+  });
+  pending.forEach(function(f){if(f.mediaId)otherRefs.add(f.mediaId)});
+  targetIds.forEach(function(id){if(!otherRefs.has(id))deleteMedia(id)})
+}
 
 function toggleArchiveManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
@@ -2393,7 +2439,7 @@ function deleteManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
   c.trashedAt=Date.now();c.pinned=false;
   if(active===manageChatId){
-    var next=chats.find(function(x){return !x.trashedAt&&x.id!==manageChatId});
+    var next=chats.find(function(x){return !x.trashedAt&&!x.archivedAt&&x.id!==manageChatId});
     active=next?next.id:""
   }
   save();closeModals();render();toastAction("Chat moved to Trash","Undo",function(){c.trashedAt=0;c.updated=Date.now();active=c.id;save();render();restoreDraft()})
