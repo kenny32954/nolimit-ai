@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "editor.h"
+#include "picker.h"
 #include "transport.h"
 
 static char const *subjects[] = {
@@ -273,10 +274,20 @@ int main(void)
             }
         }
         else if(!state.waiting && ev.key == KEY_F1) {
-            state.subject = (state.subject + 1) % SUBJECT_COUNT;
+            state.subject = qb_picker_select(
+                "SELECT SUBJECT",
+                subject_labels,
+                SUBJECT_COUNT,
+                state.subject
+            );
         }
         else if(!state.waiting && ev.key == KEY_F2) {
-            state.mode = (state.mode + 1) % MODE_COUNT;
+            state.mode = qb_picker_select(
+                "SELECT TUTOR MODE",
+                mode_labels,
+                MODE_COUNT,
+                state.mode
+            );
         }
         else if(!state.waiting && ev.key == KEY_F5) {
             snprintf(state.status, sizeof(state.status), "Connecting...");
