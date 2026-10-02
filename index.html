@@ -217,6 +217,11 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .md table{width:100%;border-collapse:collapse;font-size:14px}.md th,.md td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.05);text-align:left;vertical-align:top}.md th{font-weight:650;background:rgba(255,255,255,.045);color:#f2efea}.md tr:last-child td{border-bottom:0}.md th:last-child,.md td:last-child{border-right:0}
 .codelang{position:absolute;left:14px;top:13px;font:600 10px/1 Inter,sans-serif;letter-spacing:.08em;color:#777;text-transform:uppercase}.md pre:before{display:none}
 
+
+.trashrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:11px;border:1px solid rgba(255,255,255,.06);border-radius:13px;background:rgba(255,255,255,.025)}
+.trashrow b{display:block;font-size:13px}.trashrow span{display:block;margin-top:4px;font-size:11px;color:var(--muted)}.trashactions{display:flex;gap:6px}.trashactions button{height:32px;border-radius:9px;padding:0 9px;font-size:11px;background:rgba(255,255,255,.055);color:#bbb}.trashactions .permadelete{background:rgba(173,65,65,.15);color:#e9a3a3}
+.modebadge{font-weight:600}
+
 </style>
 </head>
 <body>
@@ -234,6 +239,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="promptsSide">Prompt library</button>
 <button class="sbtn" id="findSide">Find in chat</button>
 <button class="sbtn" id="bookmarksSide">Bookmarks</button>
+<button class="sbtn" id="trashSide">Trash</button>
 <button class="sbtn" id="installSide">Install app</button>
 <button class="sbtn" id="imageSide">Create image</button>
 <button class="sbtn" id="videoSide">Create video</button>
@@ -267,6 +273,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="toggle" id="advisorToggle">✦ Advisor</button>
 <button class="toggle" id="fusionToggle">◎ Fusion</button>
 <button class="toggle" id="tempToggle">◐ Temporary</button>
+<button class="toggle" id="modeBtn">⚡ Mode: balanced</button>
 <button class="toggle" id="reasonToggle">◌ Reasoning: medium</button>
 </div>
 <div class="pending" id="pending"></div>
@@ -367,6 +374,15 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="filter" data-filter="reasoning">Reasoning</button>
 </div>
 <div class="models" id="models"></div>
+</section>
+
+<section class="modal" id="trashModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Trash</h2>
+<div class="notice">Deleted chats stay here until you restore or permanently delete them.</div>
+<div id="trashList" class="searchresults"></div>
+<div style="height:12px"></div>
+<button class="danger" id="emptyTrash">Empty trash</button>
 </section>
 
 <section class="modal" id="findModal">
@@ -564,6 +580,7 @@ var settings=Object.assign({
   accent:"coral",
   density:"cozy",
   focusMode:false,
+  modePreset:"balanced",
   denyDataCollection:false,
   fusion:false,
   cache:false,
@@ -594,6 +611,7 @@ var imageReferenceData="";
 var videoFrameData="";
 var videoReferenceData="";
 var renderTimer=null;
+var draftTimer=null;
 function scheduleRender(){
   if(renderTimer)return;
   renderTimer=setTimeout(function(){renderTimer=null;render()},40)
@@ -611,7 +629,7 @@ function applyAppearance(){
   document.documentElement.dataset.density=settings.density||"cozy";
   document.documentElement.dataset.focus=settings.focusMode?"true":"false";
 }
-function current(){return chats.find(function(c){return c.id===active})}
+function current(){return chats.find(function(c){return c.id===active&&!c.trashedAt})}
 function projectForChat(c){return c&&c.projectId?projects.find(function(p){return p.id===c.projectId}):null}
 function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save()}return c}
 function closeSide(){q("#side").classList.remove("open");q("#shade").classList.remove("show")}
@@ -703,6 +721,8 @@ function render(){
   q("#advisorToggle").classList.toggle("on",!!settings.advisor);
   q("#fusionToggle").classList.toggle("on",!!settings.fusion);
   q("#tempToggle").classList.toggle("on",!!c.temporary);
+  q("#modeBtn").textContent="⚡ Mode: "+(settings.modePreset||"balanced");
+  q("#modeBtn").classList.toggle("on",(settings.modePreset||"balanced")!=="balanced");
   q("#reasonToggle").classList.toggle("on",settings.reasoning!=="none");
   q("#reasonToggle").textContent="◌ Reasoning: "+settings.reasoning;
   q("#researchBtn").classList.toggle("on",!!settings.web&&!!settings.fetch);
@@ -716,6 +736,7 @@ function renderHistory(){
   var term=(q("#chatSearch").value||"").toLowerCase();
   var box=q("#history");box.innerHTML="";
   chats.slice().sort(function(a,b){if(!!a.pinned!==!!b.pinned)return a.pinned?-1:1;return(b.updated||0)-(a.updated||0)}).filter(function(c){
+    if(c.trashedAt)return false;
     if(!term)return true;
     if((c.title||"").toLowerCase().includes(term))return true;
     var p=projectForChat(c);if(p&&(p.name||"").toLowerCase().includes(term))return true;
@@ -723,7 +744,7 @@ function renderHistory(){
   }).forEach(function(c){
     var row=document.createElement("div");row.className="historyitem"+(c.id===active?" on":"");
     var b=document.createElement("button");b.className="hrow";b.textContent=(c.pinned?"◆ ":"")+(c.title||"New chat");
-    b.onclick=function(){active=c.id;save();closeSide();render()};
+    b.onclick=function(){active=c.id;save();closeSide();render();restoreDraft()};
     var more=document.createElement("button");more.className="chatmore";more.textContent="⋯";
     more.onclick=function(e){e.stopPropagation();manageChatId=c.id;openChatManage()};
     row.appendChild(b);row.appendChild(more);box.appendChild(row)
@@ -1123,7 +1144,7 @@ async function send(){
   var text=q("#prompt").value.trim();if(!text&&!pending.length)return;
   if(!pending.length&&handleCommand(text))return;
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
-  var c=ensure(),files=pending.slice();pending=[];q("#prompt").value="";
+  var c=ensure(),files=pending.slice();pending=[];q("#prompt").value="";c.draft="";
   var aud=files.filter(function(f){return f.kind==="audio"});
   for(var ai=0;ai<aud.length;ai++){try{toast("Transcribing "+aud[ai].name+"…");var tr=await transcribe(aud[ai].file);text+=(text?"\n\n":"")+"[Audio transcript: "+aud[ai].name+"]\n"+tr}catch(e){toast(e.message)}}
   var m={role:"user",created:Date.now(),content:text||"Please analyze the attached file.",fileNames:files.map(function(x){return x.name}),images:files.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),pdfs:files.filter(function(x){return x.kind==="pdf"}).map(function(x){return{name:x.name,data:x.data}}),textFiles:files.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
@@ -1757,8 +1778,35 @@ function duplicateManagedChat(){
 }
 
 function deleteManagedChat(){
-  var i=chats.findIndex(function(x){return x.id===manageChatId});if(i<0)return;
-  chats.splice(i,1);if(active===manageChatId)active=chats[0]?chats[0].id:"";save();closeModals();render();toast("Chat deleted")
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  c.trashedAt=Date.now();c.pinned=false;
+  if(active===manageChatId){
+    var next=chats.find(function(x){return !x.trashedAt&&x.id!==manageChatId});
+    active=next?next.id:""
+  }
+  save();closeModals();render();toast("Chat moved to Trash")
+}
+
+function renderTrash(){
+  var box=q("#trashList");box.innerHTML="";
+  var trashed=chats.filter(function(ch){return !!ch.trashedAt}).sort(function(a,b){return(b.trashedAt||0)-(a.trashedAt||0)});
+  if(!trashed.length){box.innerHTML='<div class="notice">Trash is empty.</div>';return}
+  trashed.forEach(function(ch){
+    var row=document.createElement("div");row.className="trashrow";
+    var info=document.createElement("div"),b=document.createElement("b"),s=document.createElement("span");
+    b.textContent=ch.title||"New chat";s.textContent="Deleted "+new Date(ch.trashedAt).toLocaleString();
+    info.appendChild(b);info.appendChild(s);
+    var actions=document.createElement("div");actions.className="trashactions";
+    var restore=document.createElement("button");restore.textContent="Restore";restore.onclick=function(){ch.trashedAt=0;ch.updated=Date.now();save();renderTrash();renderHistory();toast("Chat restored")};
+    var del=document.createElement("button");del.textContent="Delete";del.className="permadelete";del.onclick=function(){if(!confirm("Permanently delete this chat? This cannot be undone."))return;chats=chats.filter(function(x){return x.id!==ch.id});save();renderTrash();renderHistory();toast("Chat permanently deleted")};
+    actions.appendChild(restore);actions.appendChild(del);row.appendChild(info);row.appendChild(actions);box.appendChild(row)
+  })
+}
+function openTrash(){openModal("#trashModal");renderTrash()}
+function emptyTrash(){
+  if(!chats.some(function(ch){return ch.trashedAt}))return toast("Trash is already empty");
+  if(!confirm("Permanently delete every chat in Trash?"))return;
+  chats=chats.filter(function(ch){return !ch.trashedAt});save();renderTrash();renderHistory();toast("Trash emptied")
 }
 
 
@@ -1839,9 +1887,35 @@ function deleteProject(){
   save();projectOptions();q("#projectSelect").value="";loadProjectFields("");render();toast("Project deleted")
 }
 
+function restoreDraft(){
+  var c=ensure();q("#prompt").value=c.draft||"";resizePrompt()
+}
+function saveDraftSoon(){
+  if(draftTimer)clearTimeout(draftTimer);
+  draftTimer=setTimeout(function(){
+    var c=current();if(!c)return;c.draft=q("#prompt").value;save()
+  },300)
+}
+function applyModePreset(mode){
+  mode=mode||"balanced";settings.modePreset=mode;
+  if(mode==="fast"){
+    settings.reasoning="low";settings.web=false;settings.fetch=false;settings.agent=false;settings.advisor=false;settings.fusion=false
+  }else if(mode==="deep"){
+    settings.reasoning="high";settings.agent=true;settings.advisor=true;settings.fusion=false
+  }else if(mode==="research"){
+    settings.reasoning="medium";settings.web=true;settings.fetch=true;settings.agent=true;settings.advisor=false;settings.fusion=false
+  }else{
+    settings.reasoning="medium";settings.agent=false;settings.advisor=false;settings.fusion=false
+  }
+  save();render();toast("Mode set to "+mode)
+}
+function cycleMode(){
+  var modes=["balanced","fast","deep","research"],i=modes.indexOf(settings.modePreset||"balanced");applyModePreset(modes[(i+1)%modes.length])
+}
+
 function newChat(){
   var parent=current(),c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[],projectId:parent&&parent.projectId?parent.projectId:""};
-  chats.unshift(c);active=c.id;save();closeSide();render();q("#prompt").focus()
+  chats.unshift(c);active=c.id;save();closeSide();render();restoreDraft();q("#prompt").focus()
 }
 function cycleReasoning(){var v=["none","minimal","low","medium","high","xhigh"],i=v.indexOf(settings.reasoning);settings.reasoning=v[(i+1)%v.length];save();render()}
 function toggleResearch(){var on=!(settings.web&&settings.fetch);settings.web=on;settings.fetch=on;if(on&&settings.reasoning==="none")settings.reasoning="medium";save();render();toast(on?"Research tools enabled":"Research tools disabled")}
@@ -1869,6 +1943,7 @@ q("#projectsSide").onclick=openProjects;
 q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
 q("#findSide").onclick=openFindInChat;
 q("#bookmarksSide").onclick=openBookmarks;
+q("#trashSide").onclick=openTrash;
 q("#installSide").onclick=async function(){
   if(installPrompt){
     installPrompt.prompt();
@@ -1890,6 +1965,7 @@ q("#importFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if
 q("#tempToggle").onclick=function(){
   var c=ensure();c.temporary=!c.temporary;save();render();toast(c.temporary?"Temporary chat — this conversation will disappear after reload":"Temporary mode off")
 };
+q("#modeBtn").onclick=cycleMode;
 q("#webToggle").onclick=function(){settings.web=!settings.web;save();render()};
 q("#fetchToggle").onclick=function(){settings.fetch=!settings.fetch;save();render()};
 q("#freshToggle").onclick=function(){settings.cacheClearNext=true;save();toast(settings.cache?"Next request will bypass the response cache":"Fresh flag armed; enable response caching if you want cache refresh behavior")};
@@ -1954,6 +2030,7 @@ q("#renameChat").onclick=renameManagedChat;
 q("#pinChat").onclick=togglePinnedChat;
 q("#duplicateChat").onclick=duplicateManagedChat;
 q("#deleteChat").onclick=deleteManagedChat;
+q("#emptyTrash").onclick=emptyTrash;
 q("#micBtn").onclick=toggleMic;
 q("#clearRunner").onclick=function(){q("#runnerOutput").textContent=""};
 q("#artifactCopy").onclick=function(){if(!artifactCode)return;navigator.clipboard.writeText(artifactCode).then(function(){toast("Artifact HTML copied")})};
@@ -1967,7 +2044,7 @@ q("#artifactOpen").onclick=function(){
 q("#themeSelect").onchange=function(){settings.theme=this.value;save();applyAppearance()};
 q("#accentSelect").onchange=function(){settings.accent=this.value;save();applyAppearance()};
 q("#densitySelect").onchange=function(){settings.density=this.value;save();applyAppearance()};
-q("#prompt").addEventListener("input",resizePrompt);
+q("#prompt").addEventListener("input",function(){resizePrompt();saveDraftSoon()});
 q("#chat").addEventListener("scroll",updateScrollButton,{passive:true});
 q("#scrollBottom").onclick=function(){q("#chat").scrollTo({top:q("#chat").scrollHeight,behavior:"smooth"})};
 q("#prompt").addEventListener("paste",function(e){
@@ -1996,7 +2073,7 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();ins
 if("serviceWorker" in navigator&&location.protocol==="https:"){
   navigator.serviceWorker.register("./sw.js").catch(function(){})
 }
-finishAuth().then(render)
+finishAuth().then(function(){render();restoreDraft()})
 })();
 </script>
 </body>
