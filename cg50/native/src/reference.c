@@ -71,7 +71,7 @@ static ref_entry_t const refs[] = {
     {"physical_education", "Warm up gradually and use safe technique.\nFitness components include cardiovascular endurance, strength, muscular endurance, flexibility, and body composition.\nRules and sportsmanship matter."}
 };
 
-static char const *lookup(char const *id)
+char const *qb_reference_text(char const *id)
 {
     unsigned int i;
     for(i = 0; i < sizeof(refs) / sizeof(refs[0]); i++) {
@@ -128,7 +128,7 @@ static int make_lines(char const *text, char lines[][REF_COLS], int max_lines)
 void qb_reference_show(char const *subject_id, char const *subject_label)
 {
     char lines[REF_LINES][REF_COLS];
-    int count = make_lines(lookup(subject_id), lines, REF_LINES);
+    int count = make_lines(qb_reference_text(subject_id), lines, REF_LINES);
     int scroll = 0;
 
     while(1) {
