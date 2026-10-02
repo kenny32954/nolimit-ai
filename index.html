@@ -6,6 +6,9 @@
 <meta name="theme-color" content="#171716">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src https://openrouter.ai; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; frame-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon.svg">
 <title>NoLimit AI</title>
 <style>
 :root{--bg:#171716;--panel:#20201e;--panel2:#2a2927;--line:#3a3935;--text:#f1efe9;--muted:#85827c;--accent:#d87858}
@@ -29,6 +32,7 @@
 <button class="sbtn" id="modelsBtn">Models</button>
 <button class="sbtn" id="compareSide">Compare models</button>
 <button class="sbtn" id="usageSide">Usage</button>
+<button class="sbtn" id="installSide">Install app</button>
 <button class="sbtn" id="imageSide">Create image</button>
 <button class="sbtn" id="videoSide">Create video</button>
 <button class="sbtn" id="exportSide">Export Markdown</button>
@@ -248,6 +252,7 @@ var recorder=null;
 var recorderChunks=[];
 var artifactCode="";
 var manageChatId=null;
+var installPrompt=null;
 
 function q(s){return document.querySelector(s)}
 function qa(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
@@ -976,6 +981,15 @@ q("#topAuth").onclick=q("#sideAuth").onclick=q("#settingsBtn").onclick=openSetti
 q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
 q("#compareSide").onclick=openCompare;
 q("#usageSide").onclick=openUsage;
+q("#installSide").onclick=async function(){
+  if(installPrompt){
+    installPrompt.prompt();
+    try{await installPrompt.userChoice}catch(e){}
+    installPrompt=null
+  }else{
+    toast("If install is not offered automatically, use your browser's Add to Home Screen or Install App option.")
+  }
+};
 q("#imageSide").onclick=q("#imageBtn").onclick=openImage;
 q("#videoSide").onclick=openVideo;
 q("#exportSide").onclick=exportChat;
@@ -1034,6 +1048,10 @@ var composer=q(".composer");
 ["dragleave","drop"].forEach(function(name){composer.addEventListener(name,function(e){e.preventDefault();composer.style.borderColor=""})});
 composer.addEventListener("drop",function(e){var fs=e.dataTransfer&&e.dataTransfer.files?Array.prototype.slice.call(e.dataTransfer.files):[];if(fs.length)addFiles(fs)});
 
+window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();installPrompt=e});
+if("serviceWorker" in navigator&&location.protocol==="https:"){
+  navigator.serviceWorker.register("./sw.js").catch(function(){})
+}
 finishAuth().then(render)
 })();
 </script>
