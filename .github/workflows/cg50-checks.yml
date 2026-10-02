@@ -47,7 +47,9 @@ jobs:
             -Icg50/native/tests/include \
             -Icg50/native/src \
             cg50/native/src/main.c \
+            cg50/native/src/diagnostics.c \
             cg50/native/src/editor.c \
             cg50/native/src/picker.c \
+            cg50/native/src/reference.c \
             cg50/native/src/base64.c \
             cg50/native/src/transport.c
