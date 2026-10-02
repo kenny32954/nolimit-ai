@@ -10,7 +10,7 @@ SUBJECTS = {
     "math": {
         "label": "Math",
         "aliases": ("math", "mathematics"),
-        "keywords": ("equation", "solve", "x=", "fraction", "decimal", "percent", "ratio", "proportion", "radical"),
+        "keywords": ("equation", "solve", "fraction", "decimal", "percent", "ratio", "proportion", "radical"),
         "instruction": "Show mathematically correct work, define variables, preserve units, and verify arithmetic when practical."
     },
     "algebra": {
@@ -28,7 +28,7 @@ SUBJECTS = {
     "statistics": {
         "label": "Statistics",
         "aliases": ("stat", "stats", "statistics"),
-        "keywords": ("mean", "median", "mode", "probability", "standard deviation", "regression", "distribution"),
+        "keywords": ("mean", "median", "probability", "standard deviation", "regression", "distribution", "sample"),
         "instruction": "Distinguish population from sample and explain what calculated values mean in context."
     },
     "calculus": {
@@ -61,10 +61,16 @@ SUBJECTS = {
         "keywords": ("planet", "star", "rock", "weathering", "plate tectonics", "climate", "solar system"),
         "instruction": "Explain Earth and space science with clear cause-and-effect relationships."
     },
+    "environmental_science": {
+        "label": "Environmental Science",
+        "aliases": ("environment", "environmental", "env_sci"),
+        "keywords": ("ecosystem", "biodiversity", "pollution", "sustainability", "carbon cycle", "renewable", "conservation"),
+        "instruction": "Explain environmental systems, tradeoffs, evidence, and cause-and-effect relationships."
+    },
     "ela": {
         "label": "English/ELA",
         "aliases": ("ela", "english", "grammar"),
-        "keywords": ("grammar", "sentence", "verb", "noun", "adjective", "punctuation", "theme", "figurative language"),
+        "keywords": ("grammar", "sentence", "verb", "noun", "adjective", "punctuation", "figurative language"),
         "instruction": "Explain language conventions and literary concepts with concise examples."
     },
     "literature": {
@@ -85,6 +91,18 @@ SUBJECTS = {
         "keywords": ("war", "revolution", "empire", "century", "historical", "civilization", "industrialization"),
         "instruction": "Use dates and chronology carefully, distinguish primary facts from interpretation, and explain causes and consequences."
     },
+    "social_studies": {
+        "label": "Social Studies",
+        "aliases": ("social", "social_studies"),
+        "keywords": ("social studies", "culture", "society", "citizenship", "community", "human geography"),
+        "instruction": "Connect history, geography, civics, economics, and culture without collapsing distinct concepts."
+    },
+    "geography": {
+        "label": "Geography",
+        "aliases": ("geog", "geography"),
+        "keywords": ("map", "latitude", "longitude", "region", "migration", "population density", "physical geography"),
+        "instruction": "Explain spatial patterns, regions, human-environment interactions, and map concepts accurately."
+    },
     "government": {
         "label": "Government/Civics",
         "aliases": ("gov", "government", "civics"),
@@ -103,11 +121,65 @@ SUBJECTS = {
         "keywords": ("marketing", "management", "entrepreneur", "business", "revenue", "profit", "customer"),
         "instruction": "Use standard business terminology and connect concepts to realistic, age-appropriate examples."
     },
+    "accounting": {
+        "label": "Accounting",
+        "aliases": ("acct", "accounting"),
+        "keywords": ("debit", "credit", "balance sheet", "income statement", "asset", "liability", "journal entry"),
+        "instruction": "Track debits, credits, classifications, and accounting equations carefully."
+    },
     "computer_science": {
         "label": "Computer Science",
         "aliases": ("cs", "computer", "coding", "programming"),
         "keywords": ("code", "python", "javascript", "algorithm", "variable", "loop", "function", "program"),
         "instruction": "Explain code precisely, prefer small testable examples, and call out assumptions and likely errors."
+    },
+    "engineering": {
+        "label": "Engineering",
+        "aliases": ("eng", "engineering", "stem"),
+        "keywords": ("design process", "prototype", "cad", "engineering", "constraint", "tolerance", "mechanism"),
+        "instruction": "Use the engineering design process, identify constraints, and separate calculations from design choices."
+    },
+    "cte": {
+        "label": "CTE/Career Tech",
+        "aliases": ("cte", "career", "career_tech", "shop"),
+        "keywords": ("career tech", "workplace", "technical drawing", "trade", "employability", "safety procedure"),
+        "instruction": "Teach practical career/technical concepts with safe, school-appropriate procedures and terminology."
+    },
+    "agriculture": {
+        "label": "Agriculture",
+        "aliases": ("ag", "agriculture"),
+        "keywords": ("agriculture", "crop", "soil", "livestock", "horticulture", "ffa", "plant science"),
+        "instruction": "Explain agricultural science, plant/animal systems, and agribusiness concepts accurately and safely."
+    },
+    "psychology": {
+        "label": "Psychology",
+        "aliases": ("psych", "psychology"),
+        "keywords": ("psychology", "memory", "learning", "behavior", "cognition", "developmental", "experiment"),
+        "instruction": "Explain psychological concepts and research methods without diagnosing the student or other people."
+    },
+    "sociology": {
+        "label": "Sociology",
+        "aliases": ("soc", "sociology"),
+        "keywords": ("sociology", "socialization", "institution", "group behavior", "culture", "social structure"),
+        "instruction": "Explain sociological concepts, institutions, and research perspectives with careful definitions."
+    },
+    "art": {
+        "label": "Art",
+        "aliases": ("art", "visual_art"),
+        "keywords": ("drawing", "painting", "composition", "perspective", "value", "color theory", "art history"),
+        "instruction": "Explain visual-art concepts, techniques, critique vocabulary, and art-history context constructively."
+    },
+    "music": {
+        "label": "Music",
+        "aliases": ("music", "band", "chorus"),
+        "keywords": ("rhythm", "tempo", "chord", "scale", "melody", "harmony", "music theory"),
+        "instruction": "Explain music theory, notation, history, and performance concepts without reproducing copyrighted lyrics."
+    },
+    "media": {
+        "label": "Media/Audio-Video",
+        "aliases": ("media", "av", "audio_video", "film"),
+        "keywords": ("camera", "editing", "premiere", "shot", "storyboard", "audio", "video", "film", "lighting"),
+        "instruction": "Teach media production, audio/video, film language, editing, and project planning with practical school-safe guidance."
     },
     "language": {
         "label": "World Language",
@@ -118,8 +190,14 @@ SUBJECTS = {
     "health": {
         "label": "Health/Nutrition",
         "aliases": ("health", "nutrition"),
-        "keywords": ("nutrition", "nutrient", "dietary", "wellness", "exercise", "health"),
-        "instruction": "Give age-appropriate educational health information and avoid diagnosis or unsafe body-image guidance."
+        "keywords": ("nutrition", "nutrient", "dietary", "wellness", "health"),
+        "instruction": "Give age-appropriate educational health information and avoid diagnosis, unsafe body-image guidance, or restrictive-eating advice."
+    },
+    "physical_education": {
+        "label": "Physical Education",
+        "aliases": ("pe", "physical_education", "fitness"),
+        "keywords": ("physical education", "fitness", "warm up", "cardio", "sports rules", "training principle"),
+        "instruction": "Explain PE concepts, sports rules, and healthy activity principles without promoting over-exercise or unsafe training."
     },
 }
 
