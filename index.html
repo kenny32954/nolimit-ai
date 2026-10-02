@@ -302,6 +302,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .shortcutGrid{display:grid;gap:7px}.shortcutRow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 12px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.025);font-size:12px;color:#bbb}.shortcutRow kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#ddd;background:#111113;border:1px solid rgba(255,255,255,.1);border-bottom-color:rgba(255,255,255,.18);border-radius:7px;padding:6px 8px;box-shadow:0 2px 0 rgba(255,255,255,.04);white-space:nowrap}.title{cursor:pointer}.title:hover{color:var(--accent2)}
 
+
+.taskList{display:grid;gap:7px}.taskRow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px;align-items:center;padding:10px 11px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.025)}.taskRow.done .taskText{text-decoration:line-through;color:#666}.taskText{font-size:12px;line-height:1.4;color:#c8c4c0;overflow-wrap:anywhere}.taskDelete{width:30px;height:30px;border-radius:8px;color:#8d888f}.taskDelete:hover{background:rgba(173,65,65,.14);color:#e7a1a1}.taskEmpty{padding:18px;text-align:center;color:var(--muted);font-size:12px}
+
 </style>
 </head>
 <body>
@@ -325,6 +328,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="projectsSide">Projects</button>
 <button class="sbtn" id="promptsSide">Prompt library</button>
 <button class="sbtn" id="scratchpadSide">Scratchpad</button>
+<button class="sbtn" id="tasksSide">Tasks</button>
 <button class="sbtn" id="snapshotsSide">Snapshots</button>
 <button class="sbtn" id="globalSearchSide">Search everything</button>
 <button class="sbtn" id="findSide">Find in chat</button>
@@ -567,6 +571,17 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 </div>
 <div class="row" style="margin:0 0 10px"><button class="secondary" id="pickFreeCompatible">Largest-context free compatible</button><button class="secondary" id="pickCheapestCompatible">Lowest-cost compatible</button><button class="secondary" id="pickRatedCompatible">Best-rated compatible</button></div>
 <div class="models" id="models"></div>
+</section>
+
+<section class="modal" id="tasksModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Conversation tasks</h2>
+<div class="notice">Keep a lightweight to-do list for this chat. AI extraction uses one model call and adds only explicit or clearly unfinished tasks.</div>
+<div class="row"><input id="taskInput" style="flex:1;min-width:180px" maxlength="240" placeholder="Add a task"><button class="primary" id="addTask">Add</button><button class="secondary" id="extractTasks">Extract with AI</button></div>
+<div id="taskProgress" class="progress hidden"><i></i></div>
+<div style="height:12px"></div>
+<div id="taskList" class="taskList"></div>
+<div class="row" style="margin-top:12px"><button class="secondary" id="clearCompletedTasks">Clear completed</button><button class="secondary" id="tasksToPrompt">Insert open tasks into composer</button></div>
 </section>
 
 <section class="modal" id="branchesModal">
@@ -1585,6 +1600,52 @@ function toggleContextPin(idx){
   var c=ensure(),m=c.messages[idx];if(!m)return;
   m.contextPinned=!m.contextPinned;c.updated=Date.now();save();render();toast(m.contextPinned?"Message pinned to context":"Context pin removed")
 }
+function normalizeTaskText(v){return String(v||"").replace(/\s+/g," ").trim().slice(0,240)}
+function renderTasks(){
+  var c=ensure(),box=q("#taskList"),list=Array.isArray(c.tasks)?c.tasks:[];box.innerHTML="";
+  if(!list.length){box.innerHTML='<div class="taskEmpty">No tasks yet.</div>';return}
+  list.forEach(function(task){
+    var row=document.createElement("div");row.className="taskRow"+(task.done?" done":"");
+    var check=document.createElement("input");check.type="checkbox";check.checked=!!task.done;check.onchange=function(){task.done=check.checked;task.updated=Date.now();c.updated=Date.now();save();renderTasks()};
+    var text=document.createElement("div");text.className="taskText";text.textContent=task.text||"Untitled task";
+    var del=document.createElement("button");del.className="taskDelete";del.textContent="×";del.title="Delete task";del.onclick=function(){c.tasks=list.filter(function(x){return x.id!==task.id});c.updated=Date.now();save();renderTasks()};
+    row.appendChild(check);row.appendChild(text);row.appendChild(del);box.appendChild(row)
+  })
+}
+function openTasks(){openModal("#tasksModal");q("#taskInput").value="";renderTasks();setTimeout(function(){q("#taskInput").focus()},30)}
+function addTask(){
+  var c=ensure(),text=normalizeTaskText(q("#taskInput").value);if(!text)return;
+  c.tasks=Array.isArray(c.tasks)?c.tasks:[];c.tasks.push({id:uid(),text:text,done:false,created:Date.now()});c.updated=Date.now();q("#taskInput").value="";save();renderTasks()
+}
+function clearCompletedTasks(){
+  var c=ensure(),before=(c.tasks||[]).length;c.tasks=(c.tasks||[]).filter(function(t){return !t.done});save();renderTasks();toast("Cleared "+(before-c.tasks.length)+" completed task"+(before-c.tasks.length===1?"":"s"))
+}
+function tasksToPrompt(){
+  var open=(ensure().tasks||[]).filter(function(t){return !t.done});if(!open.length)return toast("There are no open tasks");
+  q("#prompt").value=(q("#prompt").value?q("#prompt").value+"\n\n":"")+"Open tasks:\n"+open.map(function(t,i){return (i+1)+". "+t.text}).join("\n");closeModals();resizePrompt();saveDraftSoon();q("#prompt").focus()
+}
+async function extractTasksFromChat(){
+  var c=ensure(),material=(c.messages||[]).slice(-40).map(function(m){return (m.role==="user"?"User":"Assistant")+": "+String(m.content||"")}).join("\n\n").slice(0,90000);
+  if(!material.trim())return toast("There is no conversation to extract tasks from");
+  if(!isConnected()){openSettings();return toast("Connect OpenRouter first")}
+  q("#extractTasks").disabled=true;q("#taskProgress").classList.remove("hidden");
+  try{
+    var schema={type:"object",properties:{tasks:{type:"array",items:{type:"string"}}},required:["tasks"],additionalProperties:false};
+    var body={model:effectiveModel(c),messages:[
+      {role:"system",content:"Extract concise actionable tasks from this conversation. Include only tasks that were explicitly requested, agreed to, or are clearly unfinished. Do not invent obligations. Return unique tasks only."},
+      {role:"user",content:material}
+    ],temperature:0,stream:false,max_tokens:1200,response_format:{type:"json_schema",json_schema:{name:"conversation_tasks",strict:true,schema:schema}},provider:{require_parameters:true}};
+    var rr=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)}),j=await rr.json();
+    if(!rr.ok&&[400,422].indexOf(rr.status)>=0){delete body.response_format;delete body.provider;body.messages[0].content+=" Return valid JSON with one key named tasks.";rr=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});j=await rr.json()}
+    if(!rr.ok)throw new Error(errorText(j,"Task extraction failed"));
+    var raw=String(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim().replace(/^\`\`\`(?:json)?\s*/i,"").replace(/\s*\`\`\`$/,""),parsed=JSON.parse(raw),items=Array.isArray(parsed.tasks)?parsed.tasks:[];
+    c.tasks=Array.isArray(c.tasks)?c.tasks:[];var existing=new Set(c.tasks.map(function(t){return normalizeTaskText(t.text).toLowerCase()})),added=0;
+    items.forEach(function(x){var text=normalizeTaskText(x);if(text&&!existing.has(text.toLowerCase())){existing.add(text.toLowerCase());c.tasks.push({id:uid(),text:text,done:false,created:Date.now(),source:"ai"});added++}});
+    c.updated=Date.now();save();renderTasks();toast("Added "+added+" task"+(added===1?"":"s"))
+  }catch(e){toast("Task extraction failed: "+e.message)}
+  q("#extractTasks").disabled=false;q("#taskProgress").classList.add("hidden")
+}
+
 function branchChildren(id){
   return chats.filter(function(ch){return ch.parentChatId===id&&!ch.trashedAt}).sort(function(a,b){return(a.branchCreated||a.created||0)-(b.branchCreated||b.created||0)})
 }
@@ -1820,6 +1881,7 @@ var COMMANDS=[
   {name:"Projects",hint:"Local workspaces",run:openProjects},
   {name:"Prompt library",hint:"Saved reusable prompts",run:openPromptLibrary},
   {name:"Scratchpad",hint:"Notes for this conversation",run:openScratchpad},
+  {name:"Conversation tasks",hint:"Local to-do list + AI extraction",run:openTasks},
   {name:"Conversation snapshots",hint:"Save or restore chat states",run:openSnapshots},
   {name:"Conversation branches",hint:"Navigate alternate forks",run:openBranches},
   {name:"Search everything",hint:"Chats, projects, prompts, profiles",run:openGlobalSearch},
@@ -3649,6 +3711,7 @@ function chatStatsText(c){
   if(cost)bits.push(money(cost)+" tracked cost");
   if(p)bits.push("project: "+p.name);
   if(c.compactSummary)bits.push("context compressed"+(c.lastSummaryCost!=null?" "+money(c.lastSummaryCost):""));
+  var openTasks=(c.tasks||[]).filter(function(t){return !t.done}).length;if(openTasks)bits.push(openTasks+" open task"+(openTasks===1?"":"s"));
   if(c.archivedAt)bits.push("archived");
   var modelId=effectiveModel(c),mi=models.find(function(m){return m.id===modelId}),approx=approxContextTokens(c);
   bits.push("model: "+modelId);
@@ -4237,6 +4300,7 @@ q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
 q("#promptHistoryBtn").onclick=openPromptHistory;
 q("#improvePromptBtn").onclick=improvePrompt;
 q("#scratchpadSide").onclick=openScratchpad;
+q("#tasksSide").onclick=openTasks;
 q("#snapshotsSide").onclick=openSnapshots;
 q("#globalSearchSide").onclick=openGlobalSearch;
 q("#findSide").onclick=openFindInChat;
@@ -4386,6 +4450,11 @@ q("#resetChatOverrides").onclick=resetChatOverrides;
 q("#duplicateChat").onclick=duplicateManagedChat;
 q("#deleteChat").onclick=deleteManagedChat;
 q("#emptyTrash").onclick=emptyTrash;
+q("#addTask").onclick=addTask;
+q("#taskInput").onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();addTask()}};
+q("#extractTasks").onclick=extractTasksFromChat;
+q("#clearCompletedTasks").onclick=clearCompletedTasks;
+q("#tasksToPrompt").onclick=tasksToPrompt;
 q("#createSnapshot").onclick=createSnapshot;
 q("#saveScratchpad").onclick=saveScratchpad;
 q("#insertScratchpad").onclick=insertScratchpad;
