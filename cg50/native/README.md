@@ -9,6 +9,8 @@ The native client now has the first complete live-chat path implemented in sourc
 - color CG50 chat UI
 - scrollable subject picker
 - scrollable tutor-mode picker
+- academic-level picker: AUTO / SCHOOL / COLLEGE / ADVANCED
+- college disciplines including linear algebra, differential equations, organic chemistry, algorithms, engineering, research methods, and more
 - calculator keyboard prompt editor
 - upper/lower-case alpha input plus common math symbols
 - Base64 request/response codec
@@ -33,6 +35,7 @@ The bridge and native C code are automatically syntax/protocol checked in GitHub
 
 - **F1** - open subject picker
 - **F2** - open tutor-mode picker
+- **OPTN** - open academic-level picker
 - **F3** - open/close answer-focus view
 - **F4** - open the selected subject's offline quick reference
 - **F5** - open connection diagnostics and probe/link the desktop bridge
@@ -84,19 +87,19 @@ The calculator does not store an API key. API credentials stay on the Internet-c
 
 ## Protocol
 
-The native client uses protocol v0.2 from `../PROTOCOL.md`.
+The native client uses protocol v0.3 from `../PROTOCOL.md`.
 
 Before a request it can verify the bridge with:
 
 ```text
-H:QBAI:2
-K:QBAI:2
+H:QBAI:3
+K:QBAI:3
 ```
 
 A normal request is:
 
 ```text
-Q:<id>:<subject>:<mode>:<base64 prompt>
+Q:<id>:<subject>:<mode>:<level>:<base64 prompt>
 ```
 
 Answers arrive as ordered Base64 chunks and are assembled on the calculator.
@@ -105,7 +108,7 @@ Answers arrive as ordered Base64 chunks and are assembled on the calculator.
 
 1. Physical CG50 end-to-end serial test.
 2. Fix any hardware-specific serial timing differences found on-device.
-3. Improve text rendering for mathematical notation and non-ASCII language characters.
+3. Improve mathematical rendering for matrices, vectors, calculus notation, proofs, and non-ASCII language characters.
 4. Persistent calculator-side conversation history.
 5. Compact offline formula/reference tools.
 6. Better keyboard punctuation and symbol entry.
