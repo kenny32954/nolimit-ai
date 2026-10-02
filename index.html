@@ -422,7 +422,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="primary" id="saveSettings">Save settings</button>
 <div style="height:16px"></div>
 <div class="notice"><strong>Workspace backup</strong><br>Export chats, projects, local memory, and settings. API keys are never included.</div>
-<div class="row"><button class="secondary" id="exportWorkspace">Export workspace</button><button class="secondary" id="importWorkspaceBtn">Import workspace</button><button class="secondary" id="exportEncryptedWorkspace">Encrypted export</button><button class="secondary" id="importEncryptedWorkspaceBtn">Encrypted import</button><input id="importWorkspaceFile" type="file" accept=".json,application/json" hidden><input id="importEncryptedWorkspaceFile" type="file" accept=".json,application/json" hidden></div>
+<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="backupIncludeMedia" type="checkbox"> Include locally stored images and PDFs <span class="smallnote">(larger backup)</span></label><div class="row"><button class="secondary" id="exportWorkspace">Export workspace</button><button class="secondary" id="importWorkspaceBtn">Import workspace</button><button class="secondary" id="exportEncryptedWorkspace">Encrypted export</button><button class="secondary" id="importEncryptedWorkspaceBtn">Encrypted import</button><input id="importWorkspaceFile" type="file" accept=".json,application/json" hidden><input id="importEncryptedWorkspaceFile" type="file" accept=".json,application/json" hidden></div>
 </section>
 
 <section class="modal" id="modelInfoModal">
@@ -830,6 +830,18 @@ async function listMediaRecords(){
     var records=await new Promise(function(resolve,reject){var tx=db.transaction("media","readonly"),req=tx.objectStore("media").getAll();req.onsuccess=function(){resolve(req.result||[])};req.onerror=function(){reject(req.error)}});
     db.close();return records
   }catch(e){return []}
+}
+async function restoreMediaRecords(records){
+  if(!Array.isArray(records)||!records.length)return 0;
+  try{
+    var db=await openMediaDB(),count=0;
+    await new Promise(function(resolve,reject){
+      var tx=db.transaction("media","readwrite"),store=tx.objectStore("media");
+      records.forEach(function(rec){if(rec&&rec.id&&rec.data){store.put(rec);count++}});
+      tx.oncomplete=resolve;tx.onerror=function(){reject(tx.error)}
+    });
+    db.close();return count
+  }catch(e){return 0}
 }
 function referencedMediaIds(){
   var ids=new Set();
@@ -2132,8 +2144,13 @@ function bytesToB64(bytes){
 function b64ToBytes(s){
   var raw=atob(s),out=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out
 }
-function workspacePayload(){
-  return {type:"quantum-breaks-ai-workspace",version:3,exported_at:new Date().toISOString(),settings:Object.assign({},settings),projects:projects,prompts:savedPrompts,profiles:profiles,chats:chats.filter(function(ch){return !ch.temporary})}
+async function workspacePayload(includeMedia){
+  var data={type:"quantum-breaks-ai-workspace",version:4,exported_at:new Date().toISOString(),settings:Object.assign({},settings),projects:projects,prompts:savedPrompts,profiles:profiles,chats:chats.filter(function(ch){return !ch.temporary})};
+  if(includeMedia){
+    var records=await listMediaRecords(),refs=referencedMediaIds();
+    data.media=records.filter(function(rec){return refs.has(rec.id)})
+  }
+  return data
 }
 async function deriveBackupKey(password,salt){
   var material=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveKey"]);
@@ -2144,7 +2161,7 @@ async function exportEncryptedWorkspace(){
   var confirmPassword=window.prompt("Enter the same password again:","");if(confirmPassword!==password)return toast("Passwords did not match");
   try{
     var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await deriveBackupKey(password,salt);
-    var plain=new TextEncoder().encode(JSON.stringify(workspacePayload()));
+    var plain=new TextEncoder().encode(JSON.stringify(await workspacePayload(q("#backupIncludeMedia").checked)));
     var encrypted=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv:iv},key,plain));
     var envelope={type:"quantum-breaks-ai-encrypted-workspace",version:1,kdf:"PBKDF2-SHA256",iterations:200000,cipher:"AES-256-GCM",salt:bytesToB64(salt),iv:bytesToB64(iv),data:bytesToB64(encrypted)};
     var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(envelope,null,2)],{type:"application/json"}));a.download="quantum-breaks-ai-workspace.encrypted.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000);toast("Encrypted backup created")
@@ -2158,11 +2175,13 @@ async function importEncryptedWorkspace(file){
     var plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:iv},key,cipher);
     var data=JSON.parse(new TextDecoder().decode(plain));
     if(!data||!Array.isArray(data.chats))throw new Error("Decrypted file is not a valid workspace");
-    settings=Object.assign(settings,data.settings||{});projects=Array.isArray(data.projects)?data.projects:[];savedPrompts=Array.isArray(data.prompts)?data.prompts:[];profiles=Array.isArray(data.profiles)?data.profiles:[];chats=data.chats.map(function(ch){return Object.assign({},ch,{id:ch.id||uid(),temporary:false})});active=chats[0]?chats[0].id:"";save();closeModals();render();restoreDraft();toast("Encrypted workspace imported")
+    settings=Object.assign(settings,data.settings||{});projects=Array.isArray(data.projects)?data.projects:[];savedPrompts=Array.isArray(data.prompts)?data.prompts:[];profiles=Array.isArray(data.profiles)?data.profiles:[];chats=data.chats.map(function(ch){return Object.assign({},ch,{id:ch.id||uid(),temporary:false})});if(Array.isArray(data.media))await restoreMediaRecords(data.media);active=chats[0]?chats[0].id:"";save();closeModals();render();restoreDraft();toast("Encrypted workspace imported")
   }catch(e){toast("Encrypted import failed. Check the password and file.")}
 }
-function exportWorkspace(){
-  var data=workspacePayload();
+async function exportWorkspace(){
+  var includeMedia=q("#backupIncludeMedia").checked;
+  if(includeMedia)toast("Collecting local media for backup…");
+  var data=await workspacePayload(includeMedia);
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="quantum-breaks-ai-workspace.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 
@@ -2175,7 +2194,8 @@ async function importWorkspace(file){
     savedPrompts=Array.isArray(data.prompts)?data.prompts:[];
     profiles=Array.isArray(data.profiles)?data.profiles:[];
     chats=data.chats.map(function(ch){return Object.assign({},ch,{id:ch.id||uid(),temporary:false})});
-    active=chats[0]?chats[0].id:"";save();closeModals();render();toast("Workspace imported")
+    if(Array.isArray(data.media))await restoreMediaRecords(data.media);
+    active=chats[0]?chats[0].id:"";save();closeModals();render();restoreDraft();toast("Workspace imported"+(Array.isArray(data.media)&&data.media.length?" with media":""))
   }catch(e){toast("Workspace import failed: "+e.message)}
 }
 
