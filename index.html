@@ -620,6 +620,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <h2>Conversation</h2>
 <div class="field"><label>Title</label><input id="chatTitleInput" maxlength="80"></div>
 <div class="field"><label>Tags</label><input id="chatTagsInput" maxlength="160" placeholder="coding, research, school"><div class="smallnote">Comma-separated. Tags are searchable from the sidebar and global search.</div></div>
+<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="lockChatModel" type="checkbox"> Lock the selected model to this conversation <span class="smallnote" id="chatModelLockLabel"></span></label>
 <div class="notice" id="chatStats"></div>
 <div class="row">
 <button class="primary" id="renameChat">Rename</button>
@@ -869,6 +870,8 @@ function applyAppearance(){
   }
 }
 function current(){return chats.find(function(c){return c.id===active&&!c.trashedAt})}
+function effectiveModel(c){return c&&c.modelOverride?c.modelOverride:settings.model}
+function setActiveModel(id){var c=current();if(c&&c.modelOverride)c.modelOverride=id;else settings.model=id;rememberModel(id);save();render()}
 function projectForChat(c){return c&&c.projectId?projects.find(function(p){return p.id===c.projectId}):null}
 function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save()}return c}
 function closeSide(){q("#side").classList.remove("open");q("#shade").classList.remove("show")}
@@ -1055,9 +1058,10 @@ function render(){
   var c=ensure();
   var cp=projectForChat(c);
   q("#title").textContent=(c.title||"New chat")+(cp?" · "+cp.name:"");
-  q("#modelBottom").textContent=settings.model;
+  var currentModel=effectiveModel(c);
+  q("#modelBottom").textContent=(c.modelOverride?"🔒 ":"")+currentModel;
   var approx=approxContextTokens(c);
-  var modelInfo=models.find(function(m){return m.id===settings.model}),limit=modelInfo&&modelInfo.context_length?Number(modelInfo.context_length):0;
+  var modelInfo=models.find(function(m){return m.id===currentModel}),limit=modelInfo&&modelInfo.context_length?Number(modelInfo.context_length):0;
   var ctxText=approx?" · ~"+formatTokenCount(approx)+(limit?"/"+formatTokenCount(limit):"")+" ctx":"";
   q("#status").textContent=!navigator.onLine?"Offline":((isConnected()?"Connected":"Not connected")+ctxText);
   q("#status").classList.toggle("warn",!!(limit&&approx/limit>.8));
@@ -1212,7 +1216,7 @@ function renderChat(){
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
         tools.appendChild(cp);tools.appendChild(sv);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(bm);tools.appendChild(pin);
-        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");if(m.cacheStatus)bits.push("cache "+String(m.cacheStatus).toLowerCase()+(m.cacheAge?" "+m.cacheAge+"s":""));meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
+        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");if(m.cacheStatus)bits.push("cache "+String(m.cacheStatus).toLowerCase()+(m.cacheAge?" "+m.cacheAge+"s":""));if(m.contextTrimmed)bits.push("fit -"+m.contextTrimmed+" msgs");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
     })
@@ -1252,7 +1256,7 @@ async function reviewMessageAt(idx){
   if(u<0)return toast("No user request found for this answer");
   if(!isConnected()){openSettings();return toast("Connect OpenRouter first")}
   if(a.reviewing)return toast("Review already in progress");
-  await reviewAnswer(c,c.messages[u].content,a)
+  await reviewAnswer(c,c.messages[u].content,a,true)
 }
 
 function globalSearch(){
@@ -1714,7 +1718,7 @@ async function fetchChatWithFallback(body,headers,signal){
     if(r.status!==400&&r.status!==422)throw new Error(errorRaw(raw,"HTTP "+r.status));
     var simpler=Object.assign({},body);
     delete simpler.reasoning;delete simpler.tools;delete simpler.provider;delete simpler.session_id;delete simpler.response_format;delete simpler.max_tokens;delete simpler.plugins;delete simpler.usage;
-    if(simpler.models){delete simpler.models;simpler.model=settings.model}
+    if(simpler.models){var primary=simpler.models[0]||settings.model;delete simpler.models;simpler.model=primary}
     if(simpler.plugins&&simpler.plugins.length===0)delete simpler.plugins;
     toast("Retrying with compatibility mode…");
     var retry=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(simpler),signal:signal});
@@ -1752,8 +1756,8 @@ function handleCommand(text){
   return true
 }
 
-async function reviewAnswer(c,userMessage,assistantMessage){
-  if(!settings.review||!assistantMessage||assistantMessage.error||!assistantMessage.content)return;
+async function reviewAnswer(c,userMessage,assistantMessage,force){
+  if((!settings.review&&!force)||!assistantMessage||assistantMessage.error||!assistantMessage.content)return;
   assistantMessage.reviewing=true;save();render();
   try{
     var schema={type:"object",properties:{confidence:{type:"number",description:"Confidence from 0 to 1 that the answer is accurate and adequately addresses the request"},verdict:{type:"string",description:"Short verdict such as strong, mixed, or needs checking"},summary:{type:"string",description:"One short sentence about answer quality"},issues:{type:"array",items:{type:"string"},description:"Specific possible errors, omissions, or uncertainty worth checking"}},required:["confidence","verdict","summary","issues"],additionalProperties:false};
@@ -1777,7 +1781,7 @@ async function improvePrompt(){
   if(!isConnected()){openSettings();return toast("Connect OpenRouter first")}
   var b=q("#improvePromptBtn");b.disabled=true;b.classList.add("loading");b.textContent="…";
   try{
-    var body={model:settings.model,messages:[
+    var body={model:effectiveModel(ensure()),messages:[
       {role:"system",content:"Rewrite the user's prompt so an AI can answer it more accurately and completely. Preserve the user's intent, constraints, tone, names, and requested output format. Add useful specificity only when it is safely implied. Do not answer the prompt. Return only the improved prompt."},
       {role:"user",content:original}
     ],stream:false,temperature:0.25,max_tokens:1000};
@@ -1795,16 +1799,34 @@ async function preflightSend(files){
     try{var schema=JSON.parse(settings.jsonSchemaText||"");if(!schema||typeof schema!=="object"||Array.isArray(schema))throw new Error("Schema must be a JSON object")}
     catch(e){openSettings();toast("Fix the JSON Schema before sending: "+e.message);return false}
   }
-  var hasImages=files.some(function(f){return f.kind==="image"});if(!hasImages||settings.model==="openrouter/auto")return true;
+  var c=ensure(),modelId=effectiveModel(c),hasImages=files.some(function(f){return f.kind==="image"});if(!hasImages||modelId==="openrouter/auto")return true;
   await ensureModelCatalog();
-  var info=models.find(function(m){return m.id===settings.model});
+  var info=models.find(function(m){return m.id===modelId});
   if(info&&inputs(info).indexOf("image")<0){
     if(confirm("The selected model does not advertise image input support. Switch this request to OpenRouter Auto Router?")){
-      settings.model="openrouter/auto";rememberModel(settings.model);save();render();return true
+      if(c.modelOverride)c.modelOverride="openrouter/auto";else settings.model="openrouter/auto";rememberModel("openrouter/auto");save();render();return true
     }
     return false
   }
   return true
+}
+
+function apiPartChars(content){
+  if(typeof content==="string")return content.length;
+  if(!Array.isArray(content))return 0;
+  var chars=0;content.forEach(function(p){if(!p)return;if(p.type==="text")chars+=String(p.text||"").length;else if(p.type==="input_text")chars+=String(p.text||"").length});return chars
+}
+function estimatedMessageTokens(m){return Math.ceil((apiPartChars(m&&m.content)+24)/4)}
+function fitRequestMessages(messages,modelId){
+  var info=models.find(function(m){return m.id===modelId}),limit=info&&Number(info.context_length)||0;
+  if(!limit||!Array.isArray(messages)||messages.length<3)return {messages:messages,trimmed:0,estimated:messages.reduce(function(n,m){return n+estimatedMessageTokens(m)},0),limit:limit};
+  var reserve=Math.max(2048,Math.min(16000,Math.floor(limit*.18))),target=Math.max(2048,limit-reserve),copy=messages.slice(),total=copy.reduce(function(n,m){return n+estimatedMessageTokens(m)},0),trimmed=0;
+  var system=copy.length&&copy[0].role==="system"?copy.shift():null;
+  while(total>target&&copy.length>2){
+    var removed=copy.shift();total-=estimatedMessageTokens(removed);trimmed++
+  }
+  if(system)copy.unshift(system);
+  return {messages:copy,trimmed:trimmed,estimated:total,limit:limit}
 }
 
 async function send(){
@@ -1820,11 +1842,12 @@ async function send(){
   var m={role:"user",created:Date.now(),content:text||"Please analyze the attached file.",fileNames:files.map(function(x){return x.name}),images:files.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),imageRefs:files.filter(function(x){return x.kind==="image"&&x.mediaId}).map(function(x){return{name:x.name,mediaId:x.mediaId}}),pdfs:files.filter(function(x){return x.kind==="pdf"}).map(function(x){return{name:x.name,data:x.data,mediaId:x.mediaId||""}}),textFiles:files.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
   c.messages.push(m);if(c.title==="New chat")c.title=(text||(files[0]&&files[0].name)||"New chat").replace(/\s+/g," ").slice(0,48);c.updated=Date.now();
   await hydrateChatMedia(c);
-  var requestMessages=apiMessages(c);
-  var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:settings.model};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";q("#send").classList.add("busy");render();
+  var requestModel=effectiveModel(c),fit=fitRequestMessages(apiMessages(c),requestModel),requestMessages=fit.messages;
+  var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:requestModel,contextTrimmed:fit.trimmed||0};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";q("#send").classList.add("busy");render();
+  if(fit.trimmed)toast("Context fit skipped "+fit.trimmed+" older message"+(fit.trimmed===1?"":"s")+" for this request");
   try{
-    var body={model:settings.model,messages:requestMessages,temperature:Number(settings.temperature),stream:true,usage:{include:true},session_id:"quantum-breaks-"+c.id};
-    if(settings.fallbackModel){body.models=[settings.model,settings.fallbackModel];delete body.model}
+    var body={model:requestModel,messages:requestMessages,temperature:Number(settings.temperature),stream:true,usage:{include:true},session_id:"quantum-breaks-"+c.id};
+    if(settings.fallbackModel){body.models=[requestModel,settings.fallbackModel];delete body.model}
     if(settings.providerRouting&&settings.providerRouting!=="balanced")body.provider={sort:settings.providerRouting};
     if(settings.denyDataCollection){body.provider=body.provider||{};body.provider.data_collection="deny"}
     if(settings.requireParameters||settings.responseFormat==="json_schema"){body.provider=body.provider||{};body.provider.require_parameters=true}
@@ -2023,7 +2046,7 @@ async function compareFromMessage(idx){
 async function openCompare(){
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
   openModal("#compareModal");
-  q("#compareModel1").value=settings.model;
+  q("#compareModel1").value=effectiveModel(ensure());
   q("#compareOutput").innerHTML="";
   await ensureModelCatalog();
   var dl=q("#modelOptions");dl.innerHTML="";
@@ -2114,7 +2137,7 @@ function showModels(){
   }).slice(0,180);
   list.forEach(function(m){
     var row=document.createElement("div");row.className="modelrow2";
-    var b=document.createElement("button");b.className="modelpick"+(settings.model===m.id?" selected":"");
+    var b=document.createElement("button");b.className="modelpick"+(effectiveModel(current())===m.id?" selected":"");
     var st=document.createElement("strong");st.textContent=m.name||m.id;
     var sm=document.createElement("span");sm.className="modelmeta";var bits=[m.id];
     if(m.context_length)bits.push(Math.round(m.context_length/1000)+"k ctx");
@@ -2128,7 +2151,7 @@ function showModels(){
     if(priceZero(m))caps.push("free");
     caps.forEach(function(x){var tag=document.createElement("span");tag.className="modelbadge";tag.textContent=x;badges.appendChild(tag)});
     if(caps.length)b.appendChild(badges);
-    b.onclick=function(){settings.model=m.id;rememberModel(m.id);closeModals();render();toast("Model changed to "+m.id)};
+    b.onclick=function(){setActiveModel(m.id);closeModals();toast((current()&&current().modelOverride?"Chat model changed to ":"Model changed to ")+m.id)};
     var star=document.createElement("button");star.className="modelstar"+(favorites.indexOf(m.id)>=0?" on":"");star.textContent=favorites.indexOf(m.id)>=0?"★":"☆";star.title="Favorite model";star.onclick=function(){toggleFavoriteModel(m.id)};
     var info=document.createElement("button");info.className="modelinfo";info.textContent="i";info.title="Model details";info.onclick=function(){openModelInfo(m)};
     row.appendChild(b);row.appendChild(star);row.appendChild(info);box.appendChild(row)
@@ -2640,6 +2663,8 @@ function openChatManage(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
   q("#chatTitleInput").value=c.title||"New chat";
   q("#chatTagsInput").value=(c.tags||[]).join(", ");
+  q("#lockChatModel").checked=!!c.modelOverride;
+  q("#chatModelLockLabel").textContent=c.modelOverride?"("+c.modelOverride+")":"(currently "+effectiveModel(c)+")";
   q("#chatStats").textContent=chatStatsText(c);
   q("#pinChat").textContent=c.pinned?"Unpin":"Pin";
   q("#archiveChat").textContent=c.archivedAt?"Unarchive":"Archive";
@@ -2647,6 +2672,12 @@ function openChatManage(){
   openModal("#chatManageModal")
 }
 
+function toggleChatModelLock(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  if(q("#lockChatModel").checked)c.modelOverride=c.modelOverride||settings.model;
+  else c.modelOverride="";
+  c.updated=Date.now();save();q("#chatModelLockLabel").textContent=c.modelOverride?"("+c.modelOverride+")":"(currently "+settings.model+")";render();toast(c.modelOverride?"Model locked to this chat":"Chat now follows the global model")
+}
 function renameManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
   c.title=q("#chatTitleInput").value.trim().slice(0,80)||"New chat";c.tags=q("#chatTagsInput").value.split(",").map(function(x){return x.trim().replace(/^#/,"").slice(0,24)}).filter(Boolean).slice(0,12);c.updated=Date.now();save();closeModals();render()
@@ -3072,9 +3103,9 @@ q("#refreshStorage").onclick=refreshStorageManager;
 q("#cleanStorage").onclick=cleanOrphanedMedia;
 q("#clearMediaStorage").onclick=clearAllMedia;
 q("#copyDiagnostics").onclick=function(){navigator.clipboard.writeText(lastDiagReport||"No diagnostics run yet.").then(function(){toast("Diagnostics copied")})};
-q("#useModelInfo").onclick=function(){if(!modelInfoCurrent)return;settings.model=modelInfoCurrent.id;rememberModel(modelInfoCurrent.id);closeModals();render();toast("Model changed to "+modelInfoCurrent.id)};
+q("#useModelInfo").onclick=function(){if(!modelInfoCurrent)return;setActiveModel(modelInfoCurrent.id);closeModals();toast("Model changed to "+modelInfoCurrent.id)};
 q("#copyModelId").onclick=function(){if(!modelInfoCurrent)return;navigator.clipboard.writeText(modelInfoCurrent.id||"").then(function(){toast("Model ID copied")})};
-q("#useCustomModel").onclick=function(){var id=q("#customModelId").value.trim();if(!id)return toast("Enter a model ID");settings.model=id;rememberModel(id);closeModals();render();toast("Using custom model "+id)};
+q("#useCustomModel").onclick=function(){var id=q("#customModelId").value.trim();if(!id)return toast("Enter a model ID");setActiveModel(id);closeModals();toast("Using custom model "+id)};
 q("#favoriteModelInfo").onclick=function(){if(!modelInfoCurrent)return;toggleFavoriteModel(modelInfoCurrent.id);q("#favoriteModelInfo").textContent=(settings.favoriteModels||[]).indexOf(modelInfoCurrent.id)>=0?"Unfavorite":"Favorite"};
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
@@ -3110,6 +3141,7 @@ q("#downloadTranscript").onclick=function(){downloadCode(q("#transcriptOutput").
 q("#generateVoice").onclick=generateVoice;
 q("#voiceModel").onchange=function(){q("#voiceName").value=defaultVoiceFor(q("#voiceModel").value)};
 q("#generateVideo").onclick=generateVideo;
+q("#lockChatModel").onchange=toggleChatModelLock;
 q("#renameChat").onclick=renameManagedChat;
 q("#aiTitleChat").onclick=generateChatTitle;
 q("#compressChat").onclick=compressChatContext;
