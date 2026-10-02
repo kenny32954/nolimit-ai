@@ -7,10 +7,12 @@
 #include "transport.h"
 
 static char const *subjects[] = {
-    "AUTO", "MATH", "ALGEBRA", "GEOMETRY", "STATISTICS",
-    "CALCULUS", "BIOLOGY", "CHEMISTRY", "PHYSICS", "EARTH/SPACE",
-    "ELA", "LITERATURE", "WRITING", "HISTORY", "GOV/CIVICS",
-    "ECONOMICS", "BUSINESS", "COMPUTER SCI", "LANGUAGE", "HEALTH"
+    "AUTO", "MATH", "ALGEBRA", "GEOMETRY", "STATISTICS", "CALCULUS",
+    "BIOLOGY", "CHEMISTRY", "PHYSICS", "EARTH/SPACE", "ENV SCI",
+    "ELA", "LITERATURE", "WRITING", "HISTORY", "SOCIAL STUDIES",
+    "GEOGRAPHY", "GOV/CIVICS", "ECONOMICS", "BUSINESS", "ACCOUNTING",
+    "COMPUTER SCI", "ENGINEERING", "CTE", "AGRICULTURE", "PSYCHOLOGY",
+    "SOCIOLOGY", "ART", "MUSIC", "MEDIA/A-V", "LANGUAGE", "HEALTH", "PE"
 };
 
 static char const *modes[] = {
@@ -35,7 +37,6 @@ static void draw_badge(int x, int y, int w, char const *text, color_t bg, color_
 
 static void draw_wrapped(int x, int y, int width_px, char const *text, color_t color)
 {
-    /* Small predictable wrapper: about 7 px per glyph in the default font. */
     int max_chars = width_px / 7;
     char line[64];
     int len = (int)strlen(text);
@@ -80,7 +81,6 @@ static void draw_chat(app_state_t const *state)
 
     dclear(bg);
 
-    /* Top bar */
     drect(0, 0, DWIDTH - 1, 31, panel);
     drect(0, 31, DWIDTH - 1, 32, line);
     dtext(10, 8, text, "Q  QUANTUM BREAKS AI");
@@ -92,13 +92,11 @@ static void draw_chat(app_state_t const *state)
         draw_badge(DWIDTH - 78, 6, 66, "OFFLINE", line, muted);
     }
 
-    /* Subject/mode bar */
     dtext(10, 43, muted, "SUBJECT");
     draw_badge(76, 39, 116, subjects[state->subject], line, text);
     dtext(206, 43, muted, "MODE");
     draw_badge(252, 39, 124, modes[state->mode], accent, text);
 
-    /* Conversation area */
     dtext(12, 76, accent, "YOU");
     draw_wrapped(
         12, 94, DWIDTH - 24,
@@ -109,11 +107,10 @@ static void draw_chat(app_state_t const *state)
     dtext(12, 143, C_RGB(12, 22, 31), "QBAI");
     draw_wrapped(
         12, 161, DWIDTH - 24,
-        "Native CG50 UI is running. Live model responses will arrive through the serial bridge.",
+        "Native CG50 UI is running. Live model responses will arrive through the bridge.",
         text
     );
 
-    /* Bottom controls */
     drect(0, DHEIGHT - 31, DWIDTH - 1, DHEIGHT - 1, panel);
     drect(0, DHEIGHT - 32, DWIDTH - 1, DHEIGHT - 31, line);
     dtext(7, DHEIGHT - 23, muted, "F1 SUBJECT");
