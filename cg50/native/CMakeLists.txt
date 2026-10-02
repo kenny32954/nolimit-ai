@@ -28,8 +28,10 @@ endif()
 
 add_executable(qbai_cg50
   src/main.c
+  src/diagnostics.c
   src/editor.c
   src/picker.c
+  src/reference.c
   src/base64.c
   src/transport.c
   src/serial_syscalls.S
