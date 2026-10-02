@@ -1250,7 +1250,7 @@ function renderChat(){
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
         tools.appendChild(cp);tools.appendChild(sv);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(bm);tools.appendChild(pin);
-        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");if(m.cacheStatus)bits.push("cache "+String(m.cacheStatus).toLowerCase()+(m.cacheAge?" "+m.cacheAge+"s":""));if(m.contextTrimmed)bits.push("fit -"+m.contextTrimmed+" msgs");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
+        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");if(m.finishReason&&m.finishReason!=="stop")bits.push("finish "+m.finishReason);if(m.cacheStatus)bits.push("cache "+String(m.cacheStatus).toLowerCase()+(m.cacheAge?" "+m.cacheAge+"s":""));if(m.contextTrimmed)bits.push("fit -"+m.contextTrimmed+" msgs");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
     })
@@ -1757,6 +1757,19 @@ function addDelta(d,a){
   if(d.annotations)a.annotations=d.annotations
 }
 
+function applyStreamPayload(raw,a){
+  raw=String(raw||"").trim();if(!raw||raw==="[DONE]")return;
+  var j=JSON.parse(raw);
+  if(j.error)throw new Error(errorText(j,"Streaming request failed"));
+  var ch=j.choices&&j.choices[0];
+  if(ch&&ch.delta)addDelta(ch.delta,a);
+  if(ch&&ch.finish_reason)a.finishReason=ch.finish_reason;
+  if(j.usage){a.usage=j.usage;if(j.usage.cost!=null)a.cost=j.usage.cost}
+  if(j.cost!=null)a.cost=j.cost;
+  if(j.model)a.model=j.model;
+  scheduleRender()
+}
+
 async function fetchChatWithFallback(body,headers,signal){
   try{
     var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body),signal:signal});
@@ -1932,12 +1945,18 @@ async function send(){
     if(!reader){var j=await r.json();finishBuffered(j,a);a.finished=Date.now();save();render();return}
     var dec=new TextDecoder(),buf="";
     while(true){
-      var z=await reader.read();if(z.done)break;buf+=dec.decode(z.value,{stream:true});var lines=buf.split("\n");buf=lines.pop();
-      lines.forEach(function(line){
-        line=line.trim();if(line.indexOf("data:")!==0)return;var raw=line.slice(5).trim();if(!raw||raw==="[DONE]")return;
-        try{var j=JSON.parse(raw),ch=j.choices&&j.choices[0];if(ch&&ch.delta)addDelta(ch.delta,a);if(j.usage){a.usage=j.usage;if(j.usage.cost!=null)a.cost=j.usage.cost}if(j.cost!=null)a.cost=j.cost;if(j.model)a.model=j.model;scheduleRender()}catch(e){}
-      })
+      var z=await reader.read();if(z.done)break;
+      buf+=dec.decode(z.value,{stream:true});
+      var lines=buf.split(/\r?\n/);buf=lines.pop()||"";
+      for(var li=0;li<lines.length;li++){
+        var line=lines[li].trim();if(line.indexOf("data:")!==0)continue;
+        var raw=line.slice(5).trim();if(!raw||raw==="[DONE]")continue;
+        applyStreamPayload(raw,a)
+      }
     }
+    buf+=dec.decode();
+    var tail=buf.trim();
+    if(tail.indexOf("data:")===0){var tailRaw=tail.slice(5).trim();if(tailRaw&&tailRaw!=="[DONE]")applyStreamPayload(tailRaw,a)}
     a.finished=Date.now();save()
   }catch(e){
     if(e.name!=="AbortError"){a.content="Request failed: "+e.message;a.error=true}
