@@ -11,6 +11,10 @@ Everything else in this repository supports the app with documentation and autom
 ## Current feature set
 
 ### App experience
+- Share a chat with the Web Share API or clipboard fallback
+- Pinned chats
+- Recent-model filtering
+- Approximate context-size meter in the composer footer
 - Installable PWA support
 - Offline app-shell caching
 - Slash commands such as /help, /models, /research, /image, and /video
@@ -18,6 +22,7 @@ Everything else in this repository supports the app with documentation and autom
 - Online/offline connection status
 
 ### Chat
+- Per-chat token/cost stats when usage is available
 - Streaming OpenRouter chat completions
 - Responsive mobile and desktop layouts
 - Searchable local conversation history
@@ -44,6 +49,8 @@ Everything else in this repository supports the app with documentation and autom
 - Full workspace export/import for chats, projects, memory, and settings
 
 ### Models and routing
+- Recent-model list kept locally
+- Optional history-message cap to control context size
 - Live OpenRouter model catalog
 - Model search
 - Filters for free, vision, and reasoning-capable models
@@ -96,6 +103,8 @@ Everything else in this repository supports the app with documentation and autom
 - Optional automatic browser read-aloud
 
 ### Code and artifacts
+- Download generated code blocks with a matching file extension
+- Run JavaScript code blocks in a disposable Web Worker with a 5-second timeout
 - Rich Markdown rendering
 - Copyable code blocks
 - Sandboxed HTML artifact preview
@@ -103,6 +112,10 @@ Everything else in this repository supports the app with documentation and autom
 - Copy generated artifact HTML
 
 ### Image generation
+- Image-to-image reference input
+- Multi-image output when supported
+- Quality and background controls
+- Controls automatically adapt to the selected model's live capabilities
 - Dedicated image generation panel
 - Live image-model catalog
 - Aspect-ratio selection
@@ -110,6 +123,9 @@ Everything else in this repository supports the app with documentation and autom
 - Add generated images into the current conversation
 
 ### Video generation
+- First-frame image input for image-to-video
+- Reference image input for reference-to-video
+- Video controls automatically adapt to the selected model's supported durations, resolutions, aspect ratios, and audio capability
 - Live video-model catalog
 - Asynchronous video job submission
 - Status polling
@@ -195,7 +211,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v1.3
+Current app generation: v1.4
 
 Major capabilities now include:
 - phone + PC UI
