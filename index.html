@@ -2344,10 +2344,11 @@ function finishBuffered(j,a){
 
 function restoreAttachments(m){
   pending=[];
-  (m.images||[]).forEach(function(data,i){pending.push({kind:"image",name:"image-"+(i+1),data:data})});
-  (m.pdfs||[]).forEach(function(f){pending.push({kind:"pdf",name:f.name||"document.pdf",data:f.data})});
+  var refs=Array.isArray(m.imageRefs)?m.imageRefs:[];
+  (m.images||[]).forEach(function(data,i){var ref=refs[i]||{};pending.push({kind:"image",name:ref.name||"image-"+(i+1),data:data,mediaId:ref.mediaId||""})});
+  (m.pdfs||[]).forEach(function(f){pending.push({kind:"pdf",name:f.name||"document.pdf",data:f.data,mediaId:f.mediaId||""})});
   (m.textFiles||[]).forEach(function(f){pending.push({kind:"text",name:f.name||"file.txt",text:f.text||""})});
-  renderPending()
+  renderPending();saveDraftSoon()
 }
 
 function stashMutationUndo(c,label){
