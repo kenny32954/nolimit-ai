@@ -429,10 +429,13 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field"><label>Fallback model (optional)</label><input id="fallbackModel" placeholder="e.g. anthropic/claude-sonnet-4"><div class="smallnote">If the primary model fails, OpenRouter can try this model next.</div></div>
 <div class="field"><label>Provider routing</label><select id="providerRouting"><option value="balanced">Balanced</option><option value="price">Lowest price</option><option value="throughput">Highest throughput</option><option value="latency">Lowest latency</option></select></div>
 <div class="row">
-<div class="field" style="flex:1;min-width:180px"><label>Response format</label><select id="responseFormat"><option value="text">Normal text</option><option value="json_object">JSON object</option></select></div>
+<div class="field" style="flex:1;min-width:180px"><label>Response format</label><select id="responseFormat"><option value="text">Normal text</option><option value="json_object">JSON object</option><option value="json_schema">Strict JSON Schema</option></select></div>
 <div class="field" style="flex:1;min-width:180px"><label>Max output tokens</label><input id="maxTokens" type="number" min="0" step="256" placeholder="0 = model default"></div>
 <div class="field" style="flex:1;min-width:180px"><label>History messages sent</label><input id="historyLimit" type="number" min="0" step="1" placeholder="0 = all"><div class="smallnote">Optional context cap. 0 sends the full conversation.</div></div>
 </div>
+<div class="field"><label>JSON Schema name</label><input id="jsonSchemaName" maxlength="60" placeholder="structured_response"></div>
+<div class="field"><label>JSON Schema</label><textarea id="jsonSchemaText" spellcheck="false" placeholder='{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"],"additionalProperties":false}'></textarea><div class="row" style="margin-top:7px"><button class="secondary" id="schemaExampleBtn" type="button">Load example schema</button></div><div class="smallnote">Used only when Response format is Strict JSON Schema.</div></div>
+<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="requireParameters" type="checkbox"> Require providers that support requested parameters</label>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="denyDataCollection" type="checkbox"> Prefer providers that deny data collection</label>
 <div class="row">
 <div class="field" style="flex:1;min-width:160px"><label>Web results per search</label><input id="webMaxResults" type="number" min="1" max="10" value="5"></div>
@@ -472,6 +475,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="filter" data-filter="free">Free</button>
 <button class="filter" data-filter="vision">Vision</button>
 <button class="filter" data-filter="reasoning">Reasoning</button>
+<button class="filter" data-filter="structured">Structured</button>
 </div>
 <div class="models" id="models"></div>
 </section>
@@ -737,6 +741,9 @@ var settings=Object.assign({
   fallbackModel:"",
   providerRouting:"balanced",
   responseFormat:"text",
+  jsonSchemaName:"structured_response",
+  jsonSchemaText:"",
+  requireParameters:false,
   maxTokens:0,
   historyLimit:0,
   recentModels:[],
@@ -1487,6 +1494,9 @@ function openSettings(){
   q("#fallbackModel").value=settings.fallbackModel||"";
   q("#providerRouting").value=settings.providerRouting||"balanced";
   q("#responseFormat").value=settings.responseFormat||"text";
+  q("#jsonSchemaName").value=settings.jsonSchemaName||"structured_response";
+  q("#jsonSchemaText").value=settings.jsonSchemaText||"";
+  q("#requireParameters").checked=!!settings.requireParameters;
   q("#maxTokens").value=settings.maxTokens||0;
   q("#historyLimit").value=settings.historyLimit||0;
   q("#denyDataCollection").checked=!!settings.denyDataCollection;
@@ -1701,6 +1711,10 @@ async function improvePrompt(){
 }
 
 async function preflightSend(files){
+  if(settings.responseFormat==="json_schema"){
+    try{var schema=JSON.parse(settings.jsonSchemaText||"");if(!schema||typeof schema!=="object"||Array.isArray(schema))throw new Error("Schema must be a JSON object")}
+    catch(e){openSettings();toast("Fix the JSON Schema before sending: "+e.message);return false}
+  }
   var hasImages=files.some(function(f){return f.kind==="image"});if(!hasImages||settings.model==="openrouter/auto")return true;
   await ensureModelCatalog();
   var info=models.find(function(m){return m.id===settings.model});
@@ -1733,7 +1747,9 @@ async function send(){
     if(settings.fallbackModel){body.models=[settings.model,settings.fallbackModel];delete body.model}
     if(settings.providerRouting&&settings.providerRouting!=="balanced")body.provider={sort:settings.providerRouting};
     if(settings.denyDataCollection){body.provider=body.provider||{};body.provider.data_collection="deny"}
+    if(settings.requireParameters||settings.responseFormat==="json_schema"){body.provider=body.provider||{};body.provider.require_parameters=true}
     if(settings.responseFormat==="json_object")body.response_format={type:"json_object"};
+    if(settings.responseFormat==="json_schema")body.response_format={type:"json_schema",json_schema:{name:settings.jsonSchemaName||"structured_response",strict:true,schema:JSON.parse(settings.jsonSchemaText)}};
     if(Number(settings.maxTokens)>0)body.max_tokens=Math.floor(Number(settings.maxTokens));
     if(settings.reasoning!=="none")body.reasoning={effort:settings.reasoning,summary:"auto"};
     var tools=toolList();if(tools.length)body.tools=tools;
@@ -2009,6 +2025,7 @@ function showModels(){
     if(modelFilter==="free"&&!priceZero(m))return false;
     if(modelFilter==="vision"&&inputs(m).indexOf("image")<0)return false;
     if(modelFilter==="reasoning"){var sp=m.supported_parameters||[];if(sp.indexOf("reasoning")<0&&sp.indexOf("reasoning_effort")<0)return false}
+    if(modelFilter==="structured"){var sps=m.supported_parameters||[];if(sps.indexOf("structured_outputs")<0&&sps.indexOf("response_format")<0)return false}
     return true
   }).slice(0,180);
   list.forEach(function(m){
@@ -2023,6 +2040,7 @@ function showModels(){
     var badges=document.createElement("div");badges.className="modelbadges";
     var caps=[];if(inputs(m).indexOf("image")>=0)caps.push("vision");
     var sp=m.supported_parameters||[];if(sp.indexOf("reasoning")>=0||sp.indexOf("reasoning_effort")>=0)caps.push("reasoning");
+    if(sp.indexOf("structured_outputs")>=0||sp.indexOf("response_format")>=0)caps.push("structured");
     if(priceZero(m))caps.push("free");
     caps.forEach(function(x){var tag=document.createElement("span");tag.className="modelbadge";tag.textContent=x;badges.appendChild(tag)});
     if(caps.length)b.appendChild(badges);
@@ -2915,7 +2933,7 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.customAccent=q("#customAccent").value;settings.density=q("#densitySelect").value;settings.contentWidth=Number(q("#contentWidth").value)||860;settings.chatFontSize=Number(q("#chatFontSize").value)||17;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.jsonSchemaName=(q("#jsonSchemaName").value.trim()||"structured_response").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,60);settings.jsonSchemaText=q("#jsonSchemaText").value.trim();settings.requireParameters=q("#requireParameters").checked;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#commandSearch").oninput=function(){commandActiveIndex=0;renderCommandPalette()};
 q("#commandSearch").onkeydown=function(e){
@@ -2992,6 +3010,10 @@ q("#artifactOpen").onclick=function(){
 };
 
 // Paste and drag/drop attachments.
+q("#schemaExampleBtn").onclick=function(){
+  q("#jsonSchemaName").value="answer_with_confidence";
+  q("#jsonSchemaText").value=JSON.stringify({type:"object",properties:{answer:{type:"string"},confidence:{type:"number",description:"Confidence from 0 to 1"}},required:["answer","confidence"],additionalProperties:false},null,2)
+};
 q("#themeSelect").onchange=function(){settings.theme=this.value;save();applyAppearance()};
 q("#accentSelect").onchange=function(){settings.accent=this.value;save();applyAppearance()};
 q("#customAccent").oninput=function(){settings.customAccent=this.value;settings.accent="custom";q("#accentSelect").value="custom";save();applyAppearance()};
