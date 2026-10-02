@@ -398,7 +398,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="primary" id="saveSettings">Save settings</button>
 <div style="height:16px"></div>
 <div class="notice"><strong>Workspace backup</strong><br>Export chats, projects, local memory, and settings. API keys are never included.</div>
-<div class="row"><button class="secondary" id="exportWorkspace">Export workspace</button><button class="secondary" id="importWorkspaceBtn">Import workspace</button><input id="importWorkspaceFile" type="file" accept=".json,application/json" hidden></div>
+<div class="row"><button class="secondary" id="exportWorkspace">Export workspace</button><button class="secondary" id="importWorkspaceBtn">Import workspace</button><button class="secondary" id="exportEncryptedWorkspace">Encrypted export</button><button class="secondary" id="importEncryptedWorkspaceBtn">Encrypted import</button><input id="importWorkspaceFile" type="file" accept=".json,application/json" hidden><input id="importEncryptedWorkspaceFile" type="file" accept=".json,application/json" hidden></div>
 </section>
 
 <section class="modal" id="modelsModal">
@@ -1910,9 +1910,43 @@ function exportChat(){
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/markdown"}));a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".md";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 
+function bytesToB64(bytes){
+  var s="";for(var i=0;i<bytes.length;i++)s+=String.fromCharCode(bytes[i]);return btoa(s)
+}
+function b64ToBytes(s){
+  var raw=atob(s),out=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out
+}
+function workspacePayload(){
+  return {type:"quantum-breaks-ai-workspace",version:3,exported_at:new Date().toISOString(),settings:Object.assign({},settings),projects:projects,prompts:savedPrompts,profiles:profiles,chats:chats.filter(function(ch){return !ch.temporary})}
+}
+async function deriveBackupKey(password,salt){
+  var material=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2",salt:salt,iterations:200000,hash:"SHA-256"},material,{name:"AES-GCM",length:256},false,["encrypt","decrypt"])
+}
+async function exportEncryptedWorkspace(){
+  var password=window.prompt("Create a password for this encrypted backup:","");if(!password)return;
+  var confirmPassword=window.prompt("Enter the same password again:","");if(confirmPassword!==password)return toast("Passwords did not match");
+  try{
+    var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await deriveBackupKey(password,salt);
+    var plain=new TextEncoder().encode(JSON.stringify(workspacePayload()));
+    var encrypted=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv:iv},key,plain));
+    var envelope={type:"quantum-breaks-ai-encrypted-workspace",version:1,kdf:"PBKDF2-SHA256",iterations:200000,cipher:"AES-256-GCM",salt:bytesToB64(salt),iv:bytesToB64(iv),data:bytesToB64(encrypted)};
+    var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(envelope,null,2)],{type:"application/json"}));a.download="quantum-breaks-ai-workspace.encrypted.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000);toast("Encrypted backup created")
+  }catch(e){toast("Encrypted export failed: "+e.message)}
+}
+async function importEncryptedWorkspace(file){
+  var password=window.prompt("Password for this encrypted backup:","");if(!password)return;
+  try{
+    var envelope=JSON.parse(await file.text());if(!envelope||envelope.type!=="quantum-breaks-ai-encrypted-workspace")throw new Error("Not a Quantum Breaks AI encrypted backup");
+    var salt=b64ToBytes(envelope.salt),iv=b64ToBytes(envelope.iv),cipher=b64ToBytes(envelope.data),key=await deriveBackupKey(password,salt);
+    var plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:iv},key,cipher);
+    var data=JSON.parse(new TextDecoder().decode(plain));
+    if(!data||!Array.isArray(data.chats))throw new Error("Decrypted file is not a valid workspace");
+    settings=Object.assign(settings,data.settings||{});projects=Array.isArray(data.projects)?data.projects:[];savedPrompts=Array.isArray(data.prompts)?data.prompts:[];profiles=Array.isArray(data.profiles)?data.profiles:[];chats=data.chats.map(function(ch){return Object.assign({},ch,{id:ch.id||uid(),temporary:false})});active=chats[0]?chats[0].id:"";save();closeModals();render();restoreDraft();toast("Encrypted workspace imported")
+  }catch(e){toast("Encrypted import failed. Check the password and file.")}
+}
 function exportWorkspace(){
-  var safeSettings=Object.assign({},settings);
-  var data={type:"quantum-breaks-ai-workspace",version:3,exported_at:new Date().toISOString(),settings:safeSettings,projects:projects,prompts:savedPrompts,profiles:profiles,chats:chats.filter(function(ch){return !ch.temporary})};
+  var data=workspacePayload();
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="quantum-breaks-ai-workspace.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 
@@ -2301,6 +2335,9 @@ q("#testKeyBtn").onclick=testConnection;
 q("#manualKeyBtn").onclick=function(){q("#manualKeyField").classList.remove("hidden");q("#manualKey").focus()};
 q("#disconnectNow").onclick=function(){localStorage.removeItem(KEYSTORE);closeModals();render();toast("Disconnected")};
 q("#exportWorkspace").onclick=exportWorkspace;
+q("#exportEncryptedWorkspace").onclick=exportEncryptedWorkspace;
+q("#importEncryptedWorkspaceBtn").onclick=function(){q("#importEncryptedWorkspaceFile").click()};
+q("#importEncryptedWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importEncryptedWorkspace(f);e.target.value=""};
 q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
