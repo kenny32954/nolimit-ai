@@ -590,6 +590,17 @@ html[data-generating="true"][data-generation-fx="off"] .composer,html[data-gener
 
 .themeTile .themeThumb,.backgroundTile .bgThumb{position:relative;overflow:hidden}.themeTile .themeThumb:after,.backgroundTile .bgThumb:after{content:"";position:absolute;inset:-40% auto -40% -60%;width:45%;transform:skewX(-20deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);animation:thumbShine 5.8s ease-in-out infinite}
 @keyframes thumbShine{0%,68%{left:-60%;opacity:0}76%{opacity:.8}88%,100%{left:130%;opacity:0}}
+
+/* v4.0 quick style dock */
+.visualBtn{position:relative;width:38px;padding:0!important;font-size:15px!important;color:var(--accent2)!important}.visualBtn:after{content:"";position:absolute;inset:5px;border-radius:9px;border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);box-shadow:0 0 14px color-mix(in srgb,var(--accentGlow) 42%,transparent);opacity:.65;pointer-events:none}.visualBtn.on:after{animation:visualBtnPulse 1.8s ease-in-out infinite}
+@keyframes visualBtnPulse{50%{opacity:1;box-shadow:0 0 22px color-mix(in srgb,var(--accentGlow) 78%,transparent)}}
+.visualQuickPanel{position:fixed;z-index:95;right:16px;top:68px;width:min(360px,calc(100vw - 24px));padding:12px;border:1px solid rgba(255,255,255,.09);border-radius:17px;background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(calc(var(--glass-blur) * 1.2)) saturate(1.25);box-shadow:0 22px 70px rgba(0,0,0,.38),0 0 28px color-mix(in srgb,var(--accentGlow) 28%,transparent);opacity:0;visibility:hidden;transform:translateY(-8px) scale(.985);transition:opacity .16s ease,transform .16s ease,visibility .16s}
+.visualQuickPanel.show{opacity:1;visibility:visible;transform:none}.visualQuickHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.visualQuickHead>div{display:grid}.visualQuickHead b{font-size:12px}.visualQuickHead span{font-size:8px;color:var(--muted);margin-top:2px}.visualQuickHead button{width:28px;height:28px;border-radius:8px;color:#777}.visualQuickHead button:hover{background:rgba(255,255,255,.06);color:#fff}
+.visualQuickLooks{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.visualQuickLooks button{height:42px;border-radius:10px;border:1px solid rgba(255,255,255,.06);background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018));font-size:9px;color:#aaa}.visualQuickLooks button:hover{color:#fff;border-color:color-mix(in srgb,var(--accent) 24%,rgba(255,255,255,.07));background:color-mix(in srgb,var(--accent) 7%,rgba(255,255,255,.025));transform:translateY(-1px)}
+.visualQuickLabel{margin:11px 0 6px;font-size:8px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:#66636c}.visualQuickChips{display:flex;gap:5px;overflow:auto;scrollbar-width:none}.visualQuickChips::-webkit-scrollbar{display:none}.visualQuickChips button{flex:none;height:29px;padding:0 9px;border-radius:9px;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.025);font-size:8px;color:#777}.visualQuickChips button.on,.visualQuickChips button:hover{color:var(--accent2);border-color:color-mix(in srgb,var(--accent) 26%,transparent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.visualQuickRow{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:6px;margin-top:10px}.visualQuickRow button{height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.03);font-size:8px;color:#888}.visualQuickRow button:hover{color:#fff;background:rgba(255,255,255,.065)}#openThemeLab{color:var(--accent2)}
+@media(max-width:560px){.visualQuickPanel{top:62px;right:7px;width:calc(100vw - 14px)}.visualQuickLooks{grid-template-columns:repeat(3,1fr)}.visualQuickRow{grid-template-columns:1fr 1fr 1fr}.visualBtn{display:grid!important}}
+html[data-sidebar-rail="true"] .navgroup .sbtn{position:relative}html[data-sidebar-rail="true"] .navgroup .sbtn:hover:after{content:attr(data-rail-label);position:absolute;left:52px;z-index:120;white-space:nowrap;padding:7px 9px;border-radius:8px;background:rgba(22,22,25,.96);border:1px solid rgba(255,255,255,.07);color:#ddd;font-size:10px;box-shadow:0 10px 28px rgba(0,0,0,.34);pointer-events:none}
 </style>
 </head>
 <body>
@@ -656,10 +667,19 @@ html[data-generating="true"][data-generation-fx="off"] .composer,html[data-gener
 <header class="top">
 <button class="icon menu" id="menuBtn">☰</button>
 <div class="topIdentity"><div class="title" id="title">New chat</div><div class="topSub" id="topSub">Ready</div></div>
-<div class="topActions"><button class="research" id="researchBtn">Research</button><button class="research" id="focusBtn" title="Focus mode">Focus</button><button class="research" id="commandBtn" title="Command palette">⌘</button><button class="connect" id="topAuth">Connect</button></div>
+<div class="topActions"><button class="research visualBtn" id="visualBtn" title="Quick styles">✦</button><button class="research" id="researchBtn">Research</button><button class="research" id="focusBtn" title="Focus mode">Focus</button><button class="research" id="commandBtn" title="Command palette">⌘</button><button class="connect" id="topAuth">Connect</button></div>
 </header>
 <section class="chat" id="chat"></section>
 <button class="scrollbottom" id="scrollBottom" title="Jump to latest">↓</button>
+<div class="visualQuickPanel" id="visualQuickPanel">
+  <div class="visualQuickHead"><div><b>Quick styles</b><span>Change the whole look instantly</span></div><button id="closeVisualQuick" type="button">✕</button></div>
+  <div class="visualQuickLooks">
+    <button data-quick-look="quantum">Quantum</button><button data-quick-look="neon">Neon</button><button data-quick-look="space">Space</button><button data-quick-look="ice">Ice</button><button data-quick-look="matrix">Matrix</button><button data-quick-look="sunset">Sunset</button>
+  </div>
+  <div class="visualQuickLabel">Background</div>
+  <div class="visualQuickChips"><button data-quick-bg="aurora">Aurora</button><button data-quick-bg="cosmic">Cosmic</button><button data-quick-bg="grid">Grid</button><button data-quick-bg="prism">Prism</button><button data-quick-bg="particles">Particles</button><button data-quick-bg="waves">Waves</button></div>
+  <div class="visualQuickRow"><button id="quickShuffle" type="button">Shuffle ✦</button><button id="quickMotion" type="button">Motion: Calm</button><button id="openThemeLab" type="button">Theme Lab →</button></div>
+</div>
 <div class="composeWrap">
 <div class="toolstrip">
 <button class="toggle" id="webToggle">⌕ Web</button>
@@ -747,7 +767,7 @@ html[data-generating="true"][data-generation-fx="off"] .composer,html[data-gener
 <h3>Workspace</h3>
 <ul><li>The sidebar is now organized into collapsible AI, Workspace, Create, Chat, and App drawers that remember your layout locally.</li><li>High-frequency AI and Workspace drawers stay open by default, while lower-frequency tool groups start collapsed to reduce visual noise.</li><li>Conversation branches, tasks, snapshots, backups, archives, trash, global search, and encrypted workspace exports remain available.</li></ul>
 <h3>Interface</h3>
-<ul><li>The UI can now react to live generation with Subtle, Cinematic, or Off effects—pulsing ambient energy, composer glow, header glow, and animated brand activity while a response streams.</li><li>Optional pointer parallax adds depth to animated backgrounds, preset thumbnails now get a soft moving sheen, and Shuffle Look instantly picks one of the six full visual packs.</li><li>These generation/parallax preferences are included in saved and shared visual themes alongside the existing kinetic UI settings.</li></ul>
+<ul><li>A new Quick Style Dock in the header switches full visual packs, animated backgrounds, motion modes, or shuffles the entire look without opening Settings.</li><li>The dock links straight into the full Theme Lab for deeper editing, while the compact desktop sidebar now shows hover labels for its icon-only rail controls.</li><li>The kinetic backgrounds, generation-reactive visuals, wallpapers, gradients, surface styles, and custom-theme system remain available underneath the faster quick-style workflow.</li></ul>
 </div>
 </section>
 
@@ -1340,7 +1360,7 @@ html[data-generating="true"][data-generation-fx="off"] .composer,html[data-gener
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="3.9.0";
+var APP_VERSION="4.0.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -2463,6 +2483,8 @@ function syncAppearanceStudio(){
   qa("[data-theme-choice]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-theme-choice")===(settings.theme||"dark"))});
   qa("[data-accent-choice]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-accent-choice")===(settings.accent||"coral"))});
   qa("[data-bg-choice]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-bg-choice")===(settings.backgroundEffect||"aurora"))});
+  qa("[data-quick-bg]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-quick-bg")===(settings.backgroundEffect||"aurora"))});
+  if(q("#quickMotion"))q("#quickMotion").textContent="Motion: "+String(settings.motionStyle||"calm").replace(/^./,function(x){return x.toUpperCase()});
   if(q("#motionStyle"))q("#motionStyle").value=settings.motionStyle||"calm";
   if(q("#backgroundStrength"))q("#backgroundStrength").value=String(settings.backgroundStrength==null?70:settings.backgroundStrength);
   if(q("#glassStrength"))q("#glassStrength").value=String(settings.glassStrength==null?70:settings.glassStrength);
@@ -2560,6 +2582,18 @@ function setupAppearanceStudio(){
   document.addEventListener("pointerout",function(e){var card=e.target&&e.target.closest?e.target.closest(".quickcard,.lookPreset,.themeTile,.backgroundTile,.savedThemeCard"):null;if(card){card.style.removeProperty("--tilt-x");card.style.removeProperty("--tilt-y")}},true)
 }
 
+function setupVisualQuickPanel(){
+  var panel=q("#visualQuickPanel"),btn=q("#visualBtn");
+  function close(){panel.classList.remove("show");btn.classList.remove("on")}
+  btn.onclick=function(e){e.stopPropagation();var show=!panel.classList.contains("show");panel.classList.toggle("show",show);btn.classList.toggle("on",show)};
+  q("#closeVisualQuick").onclick=close;
+  qa("[data-quick-look]").forEach(function(b){b.onclick=function(){applyLookPreset(b.getAttribute("data-quick-look"));syncAppearanceStudio()}});
+  qa("[data-quick-bg]").forEach(function(b){b.onclick=function(){settings.backgroundEffect=b.getAttribute("data-quick-bg");save();applyAppearance();syncAppearanceStudio()}});
+  q("#quickShuffle").onclick=function(){var names=["quantum","neon","space","ice","matrix","sunset"];applyLookPreset(names[Math.floor(Math.random()*names.length)]);syncAppearanceStudio()};
+  q("#quickMotion").onclick=function(){var order=["calm","lively","off"],i=order.indexOf(settings.motionStyle||"calm");settings.motionStyle=order[(i+1)%order.length];save();applyAppearance();syncAppearanceStudio()};
+  q("#openThemeLab").onclick=function(){close();openSettings();setTimeout(function(){var el=q(".appearanceStudio");if(el)el.scrollIntoView({behavior:"smooth",block:"start"})},80)};
+  document.addEventListener("click",function(e){if(panel.classList.contains("show")&&!panel.contains(e.target)&&e.target!==btn)close()});
+}
 function setupSidebarGroups(){
   var defaults={ai:false,workspace:false,create:true,chat:true,app:true};
   if(!settings.navCollapsed||typeof settings.navCollapsed!=="object")settings.navCollapsed=Object.assign({},defaults);
@@ -2567,6 +2601,7 @@ function setupSidebarGroups(){
     var label=group.querySelector(".navlabel");if(!label)return;
     var key=String(label.textContent||"section").trim().toLowerCase().replace(/[^a-z0-9_-]/g,"-");
     group.dataset.navKey=key;
+    qa(".sbtn",group).forEach(function(b){if(!b.getAttribute("data-rail-label"))b.setAttribute("data-rail-label",String(b.textContent||"").trim())});
     if(settings.navCollapsed[key]===undefined)settings.navCollapsed[key]=!!defaults[key];
     function sync(){
       var collapsed=!!settings.navCollapsed[key];group.classList.toggle("collapsed",collapsed);
@@ -2588,7 +2623,7 @@ function setupAccessibility(){
   q("#chat").setAttribute("role","log");q("#chat").setAttribute("aria-label","Conversation");
   q("#status").setAttribute("aria-live","polite");
   q("#buildBadge").textContent="v"+APP_VERSION;
-  var labels={menuBtn:"Open sidebar",closeSide:"Close sidebar",commandBtn:"Open command palette",lightboxClose:"Close image preview",attach:"Attach files",attachFolder:"Attach folder",promptLibBtn:"Prompt library",promptHistoryBtn:"Recent prompts",improvePromptBtn:"Improve prompt",micBtn:"Record audio",imageBtn:"Create image",queueSend:"Queue message for next turn",send:"Send message",scrollBottom:"Jump to latest"};
+  var labels={menuBtn:"Open sidebar",closeSide:"Close sidebar",visualBtn:"Quick styles",commandBtn:"Open command palette",lightboxClose:"Close image preview",attach:"Attach files",attachFolder:"Attach folder",promptLibBtn:"Prompt library",promptHistoryBtn:"Recent prompts",improvePromptBtn:"Improve prompt",micBtn:"Record audio",imageBtn:"Create image",queueSend:"Queue message for next turn",send:"Send message",scrollBottom:"Jump to latest"};
   Object.keys(labels).forEach(function(id){var el=q("#"+id);if(el)el.setAttribute("aria-label",labels[id])});
   qa(".modal").forEach(function(m,i){
     m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
@@ -5413,6 +5448,7 @@ function handleLaunchAction(){
   else if(action==="research"){settings.web=true;settings.fetch=true;settings.modePreset="research";save();render();q("#prompt").focus();toast("Research mode ready")}
 }
 setupAppearanceStudio();
+setupVisualQuickPanel();
 setupSidebarGroups();
 setupAccessibility();
 syncSidebarRailButton();
