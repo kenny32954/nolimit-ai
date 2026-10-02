@@ -3,40 +3,37 @@
 # Conservative built-ins only for calculator compatibility.
 
 WIDTH = 21
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 history = []
 subject = "auto"
 mode = "explain"
+level = "auto"
 
 SUBJECTS = (
-    "auto", "math", "algebra",
-    "geometry", "statistics",
-    "calculus", "biology",
-    "chemistry", "physics",
-    "earth",
-    "environmental_science",
-    "ela", "literature",
-    "writing", "history",
-    "social_studies",
-    "geography", "government",
-    "economics", "business",
-    "accounting",
-    "computer_science",
-    "engineering", "cte",
-    "agriculture",
-    "psychology", "sociology",
-    "art", "music", "media",
-    "language", "health",
-    "physical_education"
+    "auto", "math", "algebra", "geometry", "statistics", "calculus",
+    "linear_algebra", "discrete_math", "differential_equations",
+    "number_theory", "real_analysis", "abstract_algebra",
+    "biology", "genetics", "microbiology", "anatomy_physiology",
+    "chemistry", "organic_chemistry", "biochemistry",
+    "physics", "thermodynamics", "circuits",
+    "earth", "environmental_science",
+    "ela", "literature", "writing",
+    "history", "social_studies", "geography", "government", "political_science",
+    "economics", "finance", "business", "accounting",
+    "computer_science", "data_structures", "algorithms", "databases",
+    "computer_architecture", "engineering", "statics_dynamics",
+    "materials_science", "cte", "agriculture",
+    "psychology", "research_methods", "sociology", "philosophy_logic",
+    "art", "music", "media", "language", "health", "physical_education"
 )
 
 MODES = (
-    "answer", "explain",
-    "steps", "check",
-    "quiz", "summary",
-    "flashcards"
+    "answer", "explain", "steps", "check", "quiz",
+    "summary", "flashcards", "derive", "proof", "research"
 )
+
+LEVELS = ("auto", "school", "college", "advanced")
 
 
 def rule(ch="-"):
@@ -69,7 +66,7 @@ def say(prefix, text):
 
 def banner():
     print("QUANTUM BREAKS AI")
-    print("CG50 SCHOOL CLIENT")
+    print("CG50 ACADEMIC CLIENT")
     rule("=")
     print("Prototype " + VERSION)
     print("Type /help")
@@ -80,21 +77,14 @@ def banner():
 def show_status():
     say("S: ", subject)
     say("M: ", mode)
+    say("L: ", level)
 
 
-def list_subjects():
-    print("Subjects:")
+def list_values(title, values):
+    print(title)
     i = 0
-    while i < len(SUBJECTS):
-        print(SUBJECTS[i])
-        i += 1
-
-
-def list_modes():
-    print("Tutor modes:")
-    i = 0
-    while i < len(MODES):
-        print(MODES[i])
+    while i < len(values):
+        print(values[i])
         i += 1
 
 
@@ -106,7 +96,6 @@ def set_subject(value):
         say("Subject: ", subject)
     else:
         print("Unknown subject.")
-        print("Use /subjects")
 
 
 def set_mode(value):
@@ -117,37 +106,43 @@ def set_mode(value):
         say("Mode: ", mode)
     else:
         print("Unknown mode.")
-        print("Use /modes")
+
+
+def set_level(value):
+    global level
+    value = value.strip().lower()
+    if value in LEVELS:
+        level = value
+        say("Level: ", level)
+    else:
+        print("Unknown level.")
 
 
 def help_screen():
     print("/subject NAME")
     print("/mode NAME")
+    print("/level NAME")
     print("/subjects")
     print("/modes")
+    print("/levels")
     print("/status")
     print("/history")
     print("/clear")
     print("/math")
     print("/about")
     print("/quit")
-    rule()
-    print("All-subject routing")
-    print("is ready in bridge.")
 
 
 def about():
     print("Quantum Breaks AI")
-    print("fx-CG50 school")
+    print("fx-CG50 academic")
     print("assistant prototype.")
-    print("Named subject packs")
-    print("+ general fallback.")
+    print("School -> college")
+    print("-> advanced routing.")
 
 
 def math_mode():
     print("Quick Calc")
-    print("Examples: 2+2")
-    print("or (8*7)-3")
     expr = input("expr> ")
     try:
         value = eval(expr, {"__builtins__": {}}, {})
@@ -171,9 +166,10 @@ def show_history():
 
 def local_reply(text):
     return (
-        "Saved. Live mode will "
-        "send this as " + subject
-        + " / " + mode + "."
+        "Saved. Live mode: "
+        + subject + " / "
+        + mode + " / "
+        + level + "."
     )
 
 
@@ -190,15 +186,19 @@ def handle_command(text):
     elif text == "/math":
         math_mode()
     elif text == "/subjects":
-        list_subjects()
+        list_values("Subjects:", SUBJECTS)
     elif text == "/modes":
-        list_modes()
+        list_values("Modes:", MODES)
+    elif text == "/levels":
+        list_values("Levels:", LEVELS)
     elif text == "/status":
         show_status()
     elif text.startswith("/subject "):
         set_subject(text[9:])
     elif text.startswith("/mode "):
         set_mode(text[6:])
+    elif text.startswith("/level "):
+        set_level(text[7:])
     else:
         print("Unknown command.")
         print("Use /help")
