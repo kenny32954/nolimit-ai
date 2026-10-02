@@ -1,7 +1,7 @@
 {
-  "name": "NoLimit AI",
-  "short_name": "NoLimit AI",
-  "description": "Responsive multi-model AI client powered by OpenRouter.",
+  "name": "Quantum Breaks AI",
+  "short_name": "Quantum Breaks",
+  "description": "Quantum Breaks AI — a responsive multi-model AI workspace powered by OpenRouter.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
