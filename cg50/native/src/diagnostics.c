@@ -27,7 +27,7 @@ static void draw_state(bool serial_open, bool linked, bool probing)
           probing ? "PROBING..." : (linked ? "LINKED" : "NOT FOUND"));
 
     dtext(14, 96, muted, "PROTOCOL");
-    dtext(220, 96, text, "QBAI v2");
+    dtext(220, 96, text, "QBAI v3");
 
     dtext(14, 120, muted, "SERIAL SPEED");
     dtext(220, 120, text, "115200 8N1");
