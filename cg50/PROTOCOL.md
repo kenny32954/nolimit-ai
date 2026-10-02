@@ -36,19 +36,32 @@ biology
 chemistry
 physics
 earth
+environmental_science
 ela
 literature
 writing
 history
+social_studies
+geography
 government
 economics
 business
+accounting
 computer_science
+engineering
+cte
+agriculture
+psychology
+sociology
+art
+music
+media
 language
 health
+physical_education
 ```
 
-`auto` lets the desktop bridge detect the subject from the prompt.
+`auto` lets the desktop bridge detect the subject from the prompt. Unknown or unusual electives can fall back to the general schoolwork profile.
 
 Supported tutor modes:
 
