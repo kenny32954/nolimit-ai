@@ -1882,6 +1882,7 @@ var SLASH_COMMANDS=[
   ["/search","Search the whole workspace"],
   ["/project","Open projects"],
   ["/prompts","Open prompt library"],
+  ["/history","Open recently sent prompts"],
   ["/snapshot","Open snapshots"],
   ["/mode ","Set balanced, fast, deep, or research mode"],
   ["/help","Show all commands"]
@@ -1935,6 +1936,7 @@ function handleCommand(text){
   if(cmd==="/search"){q("#prompt").value="";openGlobalSearch();return true}
   if(cmd==="/project"){q("#prompt").value="";openProjects();return true}
   if(cmd==="/prompts"){q("#prompt").value="";openPromptLibrary();return true}
+  if(cmd==="/history"){q("#prompt").value="";openPromptHistory();return true}
   if(cmd==="/snapshot"){q("#prompt").value="";openSnapshots();return true}
   if(cmd==="/mode"){
     var mode=(text.split(/\s+/)[1]||"").toLowerCase();
@@ -2836,7 +2838,7 @@ async function workspacePayload(includeMedia){
   var exportChats=chats.filter(function(ch){return !ch.temporary}).map(function(ch){
     return Object.assign({},ch,{messages:(ch.messages||[]).map(serializableMessage)})
   });
-  var data={type:"quantum-breaks-ai-workspace",version:5,exported_at:new Date().toISOString(),settings:Object.assign({},settings),projects:projects,prompts:savedPrompts,profiles:profiles,chats:exportChats};
+  var data={type:"quantum-breaks-ai-workspace",version:6,exported_at:new Date().toISOString(),settings:Object.assign({},settings),projects:projects,prompts:savedPrompts,profiles:profiles,promptHistory:promptHistory,chats:exportChats};
   if(includeMedia){
     var records=await listMediaRecords(),refs=referencedMediaIds();
     data.media=records.filter(function(rec){return refs.has(rec.id)})
@@ -2866,7 +2868,7 @@ async function importEncryptedWorkspace(file){
     var plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:iv},key,cipher);
     var data=JSON.parse(new TextDecoder().decode(plain));
     if(!data||!Array.isArray(data.chats))throw new Error("Decrypted file is not a valid workspace");
-    settings=Object.assign(settings,data.settings||{});projects=Array.isArray(data.projects)?data.projects:[];savedPrompts=Array.isArray(data.prompts)?data.prompts:[];profiles=Array.isArray(data.profiles)?data.profiles:[];chats=data.chats.map(function(ch){return Object.assign({},ch,{id:ch.id||uid(),temporary:false})});if(Array.isArray(data.media))await restoreMediaRecords(data.media);active=chats[0]?chats[0].id:"";save();closeModals();render();restoreDraft();toast("Encrypted workspace imported")
+    settings=Object.assign(settings,data.settings||{});projects=Array.isArray(data.projects)?data.projects:[];savedPrompts=Array.isArray(data.prompts)?data.prompts:[];profiles=Array.isArray(data.profiles)?data.profiles:[];promptHistory=Array.isArray(data.promptHistory)?data.promptHistory:promptHistory;savePromptHistory();chats=data.chats.map(function(ch){return Object.assign({},ch,{id:ch.id||uid(),temporary:false})});if(Array.isArray(data.media))await restoreMediaRecords(data.media);active=chats[0]?chats[0].id:"";save();closeModals();render();restoreDraft();toast("Encrypted workspace imported")
   }catch(e){toast("Encrypted import failed. Check the password and file.")}
 }
 async function exportWorkspace(){
@@ -2884,6 +2886,7 @@ async function importWorkspace(file){
     projects=Array.isArray(data.projects)?data.projects:[];
     savedPrompts=Array.isArray(data.prompts)?data.prompts:[];
     profiles=Array.isArray(data.profiles)?data.profiles:[];
+    promptHistory=Array.isArray(data.promptHistory)?data.promptHistory:promptHistory;savePromptHistory();
     chats=data.chats.map(function(ch){return Object.assign({},ch,{id:ch.id||uid(),temporary:false})});
     if(Array.isArray(data.media))await restoreMediaRecords(data.media);
     active=chats[0]?chats[0].id:"";save();closeModals();render();restoreDraft();toast("Workspace imported"+(Array.isArray(data.media)&&data.media.length?" with media":""))
