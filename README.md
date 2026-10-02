@@ -10,6 +10,18 @@ Everything else in this repository supports the app with documentation and autom
 
 ## Current feature set
 
+### Quantum Breaks AI 2.5 additions
+- Conversation branch-lineage navigator for parent/child chat forks
+- Per-conversation Tasks board with optional AI task extraction
+- Per-chat model locks and chat-specific instructions layered over project/global defaults
+- Automatic context-fit protection that restores the draft instead of sending a doomed over-context request
+- Configurable network-stall watchdog for requests that stop returning data
+- Daily locally tracked spend warnings in addition to per-request cost warnings
+- Model sorting and compatible-model selection learned from your own local 👍/👎 ratings
+- Keyboard-shortcut help and a clickable conversation title for fast management
+- Dynamic browser-tab titles and optional background completion notifications
+- Tasks preserved through snapshots, branches, backups, and imports
+
 ### Quantum Breaks AI 2.4 additions
 - User-approved, privacy-filtered local memory suggestions that explicitly exclude sensitive categories
 - Review-driven answer improvement with local AI-response version history and restoration
@@ -315,7 +327,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v2.4.0
+Current app generation: v2.5.0
 
 Major capabilities now include:
 - phone + PC UI
