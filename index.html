@@ -255,6 +255,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="toolstrip">
 <button class="toggle" id="webToggle">⌕ Web</button>
 <button class="toggle" id="fetchToggle">↗ Read pages</button>
+<button class="toggle" id="freshToggle" title="Force a fresh uncached response once">↻ Fresh</button>
 <button class="toggle" id="imageToolToggle">▣ Image tool</button>
 <button class="toggle" id="agentToggle">◇ Agent</button>
 <button class="toggle" id="advisorToggle">✦ Advisor</button>
@@ -332,8 +333,13 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 </div>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="denyDataCollection" type="checkbox"> Prefer providers that deny data collection</label>
 <div class="row">
+<div class="field" style="flex:1;min-width:160px"><label>Web results per search</label><input id="webMaxResults" type="number" min="1" max="10" value="5"></div>
+<div class="field" style="flex:1;min-width:160px"><label>Web results total cap</label><input id="webMaxTotal" type="number" min="1" max="30" value="15"></div>
+</div>
+<div class="row">
 <label style="display:flex;align-items:center;gap:8px"><input id="cacheEnabled" type="checkbox"> Response caching</label>
 <label style="display:flex;align-items:center;gap:8px"><input id="autoSpeak" type="checkbox"> Auto read replies</label>
+<div class="field" style="min-width:170px;flex:1"><label>Cache TTL</label><select id="cacheTTL"><option value="60">1 minute</option><option value="300">5 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select></div>
 </div>
 <div style="height:12px"></div>
 <button class="primary" id="saveSettings">Save settings</button>
@@ -555,6 +561,10 @@ var settings=Object.assign({
   denyDataCollection:false,
   fusion:false,
   cache:false,
+  cacheTTL:300,
+  cacheClearNext:false,
+  webMaxResults:5,
+  webMaxTotal:15,
   autoSpeak:false
 },safeJSON(localStorage.getItem(SETSTORE),{}));
 var active=localStorage.getItem(ACTIVE)||"";
@@ -905,6 +915,9 @@ function openSettings(){
   q("#historyLimit").value=settings.historyLimit||0;
   q("#denyDataCollection").checked=!!settings.denyDataCollection;
   q("#cacheEnabled").checked=!!settings.cache;
+  q("#cacheTTL").value=String(settings.cacheTTL||300);
+  q("#webMaxResults").value=settings.webMaxResults||5;
+  q("#webMaxTotal").value=settings.webMaxTotal||15;
   q("#autoSpeak").checked=!!settings.autoSpeak;
   openModal("#settingsModal")
 }
@@ -1002,7 +1015,7 @@ function approxContextTokens(c){
 
 function toolList(){
   var t=[{type:"openrouter:datetime"}];
-  if(settings.web)t.push({type:"openrouter:web_search"});
+  if(settings.web)t.push({type:"openrouter:web_search",parameters:{max_results:Math.max(1,Math.min(10,Number(settings.webMaxResults)||5)),max_total_results:Math.max(1,Math.min(30,Number(settings.webMaxTotal)||15))}});
   if(settings.fetch)t.push({type:"openrouter:web_fetch"});
   if(settings.imageTool)t.push({type:"openrouter:image_generation"});
   if(settings.agent)t.push({type:"openrouter:subagent",parameters:{model:"openrouter/auto"}});
@@ -1099,7 +1112,11 @@ async function send(){
     var tools=toolList();if(tools.length)body.tools=tools;
     if(hasPDF(c))body.plugins=[{id:"file-parser",pdf:{engine:"cloudflare-ai"}}];
     var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"};
-    if(settings.cache)headers["X-OpenRouter-Cache"]="true";
+    if(settings.cache){
+      headers["X-OpenRouter-Cache"]="true";
+      headers["X-OpenRouter-Cache-TTL"]=String(Math.max(1,Math.min(86400,Number(settings.cacheTTL)||300)));
+      if(settings.cacheClearNext){headers["X-OpenRouter-Cache-Clear"]="true";settings.cacheClearNext=false;save()}
+    }
     var r=await fetchChatWithFallback(body,headers,controller.signal);
     var reader=r.body&&r.body.getReader?r.body.getReader():null;
     if(!reader){var j=await r.json();finishBuffered(j,a);save();render();return}
@@ -1846,6 +1863,7 @@ q("#tempToggle").onclick=function(){
 };
 q("#webToggle").onclick=function(){settings.web=!settings.web;save();render()};
 q("#fetchToggle").onclick=function(){settings.fetch=!settings.fetch;save();render()};
+q("#freshToggle").onclick=function(){settings.cacheClearNext=true;save();toast(settings.cache?"Next request will bypass the response cache":"Fresh flag armed; enable response caching if you want cache refresh behavior")};
 q("#imageToolToggle").onclick=function(){settings.imageTool=!settings.imageTool;save();render()};
 q("#agentToggle").onclick=function(){settings.agent=!settings.agent;save();render();toast(settings.agent?"Agent subcalls enabled":"Agent subcalls disabled")};
 q("#advisorToggle").onclick=function(){settings.advisor=!settings.advisor;save();render();toast(settings.advisor?"Advisor enabled — the model can consult a stronger model":"Advisor disabled")};
@@ -1866,7 +1884,7 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.density=q("#densitySelect").value;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.density=q("#densitySelect").value;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.cacheTTL=Math.max(1,Math.min(86400,Number(q("#cacheTTL").value)||300));settings.webMaxResults=Math.max(1,Math.min(10,Number(q("#webMaxResults").value)||5));settings.webMaxTotal=Math.max(1,Math.min(30,Number(q("#webMaxTotal").value)||15));settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#commandSearch").oninput=renderCommandPalette;
 q("#runDiagnostics").onclick=runDiagnostics;
