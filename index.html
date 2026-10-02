@@ -628,7 +628,7 @@ async function send(){
     if(settings.reasoning!=="none")body.reasoning={effort:settings.reasoning,summary:"auto"};
     var tools=toolList();if(tools.length)body.tools=tools;
     if(hasPDF(c))body.plugins=[{id:"file-parser",pdf:{engine:"cloudflare-ai"}}];
-    var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"};
+    var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"};
     if(settings.cache)headers["X-OpenRouter-Cache"]="true";
     var r=await fetchChatWithFallback(body,headers,controller.signal);
     var reader=r.body&&r.body.getReader?r.body.getReader():null;
@@ -741,7 +741,7 @@ async function compareOne(model,prompt){
   if(settings.system)body.messages.push({role:"system",content:settings.system});
   body.messages.push({role:"user",content:prompt});
   if(settings.reasoning!=="none")body.reasoning={effort:settings.reasoning,summary:"auto"};
-  var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},body:JSON.stringify(body)});
+  var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify(body)});
   var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Comparison request failed"));
   var m=j.choices&&j.choices[0]&&j.choices[0].message||{};
   return {requested:model,served:j.model||model,text:m.content||"",usage:j.usage||{},cost:j.usage&&j.usage.cost!=null?j.usage.cost:j.cost}
@@ -803,7 +803,7 @@ async function generateImage(){
   var prompt=q("#imagePrompt").value.trim();if(!prompt)return toast("Enter an image prompt");
   q("#generateImage").disabled=true;q("#imageProgress").classList.remove("hidden");q("#imageOutput").innerHTML="";
   try{
-    var chosen=imageModels.find(function(m){return m.id===q("#imageModel").value});var params=chosen&&chosen.supported_parameters?chosen.supported_parameters:{};var imageBody={model:q("#imageModel").value,prompt:prompt,n:1};if(params.aspect_ratio||!chosen)imageBody.aspect_ratio=q("#imageRatio").value;if(params.output_format||!chosen)imageBody.output_format=q("#imageFormat").value;var r=await fetch(BASE+"/images",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},body:JSON.stringify(imageBody)});
+    var chosen=imageModels.find(function(m){return m.id===q("#imageModel").value});var params=chosen&&chosen.supported_parameters?chosen.supported_parameters:{};var imageBody={model:q("#imageModel").value,prompt:prompt,n:1};if(params.aspect_ratio||!chosen)imageBody.aspect_ratio=q("#imageRatio").value;if(params.output_format||!chosen)imageBody.output_format=q("#imageFormat").value;var r=await fetch(BASE+"/images",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify(imageBody)});
     var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Image generation failed"));var d=j.data&&j.data[0];var src=d&&(d.b64_json?("data:image/"+q("#imageFormat").value+";base64,"+d.b64_json):(d.url||""));if(!src)throw new Error("No image was returned");
     var img=document.createElement("img");img.src=src;img.className="imgresult";q("#imageOutput").appendChild(img);
     var add=document.createElement("button");add.className="secondary";add.style.marginTop="8px";add.textContent="Add to current chat";add.onclick=function(){var c=ensure();c.messages.push({role:"assistant",content:"Generated image: "+prompt,model:q("#imageModel").value,images:[src]});c.updated=Date.now();save();closeModals();render()};q("#imageOutput").appendChild(add)
@@ -814,7 +814,7 @@ async function generateImage(){
 async function transcribe(blob){
   var type=blob.type||"audio/webm",format="webm";if(type.indexOf("wav")>=0)format="wav";else if(type.indexOf("mpeg")>=0||type.indexOf("mp3")>=0)format="mp3";else if(type.indexOf("ogg")>=0)format="ogg";else if(type.indexOf("mp4")>=0||type.indexOf("m4a")>=0)format="mp4";
   var data=await readDataURL(blob),b64=String(data).split(",")[1]||"";
-  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},body:JSON.stringify({model:"openai/whisper-large-v3",input_audio:{data:b64,format:format}})});
+  var r=await fetch(BASE+"/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify({model:"openai/whisper-large-v3",input_audio:{data:b64,format:format}})});
   var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Transcription failed"));return j.text||""
 }
 
@@ -884,7 +884,7 @@ async function generateVoice(){
     };
     var r=await fetch(BASE+"/audio/speech",{
       method:"POST",
-      headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},
+      headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},
       body:JSON.stringify(body)
     });
     if(!r.ok)throw new Error(errorRaw(await r.text(),"Speech generation failed"));
@@ -950,7 +950,7 @@ async function generateVideo(){
     };
     var r=await fetch(BASE+"/videos",{
       method:"POST",
-      headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},
+      headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},
       body:JSON.stringify(body)
     });
     var job=await r.json();
@@ -961,7 +961,7 @@ async function generateVideo(){
       if(i>0)await wait(15000);
       q("#videoStatus").textContent="Video status: "+(i===0?"pending":"processing")+" · check "+(i+1);
       var pr=await fetch(BASE+"/videos/"+encodeURIComponent(job.id),{
-        headers:{Authorization:"Bearer "+getKey(),"HTTP-Referer":location.href,"X-Title":"NoLimit AI"}
+        headers:{Authorization:"Bearer "+getKey(),"HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"}
       });
       var state=await pr.json();
       if(!pr.ok)throw new Error(errorText(state,"Could not check video status"));
@@ -972,7 +972,7 @@ async function generateVideo(){
     if(!done)throw new Error("Video is still processing. Wait before submitting another copy.");
     q("#videoStatus").textContent="Downloading finished video…";
     var vr=await fetch(BASE+"/videos/"+encodeURIComponent(job.id)+"/content?index=0",{
-      headers:{Authorization:"Bearer "+getKey(),"HTTP-Referer":location.href,"X-Title":"NoLimit AI"}
+      headers:{Authorization:"Bearer "+getKey(),"HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"}
     });
     if(!vr.ok)throw new Error(errorRaw(await vr.text(),"Could not download the generated video"));
     var blob=await vr.blob();
