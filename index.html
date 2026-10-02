@@ -632,7 +632,7 @@ function renderCitations(parent,annotations){
 }
 
 function renderChat(){
-  var c=ensure(),box=q("#chat");box.innerHTML="";
+  var c=ensure(),box=q("#chat"),distanceBefore=box.scrollHeight-box.scrollTop-box.clientHeight,stickToBottom=distanceBefore<180||box.scrollHeight<=box.clientHeight+20;box.innerHTML="";
   if(!c.messages.length){
     box.innerHTML='<div class="welcome"><div class="logo"></div><h1>Build, research, create.</h1><p>One workspace for multi-model chat, web research, files, images, audio, video, code, and projects.</p><div class="quickgrid"><button class="quickcard" data-quick="research"><b>Research the web</b><span>Search, read pages, and cite sources</span></button><button class="quickcard" data-quick="build"><b>Build something</b><span>Generate code and preview artifacts</span></button><button class="quickcard" data-quick="image"><b>Create an image</b><span>Open the image studio</span></button><button class="quickcard" data-quick="compare"><b>Compare models</b><span>Run the same prompt across models</span></button></div></div>';
     qa(".quickcard").forEach(function(b){b.onclick=function(){
@@ -676,7 +676,7 @@ function renderChat(){
   }});
   qa(".codedownload").forEach(function(b){b.onclick=function(){downloadCode(decodeURIComponent(b.getAttribute("data-code")||""),decodeURIComponent(b.getAttribute("data-lang")||""))}});
   qa(".coderun").forEach(function(b){b.onclick=function(){runJavaScript(decodeURIComponent(b.getAttribute("data-code")||""))}});
-  requestAnimationFrame(function(){box.scrollTop=box.scrollHeight})
+  requestAnimationFrame(function(){if(stickToBottom)box.scrollTop=box.scrollHeight;updateScrollButton()})
 }
 
 function renderPending(){
@@ -979,18 +979,27 @@ function finishBuffered(j,a){
   a.usage=j.usage;if(j.usage&&j.usage.cost!=null)a.cost=j.usage.cost;if(j.cost!=null)a.cost=j.cost;if(j.model)a.model=j.model
 }
 
+function restoreAttachments(m){
+  pending=[];
+  (m.images||[]).forEach(function(data,i){pending.push({kind:"image",name:"image-"+(i+1),data:data})});
+  (m.pdfs||[]).forEach(function(f){pending.push({kind:"pdf",name:f.name||"document.pdf",data:f.data})});
+  (m.textFiles||[]).forEach(function(f){pending.push({kind:"text",name:f.name||"file.txt",text:f.text||""})});
+  renderPending()
+}
+
 function regenerate(idx){
   if(busy)return;var c=ensure();if(!c.messages[idx]||c.messages[idx].role!=="assistant")return;
-  c.messages.splice(idx,1);var last=c.messages[c.messages.length-1];if(!last||last.role!=="user"){save();render();return}
-  q("#prompt").value=last.content||"";c.messages.pop();save();send()
+  var u=idx-1;while(u>=0&&c.messages[u].role!=="user")u--;if(u<0)return;
+  var m=c.messages[u];q("#prompt").value=m.content||"";restoreAttachments(m);
+  c.messages=c.messages.slice(0,u);c.updated=Date.now();save();resizePrompt();send()
 }
 
 function editUserMessage(idx){
   if(busy)return;
   var c=ensure(),m=c.messages[idx];if(!m||m.role!=="user")return;
-  q("#prompt").value=m.content||"";
+  q("#prompt").value=m.content||"";restoreAttachments(m);
   c.messages=c.messages.slice(0,idx);
-  c.updated=Date.now();save();render();q("#prompt").focus();toast("Edit the message and send again")
+  c.updated=Date.now();save();render();resizePrompt();q("#prompt").focus();toast("Edit the message and send again")
 }
 
 function branchConversation(idx){
@@ -1644,6 +1653,9 @@ q("#artifactOpen").onclick=function(){
 };
 
 // Paste and drag/drop attachments.
+q("#themeSelect").onchange=function(){settings.theme=this.value;applyAppearance()};
+q("#accentSelect").onchange=function(){settings.accent=this.value;applyAppearance()};
+q("#densitySelect").onchange=function(){settings.density=this.value;applyAppearance()};
 q("#prompt").addEventListener("input",resizePrompt);
 q("#chat").addEventListener("scroll",updateScrollButton,{passive:true});
 q("#scrollBottom").onclick=function(){q("#chat").scrollTo({top:q("#chat").scrollHeight,behavior:"smooth"})};
