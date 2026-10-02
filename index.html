@@ -101,6 +101,10 @@
 <div class="field"><label>Advisor model</label><input id="advisorModel" placeholder="~anthropic/claude-opus-latest"><div class="smallnote">Used only when the Advisor toggle is enabled.</div></div>
 <div class="field"><label>Fallback model (optional)</label><input id="fallbackModel" placeholder="e.g. anthropic/claude-sonnet-4"><div class="smallnote">If the primary model fails, OpenRouter can try this model next.</div></div>
 <div class="field"><label>Provider routing</label><select id="providerRouting"><option value="balanced">Balanced</option><option value="price">Lowest price</option><option value="throughput">Highest throughput</option><option value="latency">Lowest latency</option></select></div>
+<div class="row">
+<div class="field" style="flex:1;min-width:180px"><label>Response format</label><select id="responseFormat"><option value="text">Normal text</option><option value="json_object">JSON object</option></select></div>
+<div class="field" style="flex:1;min-width:180px"><label>Max output tokens</label><input id="maxTokens" type="number" min="0" step="256" placeholder="0 = model default"></div>
+</div>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="denyDataCollection" type="checkbox"> Prefer providers that deny data collection</label>
 <div class="row">
 <label style="display:flex;align-items:center;gap:8px"><input id="cacheEnabled" type="checkbox"> Response caching</label>
@@ -108,6 +112,9 @@
 </div>
 <div style="height:12px"></div>
 <button class="primary" id="saveSettings">Save settings</button>
+<div style="height:16px"></div>
+<div class="notice"><strong>Workspace backup</strong><br>Export chats, projects, local memory, and settings. API keys are never included.</div>
+<div class="row"><button class="secondary" id="exportWorkspace">Export workspace</button><button class="secondary" id="importWorkspaceBtn">Import workspace</button><input id="importWorkspaceFile" type="file" accept=".json,application/json" hidden></div>
 </section>
 
 <section class="modal" id="modelsModal">
