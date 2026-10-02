@@ -284,6 +284,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .ratingbtn.on{color:var(--accent2)!important;background:color-mix(in srgb,var(--accent) 9%,transparent)!important}
 
+
+.galleryGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:65vh;overflow:auto}.galleryCard{min-width:0;border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.025)}.galleryCard img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;background:#111;cursor:zoom-in}.galleryMeta{padding:8px}.galleryMeta b{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.galleryMeta span{display:block;margin-top:3px;color:var(--muted);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.galleryActions{display:flex;gap:5px;padding:0 8px 8px}.galleryActions button{height:30px;flex:1;border-radius:8px;background:rgba(255,255,255,.055);font-size:10px;color:#bbb}.galleryEmpty{grid-column:1/-1}
+
 </style>
 </head>
 <body>
@@ -317,6 +320,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 <div class="navgroup"><div class="navlabel">Create</div>
 <button class="sbtn" id="imageSide">Create image</button>
+<button class="sbtn" id="gallerySide">Media gallery</button>
 <button class="sbtn" id="videoSide">Create video</button>
 <button class="sbtn" id="voiceSide">AI voice</button>
 <button class="sbtn" id="transcribeSide">Transcribe audio</button></div>
@@ -771,6 +775,14 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div id="videoProgress" class="progress hidden"><i></i></div>
 <div class="smallnote" id="videoStatus"></div>
 <div id="videoOutput"></div>
+</section>
+
+<section class="modal" id="galleryModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Media gallery</h2>
+<div class="notice">Browse images saved locally by Quantum Breaks AI or referenced in your conversations.</div>
+<div class="field"><input id="gallerySearch" placeholder="Search image names or chats"></div>
+<div id="galleryGrid" class="galleryGrid"></div>
 </section>
 
 <section class="modal" id="imageModal">
@@ -1567,6 +1579,7 @@ var COMMANDS=[
   {name:"Mode: Deep",hint:"High reasoning + agent/advisor",run:function(){applyModePreset("deep")}},
   {name:"Mode: Research",hint:"Search + fetch + agent",run:function(){applyModePreset("research")}},
   {name:"Create image",hint:"Image studio",run:openImage},
+  {name:"Media gallery",hint:"Browse and reattach images",run:openGallery},
   {name:"Create video",hint:"Video studio",run:openVideo},
   {name:"AI voice",hint:"Text to speech",run:function(){openVoice("")}},
   {name:"Transcribe audio",hint:"Speech to text",run:openTranscription},
@@ -2565,6 +2578,40 @@ function showModels(){
     row.appendChild(b);row.appendChild(star);row.appendChild(info);box.appendChild(row)
   })
 }
+
+async function collectGalleryItems(){
+  var items=[],seen=new Set(),records=await listMediaRecords();
+  records.forEach(function(rec){
+    if(!rec||!rec.data||String(rec.data).indexOf("image")<0&&rec.kind!=="image")return;
+    if(seen.has(rec.data))return;seen.add(rec.data);items.push({src:rec.data,name:rec.name||"Local image",source:"Local media",mediaId:rec.id,created:rec.created||0})
+  });
+  chats.forEach(function(ch){
+    if(ch.trashedAt)return;
+    (ch.messages||[]).forEach(function(m){
+      (m.images||[]).forEach(function(src,i){
+        if(!src||seen.has(src))return;seen.add(src);items.push({src:src,name:(m.fileNames&&m.fileNames[i])||"Chat image",source:ch.title||"Chat",mediaId:"",created:m.created||0})
+      })
+    })
+  });
+  return items.sort(function(a,b){return(b.created||0)-(a.created||0)})
+}
+async function renderGallery(){
+  var box=q("#galleryGrid"),term=(q("#gallerySearch").value||"").toLowerCase();box.innerHTML='<div class="notice galleryEmpty">Loading images…</div>';
+  var items=await collectGalleryItems();items=items.filter(function(x){return !term||(x.name+" "+x.source).toLowerCase().includes(term)});box.innerHTML="";
+  if(!items.length){box.innerHTML='<div class="notice galleryEmpty">No matching images are stored yet.</div>';return}
+  items.slice(0,180).forEach(function(item){
+    var card=document.createElement("div");card.className="galleryCard";
+    var img=document.createElement("img");img.src=item.src;img.alt=item.name;img.onclick=function(){openLightbox(item.src)};
+    var meta=document.createElement("div");meta.className="galleryMeta";var b=document.createElement("b");b.textContent=item.name;var s=document.createElement("span");s.textContent=item.source;meta.appendChild(b);meta.appendChild(s);
+    var actions=document.createElement("div");actions.className="galleryActions";
+    var view=document.createElement("button");view.textContent="View";view.onclick=function(){openLightbox(item.src)};
+    var attach=document.createElement("button");attach.textContent="Attach";attach.onclick=async function(){
+      var mediaId=item.mediaId||await putMedia(item.src,item.name,"image");pending.push({name:item.name,size:0,kind:"image",data:item.src,mediaId:mediaId});closeModals();renderPending();saveDraftSoon();q("#prompt").focus();toast("Image attached")
+    };
+    actions.appendChild(view);actions.appendChild(attach);card.appendChild(img);card.appendChild(meta);card.appendChild(actions);box.appendChild(card)
+  })
+}
+function openGallery(){openModal("#galleryModal");q("#gallerySearch").value="";renderGallery()}
 
 async function openImage(){
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
@@ -3590,6 +3637,8 @@ q("#installSide").onclick=async function(){
   }
 };
 q("#imageSide").onclick=q("#imageBtn").onclick=openImage;
+q("#gallerySide").onclick=openGallery;
+q("#gallerySearch").oninput=renderGallery;
 q("#videoSide").onclick=openVideo;
 q("#voiceSide").onclick=function(){openVoice("")};
 q("#transcribeSide").onclick=openTranscription;
