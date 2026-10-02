@@ -572,6 +572,24 @@ html[data-hover-depth="true"] .quickcard:hover,html[data-hover-depth="true"] .lo
 .cursorSpark{position:fixed;z-index:90;width:7px;height:7px;border-radius:50%;pointer-events:none;background:var(--accent2);box-shadow:0 0 12px var(--accent),0 0 24px var(--accentGlow);transform:translate(-50%,-50%);animation:sparkOut .62s ease-out forwards}
 @keyframes sparkOut{0%{opacity:.9;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(calc(-50% + var(--spark-x,0px)),calc(-50% + var(--spark-y,0px))) scale(.15)}}
 @media(hover:none),(pointer:coarse){.cursorSpark{display:none!important}}
+
+/* v3.9 reactive generation + parallax */
+.lookPresetHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-2px 0 8px}.lookPresetHeader span{font-size:9px;color:#6f6b74}.lookPresetHeader button{height:30px;font-size:9px}
+html[data-parallax-fx="true"] .ambientFX{transform:translate3d(var(--parallax-x,0px),var(--parallax-y,0px),0) scale(1.02);transition:transform .12s linear}
+html[data-parallax-fx="true"] .customGradientFX{transform:translate3d(calc(var(--parallax-x,0px) * -.45),calc(var(--parallax-y,0px) * -.45),0) scale(1.03)}
+html[data-generating="true"][data-generation-fx="subtle"] .composer{box-shadow:0 22px 70px rgba(0,0,0,.32),0 0 26px color-mix(in srgb,var(--accentGlow) 42%,transparent)!important}
+html[data-generating="true"][data-generation-fx="subtle"] .brandOrb,html[data-generating="true"][data-generation-fx="subtle"] .assistantAvatar{filter:saturate(1.12);box-shadow:0 0 24px color-mix(in srgb,var(--accent) 34%,transparent),inset 0 1px rgba(255,255,255,.42)}
+html[data-generating="true"][data-generation-fx="cinematic"] .ambientFX{opacity:min(1,calc(var(--fx-strength) + .22));filter:saturate(1.28) brightness(1.08)}
+html[data-generating="true"][data-generation-fx="cinematic"] .composer{animation:generationComposer calc(1.4s * var(--motion-speed)) ease-in-out infinite alternate;box-shadow:0 24px 80px rgba(0,0,0,.36),0 0 38px color-mix(in srgb,var(--accentGlow) 72%,transparent)!important}
+html[data-generating="true"][data-generation-fx="cinematic"] .top{box-shadow:0 10px 45px rgba(0,0,0,.18),0 0 24px color-mix(in srgb,var(--accentGlow) 48%,transparent)!important}
+html[data-generating="true"][data-generation-fx="cinematic"] .brandOrb,html[data-generating="true"][data-generation-fx="cinematic"] .assistantAvatar{animation:generationOrb calc(1.15s * var(--motion-speed)) ease-in-out infinite alternate!important}
+html[data-generating="true"][data-generation-fx="cinematic"] .send{animation:sendPulse .72s ease-in-out infinite alternate!important}
+html[data-generating="true"][data-generation-fx="cinematic"] .thinkingOrb{animation:generationOrb .9s ease-in-out infinite alternate}
+html[data-generating="true"][data-generation-fx="off"] .composer,html[data-generating="true"][data-generation-fx="off"] .brandOrb,html[data-generating="true"][data-generation-fx="off"] .assistantAvatar{animation:none!important}
+@keyframes generationComposer{from{border-color:rgba(255,255,255,.1)}to{border-color:color-mix(in srgb,var(--accent) 44%,rgba(255,255,255,.09));transform:translateY(-1px)}}@keyframes generationOrb{from{transform:scale(1);filter:saturate(1)}to{transform:scale(1.08);filter:saturate(1.28) brightness(1.08);box-shadow:0 0 32px color-mix(in srgb,var(--accent) 50%,transparent)}}
+
+.themeTile .themeThumb,.backgroundTile .bgThumb{position:relative;overflow:hidden}.themeTile .themeThumb:after,.backgroundTile .bgThumb:after{content:"";position:absolute;inset:-40% auto -40% -60%;width:45%;transform:skewX(-20deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);animation:thumbShine 5.8s ease-in-out infinite}
+@keyframes thumbShine{0%,68%{left:-60%;opacity:0}76%{opacity:.8}88%,100%{left:130%;opacity:0}}
 </style>
 </head>
 <body>
@@ -729,7 +747,7 @@ html[data-hover-depth="true"] .quickcard:hover,html[data-hover-depth="true"] .lo
 <h3>Workspace</h3>
 <ul><li>The sidebar is now organized into collapsible AI, Workspace, Create, Chat, and App drawers that remember your layout locally.</li><li>High-frequency AI and Workspace drawers stay open by default, while lower-frequency tool groups start collapsed to reduce visual noise.</li><li>Conversation branches, tasks, snapshots, backups, archives, trash, global search, and encrypted workspace exports remain available.</li></ul>
 <h3>Interface</h3>
-<ul><li>Added Prism and Particles animated backgrounds, plus Orbit/Pulse/Glitch brand motion, Soft/Neon edge glow, and Soft/Round/Sharp global corner styles.</li><li>Optional 3D hover depth gives theme cards and quick actions pointer-reactive tilt, while an optional desktop cursor spark trail adds lightweight accent particles.</li><li>Theme exports are now v3 and carry these kinetic UI settings too; custom wallpapers remain browser-local and are never embedded in shared themes.</li></ul>
+<ul><li>The UI can now react to live generation with Subtle, Cinematic, or Off effects—pulsing ambient energy, composer glow, header glow, and animated brand activity while a response streams.</li><li>Optional pointer parallax adds depth to animated backgrounds, preset thumbnails now get a soft moving sheen, and Shuffle Look instantly picks one of the six full visual packs.</li><li>These generation/parallax preferences are included in saved and shared visual themes alongside the existing kinetic UI settings.</li></ul>
 </div>
 </section>
 
@@ -824,6 +842,7 @@ html[data-hover-depth="true"] .quickcard:hover,html[data-hover-depth="true"] .lo
 </div>
 <div class="visualPresetLab">
   <div class="appearanceLabel">Whole-look presets</div>
+  <div class="lookPresetHeader"><span>Instant style packs</span><button type="button" class="secondary" id="shuffleLook">Shuffle look ✦</button></div>
   <div class="lookPresetGrid">
     <button type="button" class="lookPreset quantumLook" data-look-preset="quantum"><b>Quantum</b><span>Nebula · Aurora · Glass</span></button>
     <button type="button" class="lookPreset neonLook" data-look-preset="neon"><b>Neon Grid</b><span>Cyber · Grid · Holographic</span></button>
@@ -840,6 +859,8 @@ html[data-hover-depth="true"] .quickcard:hover,html[data-hover-depth="true"] .lo
     <div class="field"><label>Corners</label><select id="cornerStyle"><option value="soft">Soft</option><option value="round">Round</option><option value="sharp">Sharp</option></select></div>
     <label class="reactiveToggle"><input id="hoverDepth" type="checkbox"><span>3D hover depth</span></label>
     <label class="reactiveToggle"><input id="cursorTrail" type="checkbox"><span>Cursor spark trail</span></label>
+    <label class="reactiveToggle"><input id="parallaxFx" type="checkbox"><span>Background parallax</span></label>
+    <div class="field"><label>Generating FX</label><select id="generationFx"><option value="subtle">Subtle</option><option value="cinematic">Cinematic</option><option value="off">Off</option></select></div>
     <label class="reactiveToggle"><input id="scanlines" type="checkbox"><span>Scanlines</span></label>
     <label class="reactiveToggle"><input id="vignette" type="checkbox"><span>Vignette</span></label>
   </div>
@@ -1319,7 +1340,7 @@ html[data-hover-depth="true"] .quickcard:hover,html[data-hover-depth="true"] .lo
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="3.8.0";
+var APP_VERSION="3.9.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1407,6 +1428,8 @@ var settings=Object.assign({
   cornerStyle:"soft",
   hoverDepth:true,
   cursorTrail:false,
+  parallaxFx:true,
+  generationFx:"subtle",
   customTheme:{bg:"#151517",bg0:"#0f0f11",panel:"#202024",panel2:"#27272c",text:"#f5f3ef",muted:"#99959b",accent:"#e07b5f"},
   customThemes:[]
 },safeJSON(localStorage.getItem(SETSTORE),{}));
@@ -1524,6 +1547,8 @@ function applyAppearance(){
   root.dataset.cornerStyle=settings.cornerStyle||"soft";
   root.dataset.hoverDepth=settings.hoverDepth===false?"false":"true";
   root.dataset.cursorTrail=settings.cursorTrail?"true":"false";
+  root.dataset.parallaxFx=settings.parallaxFx===false?"false":"true";
+  root.dataset.generationFx=settings.generationFx||"subtle";
   root.style.setProperty("--fx-strength",Math.max(0,Math.min(1,(Number(settings.backgroundStrength)||0)/100)));
   root.style.setProperty("--gradient-a",validHex(settings.gradientA)?settings.gradientA:"#7c3aed");
   root.style.setProperty("--gradient-b",validHex(settings.gradientB)?settings.gradientB:"#0891b2");
@@ -1792,6 +1817,7 @@ function render(){
   q("#researchBtn").classList.toggle("on",!!settings.web&&!!settings.fetch);
   q("#focusBtn").classList.toggle("on",!!settings.focusMode);
   var activeBusy=busy&&c.id===busyChatId;
+  document.documentElement.dataset.generating=activeBusy?"true":"false";
   q("#send").textContent=activeBusy?"■":"↑";
   q("#send").classList.toggle("busy",activeBusy);
   q("#send").disabled=!!(busy&&!activeBusy);
@@ -2408,7 +2434,7 @@ function applySavedTheme(item){
   settings.scanlines=!!item.scanlines;settings.vignette=item.vignette!==false;settings.gradientEnabled=!!item.gradientEnabled;
   settings.gradientA=validHex(item.gradientA)?item.gradientA:"#7c3aed";settings.gradientB=validHex(item.gradientB)?item.gradientB:"#0891b2";
   settings.gradientAngle=Math.max(0,Math.min(360,Number(item.gradientAngle)||135));settings.gradientStrength=Math.max(0,Math.min(100,Number(item.gradientStrength)||35));
-  settings.brandMotion=["orbit","pulse","glitch","off"].indexOf(item.brandMotion)>=0?item.brandMotion:"orbit";settings.edgeGlow=["off","soft","neon"].indexOf(item.edgeGlow)>=0?item.edgeGlow:"soft";settings.cornerStyle=["soft","round","sharp"].indexOf(item.cornerStyle)>=0?item.cornerStyle:"soft";settings.hoverDepth=item.hoverDepth!==false;settings.cursorTrail=!!item.cursorTrail;
+  settings.brandMotion=["orbit","pulse","glitch","off"].indexOf(item.brandMotion)>=0?item.brandMotion:"orbit";settings.edgeGlow=["off","soft","neon"].indexOf(item.edgeGlow)>=0?item.edgeGlow:"soft";settings.cornerStyle=["soft","round","sharp"].indexOf(item.cornerStyle)>=0?item.cornerStyle:"soft";settings.hoverDepth=item.hoverDepth!==false;settings.cursorTrail=!!item.cursorTrail;settings.parallaxFx=item.parallaxFx!==false;settings.generationFx=["subtle","cinematic","off"].indexOf(item.generationFx)>=0?item.generationFx:"subtle";
   fillCustomThemeInputs(settings.customTheme);q("#customAccent").value=settings.customTheme.accent;save();applyAppearance();toast("Applied "+(item.name||"custom theme"))
 }
 function applyThemeFromBuilder(showToast){
@@ -2418,18 +2444,18 @@ function applyThemeFromBuilder(showToast){
 function saveThemePreset(){
   var colors=readCustomThemeInputs(),name=q("#customThemeName").value.trim().slice(0,40)||"Custom "+((settings.customThemes||[]).length+1);
   settings.customThemes=Array.isArray(settings.customThemes)?settings.customThemes:[];
-  settings.customThemes.unshift({id:uid(),name:name,colors:colors,backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",glassStrength:Number(settings.glassStrength)||70,reactiveGlow:settings.reactiveGlow!==false,surfaceStyle:settings.surfaceStyle||"glass",messageMotion:settings.messageMotion||"slide",scanlines:!!settings.scanlines,vignette:settings.vignette!==false,gradientEnabled:!!settings.gradientEnabled,gradientA:settings.gradientA||"#7c3aed",gradientB:settings.gradientB||"#0891b2",gradientAngle:Number(settings.gradientAngle)||135,gradientStrength:Number(settings.gradientStrength)||35,brandMotion:settings.brandMotion||"orbit",edgeGlow:settings.edgeGlow||"soft",cornerStyle:settings.cornerStyle||"soft",hoverDepth:settings.hoverDepth!==false,cursorTrail:!!settings.cursorTrail,created:Date.now()});
+  settings.customThemes.unshift({id:uid(),name:name,colors:colors,backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",glassStrength:Number(settings.glassStrength)||70,reactiveGlow:settings.reactiveGlow!==false,surfaceStyle:settings.surfaceStyle||"glass",messageMotion:settings.messageMotion||"slide",scanlines:!!settings.scanlines,vignette:settings.vignette!==false,gradientEnabled:!!settings.gradientEnabled,gradientA:settings.gradientA||"#7c3aed",gradientB:settings.gradientB||"#0891b2",gradientAngle:Number(settings.gradientAngle)||135,gradientStrength:Number(settings.gradientStrength)||35,brandMotion:settings.brandMotion||"orbit",edgeGlow:settings.edgeGlow||"soft",cornerStyle:settings.cornerStyle||"soft",hoverDepth:settings.hoverDepth!==false,cursorTrail:!!settings.cursorTrail,parallaxFx:settings.parallaxFx!==false,generationFx:settings.generationFx||"subtle",created:Date.now()});
   settings.customThemes=settings.customThemes.slice(0,12);save();renderSavedThemes();q("#customThemeName").value="";toast("Theme preset saved")
 }
 function exportThemePreset(){
-  var data={type:"quantum-breaks-theme",version:3,name:q("#customThemeName").value.trim()||"Quantum Breaks custom",colors:readCustomThemeInputs(),backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",glassStrength:Number(settings.glassStrength)||70,reactiveGlow:settings.reactiveGlow!==false,surfaceStyle:settings.surfaceStyle||"glass",messageMotion:settings.messageMotion||"slide",scanlines:!!settings.scanlines,vignette:settings.vignette!==false,gradientEnabled:!!settings.gradientEnabled,gradientA:settings.gradientA||"#7c3aed",gradientB:settings.gradientB||"#0891b2",gradientAngle:Number(settings.gradientAngle)||135,gradientStrength:Number(settings.gradientStrength)||35,brandMotion:settings.brandMotion||"orbit",edgeGlow:settings.edgeGlow||"soft",cornerStyle:settings.cornerStyle||"soft",hoverDepth:settings.hoverDepth!==false,cursorTrail:!!settings.cursorTrail};
+  var data={type:"quantum-breaks-theme",version:3,name:q("#customThemeName").value.trim()||"Quantum Breaks custom",colors:readCustomThemeInputs(),backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",glassStrength:Number(settings.glassStrength)||70,reactiveGlow:settings.reactiveGlow!==false,surfaceStyle:settings.surfaceStyle||"glass",messageMotion:settings.messageMotion||"slide",scanlines:!!settings.scanlines,vignette:settings.vignette!==false,gradientEnabled:!!settings.gradientEnabled,gradientA:settings.gradientA||"#7c3aed",gradientB:settings.gradientB||"#0891b2",gradientAngle:Number(settings.gradientAngle)||135,gradientStrength:Number(settings.gradientStrength)||35,brandMotion:settings.brandMotion||"orbit",edgeGlow:settings.edgeGlow||"soft",cornerStyle:settings.cornerStyle||"soft",hoverDepth:settings.hoverDepth!==false,cursorTrail:!!settings.cursorTrail,parallaxFx:settings.parallaxFx!==false,generationFx:settings.generationFx||"subtle"};
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download=(data.name||"quantum-theme").replace(/[^a-z0-9_-]+/gi,"_")+".quantum-theme.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000);toast("Theme exported")
 }
 async function importThemePreset(file){
   try{
     var data=JSON.parse(await file.text());if(!data||data.type!=="quantum-breaks-theme"||!data.colors)throw new Error("Not a Quantum Breaks theme");
     var d=defaultCustomTheme(),colors={};Object.keys(d).forEach(function(k){if(!validHex(data.colors[k]))throw new Error("Theme contains an invalid color");colors[k]=data.colors[k]});
-    var item={id:uid(),name:String(data.name||"Imported theme").slice(0,40),colors:colors,backgroundEffect:["aurora","cosmic","grid","waves","prism","particles","none"].indexOf(data.backgroundEffect)>=0?data.backgroundEffect:"aurora",backgroundStrength:Math.max(0,Math.min(100,Number(data.backgroundStrength)||70)),motionStyle:["calm","lively","off"].indexOf(data.motionStyle)>=0?data.motionStyle:"calm",glassStrength:Math.max(0,Math.min(100,Number(data.glassStrength)==null?70:Number(data.glassStrength))),reactiveGlow:data.reactiveGlow!==false,surfaceStyle:["glass","frosted","solid","holographic"].indexOf(data.surfaceStyle)>=0?data.surfaceStyle:"glass",messageMotion:["slide","fade","pop","off"].indexOf(data.messageMotion)>=0?data.messageMotion:"slide",scanlines:!!data.scanlines,vignette:data.vignette!==false,gradientEnabled:!!data.gradientEnabled,gradientA:validHex(data.gradientA)?data.gradientA:"#7c3aed",gradientB:validHex(data.gradientB)?data.gradientB:"#0891b2",gradientAngle:Math.max(0,Math.min(360,Number(data.gradientAngle)||135)),gradientStrength:Math.max(0,Math.min(100,Number(data.gradientStrength)||35)),brandMotion:["orbit","pulse","glitch","off"].indexOf(data.brandMotion)>=0?data.brandMotion:"orbit",edgeGlow:["off","soft","neon"].indexOf(data.edgeGlow)>=0?data.edgeGlow:"soft",cornerStyle:["soft","round","sharp"].indexOf(data.cornerStyle)>=0?data.cornerStyle:"soft",hoverDepth:data.hoverDepth!==false,cursorTrail:!!data.cursorTrail,created:Date.now()};
+    var item={id:uid(),name:String(data.name||"Imported theme").slice(0,40),colors:colors,backgroundEffect:["aurora","cosmic","grid","waves","prism","particles","none"].indexOf(data.backgroundEffect)>=0?data.backgroundEffect:"aurora",backgroundStrength:Math.max(0,Math.min(100,Number(data.backgroundStrength)||70)),motionStyle:["calm","lively","off"].indexOf(data.motionStyle)>=0?data.motionStyle:"calm",glassStrength:Math.max(0,Math.min(100,Number(data.glassStrength)==null?70:Number(data.glassStrength))),reactiveGlow:data.reactiveGlow!==false,surfaceStyle:["glass","frosted","solid","holographic"].indexOf(data.surfaceStyle)>=0?data.surfaceStyle:"glass",messageMotion:["slide","fade","pop","off"].indexOf(data.messageMotion)>=0?data.messageMotion:"slide",scanlines:!!data.scanlines,vignette:data.vignette!==false,gradientEnabled:!!data.gradientEnabled,gradientA:validHex(data.gradientA)?data.gradientA:"#7c3aed",gradientB:validHex(data.gradientB)?data.gradientB:"#0891b2",gradientAngle:Math.max(0,Math.min(360,Number(data.gradientAngle)||135)),gradientStrength:Math.max(0,Math.min(100,Number(data.gradientStrength)||35)),brandMotion:["orbit","pulse","glitch","off"].indexOf(data.brandMotion)>=0?data.brandMotion:"orbit",edgeGlow:["off","soft","neon"].indexOf(data.edgeGlow)>=0?data.edgeGlow:"soft",cornerStyle:["soft","round","sharp"].indexOf(data.cornerStyle)>=0?data.cornerStyle:"soft",hoverDepth:data.hoverDepth!==false,cursorTrail:!!data.cursorTrail,parallaxFx:data.parallaxFx!==false,generationFx:["subtle","cinematic","off"].indexOf(data.generationFx)>=0?data.generationFx:"subtle",created:Date.now()};
     settings.customThemes=Array.isArray(settings.customThemes)?settings.customThemes:[];settings.customThemes.unshift(item);settings.customThemes=settings.customThemes.slice(0,12);save();renderSavedThemes();applySavedTheme(item)
   }catch(e){toast("Theme import failed: "+e.message)}
 }
@@ -2459,6 +2485,8 @@ function syncAppearanceStudio(){
   if(q("#cornerStyle"))q("#cornerStyle").value=settings.cornerStyle||"soft";
   if(q("#hoverDepth"))q("#hoverDepth").checked=settings.hoverDepth!==false;
   if(q("#cursorTrail"))q("#cursorTrail").checked=!!settings.cursorTrail;
+  if(q("#parallaxFx"))q("#parallaxFx").checked=settings.parallaxFx!==false;
+  if(q("#generationFx"))q("#generationFx").value=settings.generationFx||"subtle";
   renderSavedThemes()
 }
 function applyLookPreset(name){
@@ -2502,6 +2530,9 @@ function setupAppearanceStudio(){
   q("#cornerStyle").onchange=function(){settings.cornerStyle=this.value;save();applyAppearance()};
   q("#hoverDepth").onchange=function(){settings.hoverDepth=this.checked;save();applyAppearance()};
   q("#cursorTrail").onchange=function(){settings.cursorTrail=this.checked;save();applyAppearance()};
+  q("#parallaxFx").onchange=function(){settings.parallaxFx=this.checked;save();applyAppearance()};
+  q("#generationFx").onchange=function(){settings.generationFx=this.value;save();applyAppearance()};
+  q("#shuffleLook").onclick=function(){var names=["quantum","neon","space","ice","matrix","sunset"],pick=names[Math.floor(Math.random()*names.length)];applyLookPreset(pick)};
   q("#chooseWallpaper").onclick=function(){q("#wallpaperFile").click()};
   q("#clearWallpaper").onclick=function(){settings.wallpaperData="";settings.wallpaperEnabled=false;q("#wallpaperEnabled").checked=false;save();applyAppearance();toast("Wallpaper cleared")};
   q("#wallpaperFile").onchange=function(e){var f=e.target.files&&e.target.files[0];e.target.value="";if(!f)return;if(!String(f.type||"").startsWith("image/"))return toast("Choose an image file");if(f.size>1572864)return toast("Wallpaper must be 1.5 MB or smaller");var rd=new FileReader();rd.onload=function(){settings.wallpaperData=String(rd.result||"");settings.wallpaperEnabled=true;save();applyAppearance();syncAppearanceStudio();toast("Wallpaper applied")};rd.onerror=function(){toast("Could not read wallpaper")};rd.readAsDataURL(f)};
@@ -2517,6 +2548,7 @@ function setupAppearanceStudio(){
   document.addEventListener("pointermove",function(e){
     var root=document.documentElement;
     if(settings.reactiveGlow!==false){root.style.setProperty("--pointer-x",e.clientX+"px");root.style.setProperty("--pointer-y",e.clientY+"px")}
+    if(settings.parallaxFx!==false&&window.innerWidth>700){var nx=(e.clientX/window.innerWidth-.5)*10,ny=(e.clientY/window.innerHeight-.5)*8;root.style.setProperty("--parallax-x",nx.toFixed(1)+"px");root.style.setProperty("--parallax-y",ny.toFixed(1)+"px")}
     if(settings.hoverDepth!==false){
       var card=e.target&&e.target.closest?e.target.closest(".quickcard,.lookPreset,.themeTile,.backgroundTile,.savedThemeCard"):null;
       if(card){var rr=card.getBoundingClientRect(),px=(e.clientX-rr.left)/Math.max(1,rr.width)-.5,py=(e.clientY-rr.top)/Math.max(1,rr.height)-.5;card.style.setProperty("--tilt-x",(px*6).toFixed(2)+"deg");card.style.setProperty("--tilt-y",(-py*5).toFixed(2)+"deg")}
@@ -2758,7 +2790,7 @@ function openSettings(){
   q("#gradientA").value=validHex(settings.gradientA)?settings.gradientA:"#7c3aed";q("#gradientB").value=validHex(settings.gradientB)?settings.gradientB:"#0891b2";
   q("#gradientAngle").value=String(Math.max(0,Math.min(360,Number(settings.gradientAngle)||135)));q("#gradientStrength").value=String(Math.max(0,Math.min(100,Number(settings.gradientStrength)||35)));
   q("#wallpaperEnabled").checked=!!settings.wallpaperEnabled;q("#wallpaperOpacity").value=String(Math.max(0,Math.min(100,Number(settings.wallpaperOpacity)||32)));q("#wallpaperBlur").value=String(Math.max(0,Math.min(30,Number(settings.wallpaperBlur)||0)));q("#wallpaperFit").value=settings.wallpaperFit==="contain"?"contain":"cover";
-  q("#brandMotion").value=settings.brandMotion||"orbit";q("#edgeGlow").value=settings.edgeGlow||"soft";q("#cornerStyle").value=settings.cornerStyle||"soft";q("#hoverDepth").checked=settings.hoverDepth!==false;q("#cursorTrail").checked=!!settings.cursorTrail;
+  q("#brandMotion").value=settings.brandMotion||"orbit";q("#edgeGlow").value=settings.edgeGlow||"soft";q("#cornerStyle").value=settings.cornerStyle||"soft";q("#hoverDepth").checked=settings.hoverDepth!==false;q("#cursorTrail").checked=!!settings.cursorTrail;q("#parallaxFx").checked=settings.parallaxFx!==false;q("#generationFx").value=settings.generationFx||"subtle";
   q("#densitySelect").value=settings.density||"cozy";
   q("#contentWidth").value=String(settings.contentWidth||860);
   q("#chatFontSize").value=String(settings.chatFontSize||17);
