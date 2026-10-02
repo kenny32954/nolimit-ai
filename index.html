@@ -3302,8 +3302,14 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();ins
 if("serviceWorker" in navigator&&location.protocol==="https:"){
   navigator.serviceWorker.register("./sw.js").catch(function(){})
 }
+function handleLaunchAction(){
+  var params=new URLSearchParams(location.search),action=params.get("action");if(!action)return;
+  if(action==="new")newChat();
+  else if(action==="image")openImage();
+  else if(action==="research"){settings.web=true;settings.fetch=true;settings.modePreset="research";save();render();q("#prompt").focus();toast("Research mode ready")}
+}
 setupAccessibility();
-finishAuth().then(function(){render();restoreDraft();setTimeout(function(){ensureModelCatalog().then(function(){render()})},250)})
+finishAuth().then(function(){render();restoreDraft();handleLaunchAction();setTimeout(function(){ensureModelCatalog().then(function(){render()})},250)})
 })();
 </script>
 </body>
