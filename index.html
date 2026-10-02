@@ -1769,14 +1769,34 @@ function toolList(){
 
 function hasPDF(c){return c.messages.some(function(m){return m.role==="user"&&m.pdfs&&m.pdfs.length})}
 
+function pushUnique(arr,value){if(value&&arr.indexOf(value)<0)arr.push(value)}
+function collectOutputContent(value,a){
+  if(value==null)return;
+  if(typeof value==="string"){a.content=(a.content||"")+value;return}
+  if(Array.isArray(value)){value.forEach(function(p){collectOutputContent(p,a)});return}
+  if(typeof value==="object"){
+    if(typeof value.text==="string")a.content=(a.content||"")+value.text;
+    else if(typeof value.content==="string")a.content=(a.content||"")+value.content;
+    var src=value.image_url&&value.image_url.url?value.image_url.url:(value.url&&String(value.type||"").indexOf("image")>=0?value.url:"");
+    if(src){a.images=a.images||[];pushUnique(a.images,src)}
+  }
+}
+function mergeAnnotations(target,incoming){
+  var out=Array.isArray(target)?target.slice():[],seen={};
+  out.forEach(function(x){try{seen[JSON.stringify(x)]=true}catch(e){}});
+  (Array.isArray(incoming)?incoming:[incoming]).filter(Boolean).forEach(function(x){var k="";try{k=JSON.stringify(x)}catch(e){}if(!k||!seen[k]){out.push(x);if(k)seen[k]=true}});
+  return out
+}
 function addDelta(d,a){
   if(!d)return;
-  if(typeof d.content==="string")a.content+=d.content;
-  if(Array.isArray(d.content))d.content.forEach(function(p){if(p.text)a.content+=p.text;if(p.image_url&&p.image_url.url){a.images=a.images||[];a.images.push(p.image_url.url)}});
-  if(Array.isArray(d.images))d.images.forEach(function(img){var src=img&&img.image_url&&img.image_url.url?img.image_url.url:(img&&img.url?img.url:"");if(src){a.images=a.images||[];a.images.push(src)}});
+  collectOutputContent(d.content,a);
+  if(Array.isArray(d.images))d.images.forEach(function(img){var src=img&&img.image_url&&img.image_url.url?img.image_url.url:(img&&img.url?img.url:"");if(src){a.images=a.images||[];pushUnique(a.images,src)}});
   if(typeof d.reasoning==="string")a.reasoning=(a.reasoning||"")+d.reasoning;
-  if(d.reasoning_details)a.reasoning_details=d.reasoning_details;
-  if(d.annotations)a.annotations=d.annotations
+  if(d.reasoning_details){
+    if(Array.isArray(d.reasoning_details)){a.reasoning_details=(Array.isArray(a.reasoning_details)?a.reasoning_details:[]).concat(d.reasoning_details)}
+    else a.reasoning_details=d.reasoning_details
+  }
+  if(d.annotations)a.annotations=mergeAnnotations(a.annotations,d.annotations)
 }
 
 function applyStreamPayload(raw,a){
@@ -2014,7 +2034,15 @@ async function send(){
 }
 
 function finishBuffered(j,a){
-  var m=j.choices&&j.choices[0]&&j.choices[0].message;if(m){a.content=m.content||"";a.reasoning=m.reasoning||"";a.reasoning_details=m.reasoning_details;a.annotations=m.annotations;if(Array.isArray(m.images))a.images=m.images.map(function(x){return x.image_url&&x.image_url.url?x.image_url.url:x.url||x}).filter(Boolean)}
+  var choice=j.choices&&j.choices[0],m=choice&&choice.message;
+  if(m){
+    a.content="";collectOutputContent(m.content,a);
+    a.reasoning=m.reasoning||"";
+    a.reasoning_details=m.reasoning_details;
+    a.annotations=mergeAnnotations(a.annotations,m.annotations);
+    if(Array.isArray(m.images))m.images.forEach(function(x){var src=x&&x.image_url&&x.image_url.url?x.image_url.url:(x&&x.url?x.url:"");if(src){a.images=a.images||[];pushUnique(a.images,src)}})
+  }
+  if(choice&&choice.finish_reason)a.finishReason=choice.finish_reason;
   a.usage=j.usage;if(j.usage&&j.usage.cost!=null)a.cost=j.usage.cost;if(j.cost!=null)a.cost=j.cost;if(j.model)a.model=j.model
 }
 
