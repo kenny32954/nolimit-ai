@@ -44,6 +44,9 @@ static char const *mode_labels[] = {
 #define PROMPT_CAP 700
 #define ANSWER_CAP 4096
 #define RESPONSE_TIMEOUT_TICKS 12500
+#define HISTORY_SLOTS 4
+#define HISTORY_PROMPT_CAP 240
+#define HISTORY_ANSWER_CAP 1600
 
 typedef struct {
     int subject;
@@ -60,6 +63,56 @@ typedef struct {
     size_t answer_len;
     char status[96];
 } app_state_t;
+
+typedef struct {
+    char prompt[HISTORY_PROMPT_CAP];
+    char answer[HISTORY_ANSWER_CAP];
+    int subject;
+    int mode;
+} history_turn_t;
+
+static history_turn_t recent[HISTORY_SLOTS];
+static int recent_count = 0;
+static int recent_view = -1;
+
+static void save_history_turn(app_state_t const *state)
+{
+    int i;
+
+    if(!state->prompt[0] || !state->answer[0]) return;
+
+    for(i = HISTORY_SLOTS - 1; i > 0; i--) {
+        recent[i] = recent[i - 1];
+    }
+
+    strncpy(recent[0].prompt, state->prompt, HISTORY_PROMPT_CAP - 1);
+    recent[0].prompt[HISTORY_PROMPT_CAP - 1] = '\0';
+    strncpy(recent[0].answer, state->answer, HISTORY_ANSWER_CAP - 1);
+    recent[0].answer[HISTORY_ANSWER_CAP - 1] = '\0';
+    recent[0].subject = state->subject;
+    recent[0].mode = state->mode;
+
+    if(recent_count < HISTORY_SLOTS) recent_count++;
+    recent_view = 0;
+}
+
+static void load_history_turn(app_state_t *state, int index)
+{
+    if(index < 0 || index >= recent_count) return;
+
+    strncpy(state->prompt, recent[index].prompt, sizeof(state->prompt) - 1);
+    state->prompt[sizeof(state->prompt) - 1] = '\0';
+    strncpy(state->answer, recent[index].answer, sizeof(state->answer) - 1);
+    state->answer[sizeof(state->answer) - 1] = '\0';
+    state->answer_len = strlen(state->answer);
+    state->subject = recent[index].subject;
+    state->mode = recent[index].mode;
+    state->scroll = 0;
+    recent_view = index;
+    snprintf(state->status, sizeof(state->status),
+             "History %d/%d  LEFT/RIGHT browse",
+             index + 1, recent_count);
+}
 
 static void draw_badge(int x, int y, int w, char const *text, color_t bg, color_t fg)
 {
@@ -278,7 +331,11 @@ static void poll_transport(app_state_t *state)
             append_answer(state, chunk);
             state->waiting = false;
             state->wait_ticks = 0;
-            snprintf(state->status, sizeof(state->status), "Answer complete");
+            save_history_turn(state);
+            snprintf(state->status, sizeof(state->status),
+                     recent_count > 1
+                         ? "Answer complete - LEFT/RIGHT history"
+                         : "Answer complete");
         }
         else if(event == QB_TRANSPORT_ERROR) {
             state->waiting = false;
@@ -322,6 +379,7 @@ static bool start_request(app_state_t *state)
     state->answer[0] = '\0';
     state->answer_len = 0;
     state->scroll = 0;
+    recent_view = -1;
     snprintf(state->status, sizeof(state->status), "Question sent");
     return true;
 }
@@ -427,6 +485,16 @@ int main(void)
                 state.focus_answer = false;
                 start_request(&state);
             }
+        }
+        else if(!state.waiting && ev.key == KEY_LEFT && recent_count > 0) {
+            int next = recent_view < 0 ? 0 : recent_view + 1;
+            if(next >= recent_count) next = recent_count - 1;
+            load_history_turn(&state, next);
+        }
+        else if(!state.waiting && ev.key == KEY_RIGHT && recent_count > 0) {
+            int next = recent_view < 0 ? 0 : recent_view - 1;
+            if(next < 0) next = 0;
+            load_history_turn(&state, next);
         }
         else if(ev.key == KEY_UP) {
             if(state.scroll > 0) state.scroll--;
