@@ -642,7 +642,7 @@ html[data-bg-effect="waves"] .ambientFX i:nth-child(1){bottom:-18vh;transform:ro
 <h3>Workspace</h3>
 <ul><li>The sidebar is now organized into collapsible AI, Workspace, Create, Chat, and App drawers that remember your layout locally.</li><li>High-frequency AI and Workspace drawers stay open by default, while lower-frequency tool groups start collapsed to reduce visual noise.</li><li>Conversation branches, tasks, snapshots, backups, archives, trash, global search, and encrypted workspace exports remain available.</li></ul>
 <h3>Interface</h3>
-<ul><li>Desktop now has a remembered compact sidebar rail that shrinks navigation to a 76px icon strip and gives the conversation substantially more horizontal space.</li><li>Notifications now stack cleanly with entrance/exit motion instead of overlapping each other, and chat history always shows a useful tag or relative-time subtitle.</li><li>The live appearance studio, shared icon language, polished message actions, active-chat indicators, and responsive mobile layout remain part of the v3 design system.</li></ul>
+<ul><li>The new Theme Lab adds Aurora, Cosmic, Grid, Waves, and clean background modes with live strength control and Calm/Lively/Off motion settings.</li><li>A full custom-theme builder now controls background, panels, text, muted text, and accent colors; users can save up to 12 presets and safely export/import shareable theme JSON files.</li><li>All effects are CSS-generated and respect reduced-motion preferences, while the compact sidebar rail and stacked notification system remain available.</li></ul>
 </div>
 </section>
 
@@ -750,7 +750,7 @@ html[data-bg-effect="waves"] .ambientFX i:nth-child(1){bottom:-18vh;transform:ro
   <div class="savedThemeList" id="savedThemeList"></div>
 </div>
 <div class="row">
-<div class="field appearanceLegacy" style="flex:1;min-width:160px"><label>Theme</label><select id="themeSelect"><option value="dark">Dark</option><option value="midnight">Midnight</option><option value="ember">Ember</option><option value="nebula">Nebula</option><option value="cyber">Cyber</option><option value="oled">OLED</option></select></div>
+<div class="field appearanceLegacy" style="flex:1;min-width:160px"><label>Theme</label><select id="themeSelect"><option value="dark">Dark</option><option value="midnight">Midnight</option><option value="ember">Ember</option><option value="nebula">Nebula</option><option value="cyber">Cyber</option><option value="oled">OLED</option><option value="custom">Custom</option></select></div>
 <div class="field appearanceLegacy" style="flex:1;min-width:160px"><label>Accent</label><select id="accentSelect"><option value="coral">Coral</option><option value="blue">Blue</option><option value="violet">Violet</option><option value="green">Green</option><option value="cyan">Cyan</option><option value="gold">Gold</option><option value="pink">Pink</option><option value="custom">Custom</option></select></div>
 <div class="field" style="flex:1;min-width:160px"><label>Density</label><select id="densitySelect"><option value="cozy">Cozy</option><option value="compact">Compact</option></select></div>
 <div class="field" style="flex:1;min-width:160px"><label>Custom accent</label><input id="customAccent" type="color" value="#e07b5f"></div>
@@ -1356,10 +1356,21 @@ function applyAppearance(){
   root.dataset.density=settings.density||"cozy";
   root.dataset.focus=settings.focusMode?"true":"false";
   root.dataset.sidebarRail=settings.sidebarRail?"true":"false";
+  root.dataset.bgEffect=settings.backgroundEffect||"aurora";
+  root.dataset.motion=settings.motionStyle||"calm";
+  root.style.setProperty("--fx-strength",Math.max(0,Math.min(1,(Number(settings.backgroundStrength)||0)/100)));
   root.style.setProperty("--content-max",Math.max(680,Math.min(1400,Number(settings.contentWidth)||860))+"px");
   root.style.setProperty("--chat-font",Math.max(14,Math.min(24,Number(settings.chatFontSize)||17))+"px");
-  if(settings.accent==="custom"){
-    var accent=settings.customAccent||"#e07b5f";root.style.setProperty("--accent",accent);root.style.setProperty("--accent2",lightenHex(accent,45));root.style.setProperty("--accentGlow",accent+"38")
+  var custom=settings.customTheme||{};
+  if(settings.theme==="custom"){
+    var themeKeys={bg:"--bg",bg0:"--bg0",panel:"--panel",panel2:"--panel2",text:"--text",muted:"--muted"};
+    Object.keys(themeKeys).forEach(function(k){if(validHex(custom[k]))root.style.setProperty(themeKeys[k],custom[k]);else root.style.removeProperty(themeKeys[k])})
+  }else{
+    ["--bg","--bg0","--panel","--panel2","--text","--muted"].forEach(function(k){root.style.removeProperty(k)})
+  }
+  if(settings.accent==="custom"||settings.theme==="custom"){
+    var accent=validHex(settings.theme==="custom"?custom.accent:settings.customAccent)?(settings.theme==="custom"?custom.accent:settings.customAccent):"#e07b5f";
+    root.style.setProperty("--accent",accent);root.style.setProperty("--accent2",lightenHex(accent,45));root.style.setProperty("--accentGlow",accent+"38")
   }else{
     root.style.removeProperty("--accent");root.style.removeProperty("--accent2");root.style.removeProperty("--accentGlow")
   }
@@ -2186,9 +2197,67 @@ function runNextQueued(chat){
   setTimeout(function(){if(!busy&&current()&&current().id===chat.id)send()},180)
 }
 
+function validHex(v){return /^#[0-9a-f]{6}$/i.test(String(v||""))}
+function defaultCustomTheme(){return {bg:"#151517",bg0:"#0f0f11",panel:"#202024",panel2:"#27272c",text:"#f5f3ef",muted:"#99959b",accent:"#e07b5f"}}
+function readCustomThemeInputs(){
+  var map={bg:"customBg",bg0:"customBg0",panel:"customPanel",panel2:"customPanel2",text:"customText",muted:"customMuted",accent:"customThemeAccent"},out={};
+  Object.keys(map).forEach(function(k){var v=q("#"+map[k]).value;out[k]=validHex(v)?v:defaultCustomTheme()[k]});return out
+}
+function fillCustomThemeInputs(theme){
+  theme=Object.assign(defaultCustomTheme(),theme||{});
+  var map={bg:"customBg",bg0:"customBg0",panel:"customPanel",panel2:"customPanel2",text:"customText",muted:"customMuted",accent:"customThemeAccent"};
+  Object.keys(map).forEach(function(k){q("#"+map[k]).value=validHex(theme[k])?theme[k]:defaultCustomTheme()[k]})
+}
+function renderSavedThemes(){
+  var box=q("#savedThemeList");if(!box)return;box.innerHTML="";
+  var list=Array.isArray(settings.customThemes)?settings.customThemes:[];
+  if(!list.length){box.innerHTML='<div class="smallnote">Saved custom themes will appear here.</div>';return}
+  list.forEach(function(item){
+    var card=document.createElement("button");card.type="button";card.className="savedThemeCard";
+    var sw=document.createElement("span");sw.className="swatches";["bg0","panel","accent","text"].forEach(function(k){var i=document.createElement("i");i.style.background=(item.colors&&validHex(item.colors[k]))?item.colors[k]:"#222";sw.appendChild(i)});
+    var name=document.createElement("b");name.textContent=item.name||"Custom theme";var meta=document.createElement("small");meta.textContent=(item.backgroundEffect||"aurora")+" · "+(item.motionStyle||"calm");
+    var del=document.createElement("button");del.type="button";del.className="savedThemeDelete";del.textContent="×";del.title="Delete saved theme";
+    del.onclick=function(e){e.stopPropagation();settings.customThemes=list.filter(function(x){return x.id!==item.id});save();renderSavedThemes();toast("Theme preset deleted")};
+    card.onclick=function(){applySavedTheme(item)};
+    card.appendChild(sw);card.appendChild(name);card.appendChild(meta);card.appendChild(del);box.appendChild(card)
+  })
+}
+function applySavedTheme(item){
+  if(!item||!item.colors)return;settings.customTheme=Object.assign(defaultCustomTheme(),item.colors);settings.theme="custom";settings.accent="custom";settings.customAccent=settings.customTheme.accent;
+  settings.backgroundEffect=["aurora","cosmic","grid","waves","none"].indexOf(item.backgroundEffect)>=0?item.backgroundEffect:"aurora";
+  settings.backgroundStrength=Math.max(0,Math.min(100,Number(item.backgroundStrength)||70));
+  settings.motionStyle=["calm","lively","off"].indexOf(item.motionStyle)>=0?item.motionStyle:"calm";
+  fillCustomThemeInputs(settings.customTheme);q("#customAccent").value=settings.customTheme.accent;save();applyAppearance();toast("Applied "+(item.name||"custom theme"))
+}
+function applyThemeFromBuilder(showToast){
+  settings.customTheme=readCustomThemeInputs();settings.theme="custom";settings.accent="custom";settings.customAccent=settings.customTheme.accent;
+  q("#themeSelect").value="custom";q("#accentSelect").value="custom";q("#customAccent").value=settings.customTheme.accent;save();applyAppearance();if(showToast)toast("Custom theme applied")
+}
+function saveThemePreset(){
+  var colors=readCustomThemeInputs(),name=q("#customThemeName").value.trim().slice(0,40)||"Custom "+((settings.customThemes||[]).length+1);
+  settings.customThemes=Array.isArray(settings.customThemes)?settings.customThemes:[];
+  settings.customThemes.unshift({id:uid(),name:name,colors:colors,backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",created:Date.now()});
+  settings.customThemes=settings.customThemes.slice(0,12);save();renderSavedThemes();q("#customThemeName").value="";toast("Theme preset saved")
+}
+function exportThemePreset(){
+  var data={type:"quantum-breaks-theme",version:1,name:q("#customThemeName").value.trim()||"Quantum Breaks custom",colors:readCustomThemeInputs(),backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm"};
+  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download=(data.name||"quantum-theme").replace(/[^a-z0-9_-]+/gi,"_")+".quantum-theme.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000);toast("Theme exported")
+}
+async function importThemePreset(file){
+  try{
+    var data=JSON.parse(await file.text());if(!data||data.type!=="quantum-breaks-theme"||!data.colors)throw new Error("Not a Quantum Breaks theme");
+    var d=defaultCustomTheme(),colors={};Object.keys(d).forEach(function(k){if(!validHex(data.colors[k]))throw new Error("Theme contains an invalid color");colors[k]=data.colors[k]});
+    var item={id:uid(),name:String(data.name||"Imported theme").slice(0,40),colors:colors,backgroundEffect:["aurora","cosmic","grid","waves","none"].indexOf(data.backgroundEffect)>=0?data.backgroundEffect:"aurora",backgroundStrength:Math.max(0,Math.min(100,Number(data.backgroundStrength)||70)),motionStyle:["calm","lively","off"].indexOf(data.motionStyle)>=0?data.motionStyle:"calm",created:Date.now()};
+    settings.customThemes=Array.isArray(settings.customThemes)?settings.customThemes:[];settings.customThemes.unshift(item);settings.customThemes=settings.customThemes.slice(0,12);save();renderSavedThemes();applySavedTheme(item)
+  }catch(e){toast("Theme import failed: "+e.message)}
+}
 function syncAppearanceStudio(){
   qa("[data-theme-choice]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-theme-choice")===(settings.theme||"dark"))});
   qa("[data-accent-choice]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-accent-choice")===(settings.accent||"coral"))});
+  qa("[data-bg-choice]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-bg-choice")===(settings.backgroundEffect||"aurora"))});
+  if(q("#motionStyle"))q("#motionStyle").value=settings.motionStyle||"calm";
+  if(q("#backgroundStrength"))q("#backgroundStrength").value=String(settings.backgroundStrength==null?70:settings.backgroundStrength);
+  renderSavedThemes()
 }
 function setupAppearanceStudio(){
   qa("[data-theme-choice]").forEach(function(b){b.onclick=function(){settings.theme=b.getAttribute("data-theme-choice");q("#themeSelect").value=settings.theme;save();applyAppearance()}});
@@ -2197,7 +2266,16 @@ function setupAppearanceStudio(){
     if(value==="custom"){settings.accent="custom";q("#accentSelect").value="custom";save();applyAppearance();setTimeout(function(){q("#customAccent").click()},0);return}
     settings.accent=value;q("#accentSelect").value=value;save();applyAppearance()
   }});
-  syncAppearanceStudio()
+  qa("[data-bg-choice]").forEach(function(b){b.onclick=function(){settings.backgroundEffect=b.getAttribute("data-bg-choice");save();applyAppearance()}});
+  q("#motionStyle").onchange=function(){settings.motionStyle=this.value;save();applyAppearance()};
+  q("#backgroundStrength").oninput=function(){settings.backgroundStrength=Math.max(0,Math.min(100,Number(this.value)||0));save();applyAppearance()};
+  ["customBg","customBg0","customPanel","customPanel2","customText","customMuted","customThemeAccent"].forEach(function(id){q("#"+id).oninput=function(){applyThemeFromBuilder(false)}});
+  q("#applyCustomTheme").onclick=function(){applyThemeFromBuilder(true)};
+  q("#saveCustomTheme").onclick=saveThemePreset;q("#exportCustomTheme").onclick=exportThemePreset;
+  q("#importCustomThemeBtn").onclick=function(){q("#importCustomThemeFile").click()};
+  q("#importCustomThemeFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importThemePreset(f);e.target.value=""};
+  q("#resetCustomTheme").onclick=function(){settings.customTheme=defaultCustomTheme();fillCustomThemeInputs(settings.customTheme);applyThemeFromBuilder(true)};
+  fillCustomThemeInputs(settings.customTheme);syncAppearanceStudio()
 }
 
 function setupSidebarGroups(){
@@ -2420,6 +2498,9 @@ function openSettings(){
   q("#themeSelect").value=settings.theme||"dark";
   q("#accentSelect").value=settings.accent||"coral";
   q("#customAccent").value=settings.customAccent||"#e07b5f";
+  fillCustomThemeInputs(settings.customTheme);
+  q("#motionStyle").value=settings.motionStyle||"calm";
+  q("#backgroundStrength").value=String(settings.backgroundStrength==null?70:settings.backgroundStrength);
   q("#densitySelect").value=settings.density||"cozy";
   q("#contentWidth").value=String(settings.contentWidth||860);
   q("#chatFontSize").value=String(settings.chatFontSize||17);
@@ -2451,6 +2532,7 @@ function openSettings(){
   q("#webMaxTotal").value=settings.webMaxTotal||15;
   q("#autoSpeak").checked=!!settings.autoSpeak;
   q("#backgroundNotify").checked=!!settings.backgroundNotify;
+  syncAppearanceStudio();
   openModal("#settingsModal")
 }
 
