@@ -446,13 +446,13 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="notice" id="whatsNewVersion"></div>
 <div class="changelog">
 <h3>AI quality</h3>
-<ul><li>Review-driven answer improvement can revise a response from its second-pass review while preserving local version history.</li><li>Multi-model comparison can synthesize successful answers into one response.</li><li>Optional automatic long-chat summaries preserve continuity before old turns need trimming.</li><li>Per-chat and per-project model, reasoning, temperature, instructions, and context controls.</li></ul>
+<ul><li>Per-chat model locks, chat-specific instructions, reasoning and temperature overrides now work alongside project and global defaults.</li><li>Strict JSON Schema output, second-pass AI review, review-driven revision, comparison synthesis, and automatic long-chat summarization remain available.</li><li>Model selection can now learn from your own local 👍/👎 ratings and pick the best-rated compatible model.</li></ul>
 <h3>Reliability</h3>
-<ul><li>Stronger streaming parsing, compatibility retries, draft/media recovery, partial-response persistence, and cross-chat generation protection.</li><li>Portable chat, project, and workspace backups preserve local media safely.</li><li>Request cost estimates and optional pre-send cost warnings help avoid accidental expensive calls.</li></ul>
+<ul><li>Oversized requests are stopped before they hit a model context limit, with the draft and attachments restored automatically.</li><li>A configurable network-stall watchdog can abort requests that stop returning data instead of hanging forever.</li><li>Per-request and daily tracked-spend warnings help catch unexpectedly expensive calls before sending.</li></ul>
 <h3>Workspace</h3>
-<ul><li>Recent prompt history, folder attachments, searchable settings, project portability, local response ratings, analytics, source exports, and user-approved privacy-filtered memory suggestions.</li><li>Persistent image/PDF storage, media gallery, file previews, encrypted backups, snapshots, archives, trash, and global search.</li></ul>
+<ul><li>Conversation branch lineage shows parent/child forks and lets you jump across alternate paths.</li><li>Conversation Tasks adds a persistent per-chat to-do board with optional AI task extraction.</li><li>Tasks survive snapshots, branches, chat backups, and imports; media persistence, archives, trash, global search, and encrypted backups remain intact.</li></ul>
 <h3>Interface</h3>
-<ul><li>Response version history, local response editing, source copying, model sorting/performance stats, context preview, accessibility focus handling, and installable PWA shortcuts.</li></ul>
+<ul><li>Keyboard-shortcut help, clickable conversation titles, live tab titles, optional background completion notifications, and expanded model sorting improve daily use.</li></ul>
 </div>
 </section>
 
@@ -926,7 +926,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="2.4.0";
+var APP_VERSION="2.5.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
