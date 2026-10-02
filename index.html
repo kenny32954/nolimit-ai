@@ -32,6 +32,7 @@
 <button class="sbtn" id="modelsBtn">Models</button>
 <button class="sbtn" id="compareSide">Compare models</button>
 <button class="sbtn" id="usageSide">Usage</button>
+<button class="sbtn" id="projectsSide">Projects</button>
 <button class="sbtn" id="installSide">Install app</button>
 <button class="sbtn" id="imageSide">Create image</button>
 <button class="sbtn" id="videoSide">Create video</button>
@@ -58,6 +59,7 @@
 <button class="toggle" id="agentToggle">◇ Agent</button>
 <button class="toggle" id="advisorToggle">✦ Advisor</button>
 <button class="toggle" id="fusionToggle">◎ Fusion</button>
+<button class="toggle" id="tempToggle">◐ Temporary</button>
 <button class="toggle" id="reasonToggle">◌ Reasoning: medium</button>
 </div>
 <div class="pending" id="pending"></div>
@@ -91,6 +93,7 @@
 </div>
 <div class="field hidden" id="manualKeyField"><label>OpenRouter API key</label><input id="manualKey" type="password" autocomplete="off" placeholder="sk-or-v1-..."><div class="smallnote">Stored only in this browser for this site. It is not committed to GitHub.</div></div>
 <div class="field"><label>System instructions</label><textarea id="systemPrompt"></textarea></div>
+<div class="field"><label>Local memory</label><textarea id="localMemory" placeholder="Facts or preferences you want NoLimit AI to remember across chats on this browser"></textarea><div class="smallnote">Stored only in this browser and appended to your system context.</div></div>
 <div class="row">
 <div class="field" style="flex:1;min-width:180px"><label>Temperature</label><input id="temperature" type="number" min="0" max="2" step="0.1"></div>
 <div class="field" style="flex:1;min-width:180px"><label>Reasoning effort</label><select id="reasoning"><option value="none">None</option><option value="minimal">Minimal</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">Extra high</option></select></div>
@@ -118,6 +121,22 @@
 <button class="filter" data-filter="reasoning">Reasoning</button>
 </div>
 <div class="models" id="models"></div>
+</section>
+
+<section class="modal" id="projectsModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Projects</h2>
+<div class="notice">Projects are local workspaces with their own instructions and reference text. They stay in this browser unless you back them up separately.</div>
+<div class="field"><label>Project</label><select id="projectSelect"></select></div>
+<div class="field"><label>Name</label><input id="projectName" maxlength="80" placeholder="Project name"></div>
+<div class="field"><label>Project instructions</label><textarea id="projectInstructions" placeholder="How NoLimit AI should behave inside this project"></textarea></div>
+<div class="field"><label>Project knowledge</label><textarea id="projectKnowledge" placeholder="Paste reference notes, lore, specifications, or other context"></textarea><div class="smallnote">Keep this reasonably sized because it is sent with each project chat.</div></div>
+<div class="row">
+<button class="primary" id="saveProject">Save project</button>
+<button class="secondary" id="newProject">New project</button>
+<button class="secondary" id="assignProject">Assign current chat</button>
+<button class="danger" id="deleteProject">Delete project</button>
+</div>
 </section>
 
 <section class="modal" id="usageModal">
