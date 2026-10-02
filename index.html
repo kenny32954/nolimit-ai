@@ -1182,7 +1182,11 @@ async function runDiagnostics(){
   add("Service worker","serviceWorker" in navigator?"Supported":"Unavailable");
   add("Microphone",navigator.mediaDevices&&navigator.mediaDevices.getUserMedia?"Supported":"Unavailable");
   add("Web Share",navigator.share?"Supported":"Unavailable");
-  add("Storage",Math.round(new Blob([localStorage.getItem(STORE)||""]).size/1024)+" KB chats");
+  add("Storage",Math.round(new Blob([localStorage.getItem(STORE)||""]).size/1024)+" KB chat metadata");
+  add("Persistent media","indexedDB" in window?"Supported":"Unavailable");
+  if(navigator.storage&&navigator.storage.estimate){
+    try{var est=await navigator.storage.estimate();if(est.usage!=null)add("Browser storage",fmtBytes(est.usage)+(est.quota?" / "+fmtBytes(est.quota):""))}catch(e){}
+  }
   add("Model",settings.model);
   if(location.protocol!=="https:")issues.push("App is not running over HTTPS.");
   if(!navigator.onLine)issues.push("Browser reports that it is offline.");
