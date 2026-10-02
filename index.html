@@ -686,7 +686,7 @@ html[data-message-motion="off"] .assistant,html[data-message-motion="off"] .user
 <h3>Workspace</h3>
 <ul><li>The sidebar is now organized into collapsible AI, Workspace, Create, Chat, and App drawers that remember your layout locally.</li><li>High-frequency AI and Workspace drawers stay open by default, while lower-frequency tool groups start collapsed to reduce visual noise.</li><li>Conversation branches, tasks, snapshots, backups, archives, trash, global search, and encrypted workspace exports remain available.</li></ul>
 <h3>Interface</h3>
-<ul><li>Theme Lab now includes Aurora, Cosmic, Grid, Waves, and clean backgrounds, plus live strength, glass-blur, and Calm/Lively/Off motion controls.</li><li>Added Matrix, Frost, and Void built-in themes and an optional desktop cursor-reactive ambient glow for a more sci-fi look.</li><li>The custom-theme builder controls background, panels, text, muted text, and accents; up to 12 presets can be saved and safely exported/imported as non-executable theme JSON.</li></ul>
+<ul><li>Added six whole-look presets—Quantum, Neon Grid, Deep Space, Ice Glass, Matrix Terminal, and Sunset Wave—that restyle the entire app in one click.</li><li>New visual controls cover Glass/Frosted/Solid/Holographic surfaces, Slide/Fade/Pop message motion, scanlines, vignette, and a two-color custom gradient overlay with angle and strength controls.</li><li>Saved/exported themes now carry the complete visual configuration, including animated backgrounds, motion, glass, reactive glow, surfaces, message effects, gradient settings, and overlays.</li></ul>
 </div>
 </section>
 
@@ -2310,7 +2310,7 @@ function renderSavedThemes(){
   list.forEach(function(item){
     var card=document.createElement("button");card.type="button";card.className="savedThemeCard";
     var sw=document.createElement("span");sw.className="swatches";["bg0","panel","accent","text"].forEach(function(k){var i=document.createElement("i");i.style.background=(item.colors&&validHex(item.colors[k]))?item.colors[k]:"#222";sw.appendChild(i)});
-    var name=document.createElement("b");name.textContent=item.name||"Custom theme";var meta=document.createElement("small");meta.textContent=(item.backgroundEffect||"aurora")+" · "+(item.motionStyle||"calm");
+    var name=document.createElement("b");name.textContent=item.name||"Custom theme";var meta=document.createElement("small");meta.textContent=(item.backgroundEffect||"aurora")+" · "+(item.surfaceStyle||"glass")+" · "+(item.motionStyle||"calm");
     var del=document.createElement("button");del.type="button";del.className="savedThemeDelete";del.textContent="×";del.title="Delete saved theme";
     del.onclick=function(e){e.stopPropagation();settings.customThemes=list.filter(function(x){return x.id!==item.id});save();renderSavedThemes();toast("Theme preset deleted")};
     card.onclick=function(){applySavedTheme(item)};
@@ -2322,6 +2322,13 @@ function applySavedTheme(item){
   settings.backgroundEffect=["aurora","cosmic","grid","waves","none"].indexOf(item.backgroundEffect)>=0?item.backgroundEffect:"aurora";
   settings.backgroundStrength=Math.max(0,Math.min(100,Number(item.backgroundStrength)||70));
   settings.motionStyle=["calm","lively","off"].indexOf(item.motionStyle)>=0?item.motionStyle:"calm";
+  settings.glassStrength=Math.max(0,Math.min(100,Number(item.glassStrength)==null?70:Number(item.glassStrength)));
+  settings.reactiveGlow=item.reactiveGlow!==false;
+  settings.surfaceStyle=["glass","frosted","solid","holographic"].indexOf(item.surfaceStyle)>=0?item.surfaceStyle:"glass";
+  settings.messageMotion=["slide","fade","pop","off"].indexOf(item.messageMotion)>=0?item.messageMotion:"slide";
+  settings.scanlines=!!item.scanlines;settings.vignette=item.vignette!==false;settings.gradientEnabled=!!item.gradientEnabled;
+  settings.gradientA=validHex(item.gradientA)?item.gradientA:"#7c3aed";settings.gradientB=validHex(item.gradientB)?item.gradientB:"#0891b2";
+  settings.gradientAngle=Math.max(0,Math.min(360,Number(item.gradientAngle)||135));settings.gradientStrength=Math.max(0,Math.min(100,Number(item.gradientStrength)||35));
   fillCustomThemeInputs(settings.customTheme);q("#customAccent").value=settings.customTheme.accent;save();applyAppearance();toast("Applied "+(item.name||"custom theme"))
 }
 function applyThemeFromBuilder(showToast){
@@ -2331,18 +2338,18 @@ function applyThemeFromBuilder(showToast){
 function saveThemePreset(){
   var colors=readCustomThemeInputs(),name=q("#customThemeName").value.trim().slice(0,40)||"Custom "+((settings.customThemes||[]).length+1);
   settings.customThemes=Array.isArray(settings.customThemes)?settings.customThemes:[];
-  settings.customThemes.unshift({id:uid(),name:name,colors:colors,backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",created:Date.now()});
+  settings.customThemes.unshift({id:uid(),name:name,colors:colors,backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",glassStrength:Number(settings.glassStrength)||70,reactiveGlow:settings.reactiveGlow!==false,surfaceStyle:settings.surfaceStyle||"glass",messageMotion:settings.messageMotion||"slide",scanlines:!!settings.scanlines,vignette:settings.vignette!==false,gradientEnabled:!!settings.gradientEnabled,gradientA:settings.gradientA||"#7c3aed",gradientB:settings.gradientB||"#0891b2",gradientAngle:Number(settings.gradientAngle)||135,gradientStrength:Number(settings.gradientStrength)||35,created:Date.now()});
   settings.customThemes=settings.customThemes.slice(0,12);save();renderSavedThemes();q("#customThemeName").value="";toast("Theme preset saved")
 }
 function exportThemePreset(){
-  var data={type:"quantum-breaks-theme",version:1,name:q("#customThemeName").value.trim()||"Quantum Breaks custom",colors:readCustomThemeInputs(),backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm"};
+  var data={type:"quantum-breaks-theme",version:2,name:q("#customThemeName").value.trim()||"Quantum Breaks custom",colors:readCustomThemeInputs(),backgroundEffect:settings.backgroundEffect||"aurora",backgroundStrength:Number(settings.backgroundStrength)||70,motionStyle:settings.motionStyle||"calm",glassStrength:Number(settings.glassStrength)||70,reactiveGlow:settings.reactiveGlow!==false,surfaceStyle:settings.surfaceStyle||"glass",messageMotion:settings.messageMotion||"slide",scanlines:!!settings.scanlines,vignette:settings.vignette!==false,gradientEnabled:!!settings.gradientEnabled,gradientA:settings.gradientA||"#7c3aed",gradientB:settings.gradientB||"#0891b2",gradientAngle:Number(settings.gradientAngle)||135,gradientStrength:Number(settings.gradientStrength)||35};
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download=(data.name||"quantum-theme").replace(/[^a-z0-9_-]+/gi,"_")+".quantum-theme.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000);toast("Theme exported")
 }
 async function importThemePreset(file){
   try{
     var data=JSON.parse(await file.text());if(!data||data.type!=="quantum-breaks-theme"||!data.colors)throw new Error("Not a Quantum Breaks theme");
     var d=defaultCustomTheme(),colors={};Object.keys(d).forEach(function(k){if(!validHex(data.colors[k]))throw new Error("Theme contains an invalid color");colors[k]=data.colors[k]});
-    var item={id:uid(),name:String(data.name||"Imported theme").slice(0,40),colors:colors,backgroundEffect:["aurora","cosmic","grid","waves","none"].indexOf(data.backgroundEffect)>=0?data.backgroundEffect:"aurora",backgroundStrength:Math.max(0,Math.min(100,Number(data.backgroundStrength)||70)),motionStyle:["calm","lively","off"].indexOf(data.motionStyle)>=0?data.motionStyle:"calm",created:Date.now()};
+    var item={id:uid(),name:String(data.name||"Imported theme").slice(0,40),colors:colors,backgroundEffect:["aurora","cosmic","grid","waves","none"].indexOf(data.backgroundEffect)>=0?data.backgroundEffect:"aurora",backgroundStrength:Math.max(0,Math.min(100,Number(data.backgroundStrength)||70)),motionStyle:["calm","lively","off"].indexOf(data.motionStyle)>=0?data.motionStyle:"calm",glassStrength:Math.max(0,Math.min(100,Number(data.glassStrength)==null?70:Number(data.glassStrength))),reactiveGlow:data.reactiveGlow!==false,surfaceStyle:["glass","frosted","solid","holographic"].indexOf(data.surfaceStyle)>=0?data.surfaceStyle:"glass",messageMotion:["slide","fade","pop","off"].indexOf(data.messageMotion)>=0?data.messageMotion:"slide",scanlines:!!data.scanlines,vignette:data.vignette!==false,gradientEnabled:!!data.gradientEnabled,gradientA:validHex(data.gradientA)?data.gradientA:"#7c3aed",gradientB:validHex(data.gradientB)?data.gradientB:"#0891b2",gradientAngle:Math.max(0,Math.min(360,Number(data.gradientAngle)||135)),gradientStrength:Math.max(0,Math.min(100,Number(data.gradientStrength)||35)),created:Date.now()};
     settings.customThemes=Array.isArray(settings.customThemes)?settings.customThemes:[];settings.customThemes.unshift(item);settings.customThemes=settings.customThemes.slice(0,12);save();renderSavedThemes();applySavedTheme(item)
   }catch(e){toast("Theme import failed: "+e.message)}
 }
@@ -2354,7 +2361,27 @@ function syncAppearanceStudio(){
   if(q("#backgroundStrength"))q("#backgroundStrength").value=String(settings.backgroundStrength==null?70:settings.backgroundStrength);
   if(q("#glassStrength"))q("#glassStrength").value=String(settings.glassStrength==null?70:settings.glassStrength);
   if(q("#reactiveGlow"))q("#reactiveGlow").checked=settings.reactiveGlow!==false;
+  if(q("#surfaceStyle"))q("#surfaceStyle").value=settings.surfaceStyle||"glass";
+  if(q("#messageMotion"))q("#messageMotion").value=settings.messageMotion||"slide";
+  if(q("#scanlines"))q("#scanlines").checked=!!settings.scanlines;
+  if(q("#vignette"))q("#vignette").checked=settings.vignette!==false;
+  if(q("#gradientEnabled"))q("#gradientEnabled").checked=!!settings.gradientEnabled;
+  if(q("#gradientA"))q("#gradientA").value=validHex(settings.gradientA)?settings.gradientA:"#7c3aed";
+  if(q("#gradientB"))q("#gradientB").value=validHex(settings.gradientB)?settings.gradientB:"#0891b2";
+  if(q("#gradientAngle"))q("#gradientAngle").value=String(Math.max(0,Math.min(360,Number(settings.gradientAngle)||135)));
+  if(q("#gradientStrength"))q("#gradientStrength").value=String(Math.max(0,Math.min(100,Number(settings.gradientStrength)||35)));
   renderSavedThemes()
+}
+function applyLookPreset(name){
+  var looks={
+    quantum:{theme:"nebula",accent:"violet",backgroundEffect:"aurora",backgroundStrength:78,motionStyle:"calm",glassStrength:78,reactiveGlow:true,surfaceStyle:"glass",messageMotion:"slide",scanlines:false,vignette:true,gradientEnabled:false},
+    neon:{theme:"cyber",accent:"cyan",backgroundEffect:"grid",backgroundStrength:82,motionStyle:"lively",glassStrength:58,reactiveGlow:true,surfaceStyle:"holographic",messageMotion:"pop",scanlines:true,vignette:true,gradientEnabled:true,gradientA:"#00d4ff",gradientB:"#9b5cff",gradientAngle:125,gradientStrength:24},
+    space:{theme:"void",accent:"violet",backgroundEffect:"cosmic",backgroundStrength:88,motionStyle:"calm",glassStrength:82,reactiveGlow:true,surfaceStyle:"glass",messageMotion:"fade",scanlines:false,vignette:true,gradientEnabled:true,gradientA:"#381b73",gradientB:"#0ea5e9",gradientAngle:145,gradientStrength:18},
+    ice:{theme:"frost",accent:"cyan",backgroundEffect:"aurora",backgroundStrength:58,motionStyle:"calm",glassStrength:92,reactiveGlow:false,surfaceStyle:"frosted",messageMotion:"fade",scanlines:false,vignette:false,gradientEnabled:true,gradientA:"#7dd3fc",gradientB:"#dbeafe",gradientAngle:160,gradientStrength:16},
+    matrix:{theme:"matrix",accent:"green",backgroundEffect:"grid",backgroundStrength:76,motionStyle:"lively",glassStrength:38,reactiveGlow:true,surfaceStyle:"solid",messageMotion:"slide",scanlines:true,vignette:true,gradientEnabled:false},
+    sunset:{theme:"ember",accent:"pink",backgroundEffect:"waves",backgroundStrength:72,motionStyle:"calm",glassStrength:72,reactiveGlow:true,surfaceStyle:"glass",messageMotion:"pop",scanlines:false,vignette:true,gradientEnabled:true,gradientA:"#fb7185",gradientB:"#f59e0b",gradientAngle:135,gradientStrength:24}
+  },p=looks[name];if(!p)return;
+  Object.keys(p).forEach(function(k){settings[k]=p[k]});save();applyAppearance();syncAppearanceStudio();toast("Applied "+name+" visual preset")
 }
 function setupAppearanceStudio(){
   qa("[data-theme-choice]").forEach(function(b){b.onclick=function(){settings.theme=b.getAttribute("data-theme-choice");q("#themeSelect").value=settings.theme;save();applyAppearance()}});
@@ -2368,6 +2395,16 @@ function setupAppearanceStudio(){
   q("#backgroundStrength").oninput=function(){settings.backgroundStrength=Math.max(0,Math.min(100,Number(this.value)||0));save();applyAppearance()};
   q("#glassStrength").oninput=function(){settings.glassStrength=Math.max(0,Math.min(100,Number(this.value)||0));save();applyAppearance()};
   q("#reactiveGlow").onchange=function(){settings.reactiveGlow=this.checked;save();applyAppearance()};
+  q("#surfaceStyle").onchange=function(){settings.surfaceStyle=this.value;save();applyAppearance()};
+  q("#messageMotion").onchange=function(){settings.messageMotion=this.value;save();applyAppearance()};
+  q("#scanlines").onchange=function(){settings.scanlines=this.checked;save();applyAppearance()};
+  q("#vignette").onchange=function(){settings.vignette=this.checked;save();applyAppearance()};
+  q("#gradientEnabled").onchange=function(){settings.gradientEnabled=this.checked;save();applyAppearance()};
+  q("#gradientA").oninput=function(){settings.gradientA=this.value;save();applyAppearance()};
+  q("#gradientB").oninput=function(){settings.gradientB=this.value;save();applyAppearance()};
+  q("#gradientAngle").oninput=function(){settings.gradientAngle=Math.max(0,Math.min(360,Number(this.value)||0));save();applyAppearance()};
+  q("#gradientStrength").oninput=function(){settings.gradientStrength=Math.max(0,Math.min(100,Number(this.value)||0));save();applyAppearance()};
+  qa("[data-look-preset]").forEach(function(b){b.onclick=function(){applyLookPreset(b.getAttribute("data-look-preset"))}});
   ["customBg","customBg0","customPanel","customPanel2","customText","customMuted","customThemeAccent"].forEach(function(id){q("#"+id).oninput=function(){applyThemeFromBuilder(false)}});
   q("#applyCustomTheme").onclick=function(){applyThemeFromBuilder(true)};
   q("#saveCustomTheme").onclick=saveThemePreset;q("#exportCustomTheme").onclick=exportThemePreset;
@@ -2603,6 +2640,10 @@ function openSettings(){
   q("#backgroundStrength").value=String(settings.backgroundStrength==null?70:settings.backgroundStrength);
   q("#glassStrength").value=String(settings.glassStrength==null?70:settings.glassStrength);
   q("#reactiveGlow").checked=settings.reactiveGlow!==false;
+  q("#surfaceStyle").value=settings.surfaceStyle||"glass";q("#messageMotion").value=settings.messageMotion||"slide";
+  q("#scanlines").checked=!!settings.scanlines;q("#vignette").checked=settings.vignette!==false;q("#gradientEnabled").checked=!!settings.gradientEnabled;
+  q("#gradientA").value=validHex(settings.gradientA)?settings.gradientA:"#7c3aed";q("#gradientB").value=validHex(settings.gradientB)?settings.gradientB:"#0891b2";
+  q("#gradientAngle").value=String(Math.max(0,Math.min(360,Number(settings.gradientAngle)||135)));q("#gradientStrength").value=String(Math.max(0,Math.min(100,Number(settings.gradientStrength)||35)));
   q("#densitySelect").value=settings.density||"cozy";
   q("#contentWidth").value=String(settings.contentWidth||860);
   q("#chatFontSize").value=String(settings.chatFontSize||17);
