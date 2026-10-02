@@ -1725,6 +1725,12 @@ async function finishAuth(){
   }catch(e){alert("OpenRouter connection failed: "+e.message)}
 }
 
+function isLikelyTextFile(f){
+  var type=String(f&&f.type||"").toLowerCase(),name=String(f&&f.name||"").toLowerCase();
+  if(type.indexOf("text/")===0)return true;
+  if(["application/json","application/xml","application/javascript","application/x-javascript","application/sql"].indexOf(type)>=0)return true;
+  return /\.(txt|md|markdown|json|jsonl|csv|tsv|js|mjs|cjs|ts|tsx|jsx|html?|css|scss|sass|less|py|java|c|cc|cpp|cxx|h|hpp|cs|go|rs|rb|php|swift|kt|kts|sh|bash|zsh|fish|ps1|sql|xml|ya?ml|toml|ini|cfg|conf|env|gitignore|dockerfile|makefile|gradle|properties|vue|svelte)$/i.test(name)
+}
 async function addFiles(list){
   list=Array.prototype.slice.call(list||[]);
   if(list.length>40){toast("Attaching the first 40 files from this selection");list=list.slice(0,40)}
@@ -1739,6 +1745,7 @@ async function addFiles(list){
       pending.push({name:displayName,size:f.size,kind:"pdf",data:pdfData,mediaId:pdfId})
     }else if(type.indexOf("audio/")===0)pending.push({name:displayName,size:f.size,kind:"audio",file:f});
     else{
+      if(!isLikelyTextFile(f)){toast("Skipped unsupported binary file: "+displayName);continue}
       try{
         var txt=await f.text(),truncated=false;
         if(txt.length>500000){txt=txt.slice(0,500000)+"\n\n[Quantum Breaks AI truncated this file after 500,000 characters.]";truncated=true}
