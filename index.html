@@ -698,6 +698,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="row">
 <button class="primary" id="renameChat">Rename</button>
 <button class="secondary" id="aiTitleChat">AI title</button>
+<button class="secondary" id="aiOrganizeChat">AI organize</button>
 <button class="secondary" id="compressChat">Compress context</button>
 <button class="secondary" id="contextPreviewChat">Preview context</button>
 <button class="secondary" id="pinChat">Pin</button>
@@ -3263,6 +3264,35 @@ async function generateChatTitle(){
   q("#aiTitleChat").disabled=false;q("#aiTitleChat").textContent="AI title"
 }
 
+async function organizeChatWithAI(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  if(!isConnected())return toast("Connect OpenRouter first");
+  var material=(c.messages||[]).slice(0,16).map(function(m){return (m.role==="user"?"User: ":"Assistant: ")+String(m.content||"").slice(0,1800)}).join("\n\n").slice(0,28000);
+  if(!material.trim())return toast("There is not enough conversation to organize yet");
+  var btn=q("#aiOrganizeChat");btn.disabled=true;btn.textContent="Organizing…";
+  try{
+    var schema={type:"object",properties:{title:{type:"string"},tags:{type:"array",items:{type:"string"},maxItems:6}},required:["title","tags"],additionalProperties:false};
+    var body={model:effectiveModel(c),messages:[
+      {role:"system",content:"Organize this conversation. Create a specific title of at most 6 words and 2-6 short lowercase tags. Return only the requested structured data. Do not invent topics not present in the conversation."},
+      {role:"user",content:material}
+    ],stream:false,temperature:0.2,max_tokens:180,response_format:{type:"json_schema",json_schema:{name:"conversation_organization",strict:true,schema:schema}},provider:{require_parameters:true}};
+    var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"};
+    var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body)}),j=await r.json();
+    if(!r.ok&&[400,422].indexOf(r.status)>=0){
+      delete body.response_format;delete body.provider;body.messages[0].content+=" Return valid JSON with keys title and tags.";
+      r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body)});j=await r.json()
+    }
+    if(!r.ok)throw new Error(errorText(j,"Could not organize chat"));
+    var raw=String(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim().replace(/^\`\`\`(?:json)?\s*/i,"").replace(/\s*\`\`\`$/,""),data=JSON.parse(raw);
+    var title=String(data.title||"").replace(/^["']|["']$/g,"").trim().replace(/\s+/g," ").slice(0,80);
+    var tags=Array.isArray(data.tags)?data.tags.map(function(x){return String(x||"").toLowerCase().replace(/^#/,"").replace(/[^a-z0-9 _-]/g,"").trim().replace(/\s+/g,"-").slice(0,24)}).filter(Boolean).slice(0,6):[];
+    if(title){c.title=title;q("#chatTitleInput").value=title}
+    if(tags.length){c.tags=tags;q("#chatTagsInput").value=tags.join(", ")}
+    c.updated=Date.now();save();render();q("#chatStats").textContent=chatStatsText(c);toast("Chat title and tags organized")
+  }catch(e){toast("AI organize failed: "+e.message)}
+  btn.disabled=false;btn.textContent="AI organize"
+}
+
 async function compressChatContext(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
   if(c.compactSummary){
@@ -3861,6 +3891,7 @@ q("#generateVideo").onclick=generateVideo;
 q("#lockChatModel").onchange=toggleChatModelLock;
 q("#renameChat").onclick=renameManagedChat;
 q("#aiTitleChat").onclick=generateChatTitle;
+q("#aiOrganizeChat").onclick=organizeChatWithAI;
 q("#compressChat").onclick=compressChatContext;
 q("#contextPreviewChat").onclick=openContextPreview;
 q("#copyContextPreview").onclick=function(){navigator.clipboard.writeText(q("#contextPreviewOutput").textContent||"").then(function(){toast("Context preview copied")})};
