@@ -704,6 +704,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="secondary" id="pinChat">Pin</button>
 <button class="secondary" id="archiveChat">Archive</button>
 <button class="secondary" id="snapshotChat">Snapshot</button>
+<button class="secondary" id="resetChatOverrides">Reset AI overrides</button>
 <button class="secondary" id="duplicateChat">Duplicate</button>
 <button class="danger" id="deleteChat">Delete</button>
 </div>
@@ -1187,7 +1188,8 @@ function render(){
   var cp=projectForChat(c);
   q("#title").textContent=(c.title||"New chat")+(cp?" · "+cp.name:"");
   var currentModel=effectiveModel(c);
-  q("#modelBottom").textContent=(c.modelOverride?"🔒 ":"")+currentModel;
+  q("#modelBottom").textContent=(c.modelOverride?"🔒 ":(cp&&cp.model?"◆ ":""))+currentModel;
+  q("#modelBottom").title=c.modelOverride?"Chat-locked model":(cp&&cp.model?"Project default model":"Global model");
   var approx=approxContextTokens(c);
   var modelInfo=models.find(function(m){return m.id===currentModel}),limit=modelInfo&&modelInfo.context_length?Number(modelInfo.context_length):0;
   var ctxText=approx?" · ~"+formatTokenCount(approx)+(limit?"/"+formatTokenCount(limit):"")+" ctx":"";
@@ -3224,6 +3226,9 @@ function chatStatsText(c){
   if(c.compactSummary)bits.push("context compressed"+(c.lastSummaryCost!=null?" "+money(c.lastSummaryCost):""));
   if(c.archivedAt)bits.push("archived");
   var modelId=effectiveModel(c),mi=models.find(function(m){return m.id===modelId}),approx=approxContextTokens(c);
+  bits.push("model: "+modelId);
+  bits.push("reasoning: "+effectiveReasoning(c));
+  bits.push("temp: "+effectiveTemperature(c));
   if(approx)bits.push("~"+formatTokenCount(approx)+" context"+(mi&&mi.context_length?" / "+formatTokenCount(mi.context_length):""));
   if(c.temporary)bits.push("temporary");
   return bits.join(" · ")
@@ -3249,6 +3254,12 @@ function toggleChatModelLock(){
   if(q("#lockChatModel").checked)c.modelOverride=c.modelOverride||effectiveModel(c);
   else c.modelOverride="";
   c.updated=Date.now();save();q("#chatModelLockLabel").textContent=c.modelOverride?"("+c.modelOverride+")":"(currently "+effectiveModel(c)+")";render();toast(c.modelOverride?"Model locked to this chat":"Chat now follows its project/global model")
+}
+function resetChatOverrides(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  c.modelOverride="";c.reasoningOverride="";c.temperatureOverride="";c.updated=Date.now();save();
+  q("#lockChatModel").checked=false;q("#chatReasoningOverride").value="";q("#chatTemperatureOverride").value="";
+  q("#chatModelLockLabel").textContent="(currently "+effectiveModel(c)+")";q("#chatStats").textContent=chatStatsText(c);render();toast("Chat AI overrides reset")
 }
 function renameManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
@@ -3909,6 +3920,7 @@ q("#copyContextPreview").onclick=function(){navigator.clipboard.writeText(q("#co
 q("#pinChat").onclick=togglePinnedChat;
 q("#archiveChat").onclick=toggleArchiveManagedChat;
 q("#snapshotChat").onclick=function(){closeModals();openSnapshots()};
+q("#resetChatOverrides").onclick=resetChatOverrides;
 q("#duplicateChat").onclick=duplicateManagedChat;
 q("#deleteChat").onclick=deleteManagedChat;
 q("#emptyTrash").onclick=emptyTrash;
