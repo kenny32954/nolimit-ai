@@ -333,7 +333,8 @@ function renderMarkdown(text){
 
 function render(){
   var c=ensure();
-  q("#title").textContent=c.title||"New chat";
+  var cp=projectForChat(c);
+  q("#title").textContent=(c.title||"New chat")+(cp?" · "+cp.name:"");
   q("#modelBottom").textContent=settings.model;
   q("#status").textContent=!navigator.onLine?"Offline":(isConnected()?"Connected":"Not connected");
   q("#topAuth").textContent=isConnected()?"Connected":"Connect";
@@ -357,7 +358,12 @@ function render(){
 function renderHistory(){
   var term=(q("#chatSearch").value||"").toLowerCase();
   var box=q("#history");box.innerHTML="";
-  chats.slice().sort(function(a,b){return(b.updated||0)-(a.updated||0)}).filter(function(c){return !term||(c.title||"").toLowerCase().includes(term)}).forEach(function(c){
+  chats.slice().sort(function(a,b){return(b.updated||0)-(a.updated||0)}).filter(function(c){
+    if(!term)return true;
+    if((c.title||"").toLowerCase().includes(term))return true;
+    var p=projectForChat(c);if(p&&(p.name||"").toLowerCase().includes(term))return true;
+    return (c.messages||[]).some(function(m){return String(m.content||"").toLowerCase().includes(term)})
+  }).forEach(function(c){
     var row=document.createElement("div");row.className="historyitem"+(c.id===active?" on":"");
     var b=document.createElement("button");b.className="hrow";b.textContent=c.title||"New chat";
     b.onclick=function(){active=c.id;save();closeSide();render()};
@@ -506,7 +512,13 @@ function contentFor(m){
 }
 
 function apiMessages(c){
-  var out=[];if(settings.system)out.push({role:"system",content:settings.system});
+  var out=[],systemParts=[];
+  if(settings.system)systemParts.push(settings.system);
+  if(settings.memory)systemParts.push("Persistent local memory:\n"+settings.memory);
+  var p=projectForChat(c);
+  if(p&&p.instructions)systemParts.push("Project instructions:\n"+p.instructions);
+  if(p&&p.knowledge)systemParts.push("Project reference knowledge:\n"+p.knowledge);
+  if(systemParts.length)out.push({role:"system",content:systemParts.join("\n\n")});
   c.messages.forEach(function(m){
     if(m.role==="assistant"){
       var a={role:"assistant",content:m.content||""};if(m.reasoning_details)a.reasoning_details=m.reasoning_details;if(m.annotations)a.annotations=m.annotations;out.push(a)
@@ -1017,7 +1029,59 @@ function deleteManagedChat(){
   chats.splice(i,1);if(active===manageChatId)active=chats[0]?chats[0].id:"";save();closeModals();render();toast("Chat deleted")
 }
 
-function newChat(){var c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save();closeSide();render();q("#prompt").focus()}
+function projectOptions(){
+  var s=q("#projectSelect");s.innerHTML="";
+  var none=document.createElement("option");none.value="";none.textContent="No project";s.appendChild(none);
+  projects.forEach(function(p){var o=document.createElement("option");o.value=p.id;o.textContent=p.name||"Untitled project";s.appendChild(o)})
+}
+
+function loadProjectFields(id){
+  var p=projects.find(function(x){return x.id===id});
+  q("#projectName").value=p?p.name:"";
+  q("#projectInstructions").value=p?p.instructions||"":"";
+  q("#projectKnowledge").value=p?p.knowledge||"":""
+}
+
+function openProjects(){
+  projectOptions();
+  var c=ensure(),id=c.projectId||"";
+  q("#projectSelect").value=id;
+  loadProjectFields(id);
+  openModal("#projectsModal")
+}
+
+function createProject(){
+  var p={id:uid(),name:"New project",instructions:"",knowledge:"",created:Date.now(),updated:Date.now()};
+  projects.unshift(p);save();projectOptions();q("#projectSelect").value=p.id;loadProjectFields(p.id);toast("Project created")
+}
+
+function saveProject(){
+  var id=q("#projectSelect").value,p=projects.find(function(x){return x.id===id});
+  if(!p)return toast("Choose or create a project");
+  p.name=q("#projectName").value.trim().slice(0,80)||"Untitled project";
+  p.instructions=q("#projectInstructions").value.slice(0,50000);
+  p.knowledge=q("#projectKnowledge").value.slice(0,150000);
+  p.updated=Date.now();save();projectOptions();q("#projectSelect").value=p.id;render();toast("Project saved")
+}
+
+function assignProject(){
+  var c=ensure(),id=q("#projectSelect").value;
+  c.projectId=id||"";c.updated=Date.now();save();render();toast(id?"Chat assigned to project":"Chat removed from project")
+}
+
+function deleteProject(){
+  var id=q("#projectSelect").value;if(!id)return toast("Choose a project");
+  var p=projects.find(function(x){return x.id===id});if(!p)return;
+  if(!confirm("Delete project "+p.name+"? Chats will remain but lose the project context."))return;
+  projects=projects.filter(function(x){return x.id!==id});
+  chats.forEach(function(ch){if(ch.projectId===id)ch.projectId=""});
+  save();projectOptions();q("#projectSelect").value="";loadProjectFields("");render();toast("Project deleted")
+}
+
+function newChat(){
+  var parent=current(),c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[],projectId:parent&&parent.projectId?parent.projectId:""};
+  chats.unshift(c);active=c.id;save();closeSide();render();q("#prompt").focus()
+}
 function cycleReasoning(){var v=["none","minimal","low","medium","high","xhigh"],i=v.indexOf(settings.reasoning);settings.reasoning=v[(i+1)%v.length];save();render()}
 function toggleResearch(){var on=!(settings.web&&settings.fetch);settings.web=on;settings.fetch=on;if(on&&settings.reasoning==="none")settings.reasoning="medium";save();render();toast(on?"Research tools enabled":"Research tools disabled")}
 
@@ -1036,6 +1100,7 @@ q("#topAuth").onclick=q("#sideAuth").onclick=q("#settingsBtn").onclick=openSetti
 q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
 q("#compareSide").onclick=openCompare;
 q("#usageSide").onclick=openUsage;
+q("#projectsSide").onclick=openProjects;
 q("#installSide").onclick=async function(){
   if(installPrompt){
     installPrompt.prompt();
@@ -1051,6 +1116,9 @@ q("#exportSide").onclick=exportChat;
 q("#backupSide").onclick=backupChat;
 q("#importSide").onclick=function(){q("#importFile").click()};
 q("#importFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importBackup(f);e.target.value=""};
+q("#tempToggle").onclick=function(){
+  var c=ensure();c.temporary=!c.temporary;save();render();toast(c.temporary?"Temporary chat — this conversation will disappear after reload":"Temporary mode off")
+};
 q("#webToggle").onclick=function(){settings.web=!settings.web;save();render()};
 q("#fetchToggle").onclick=function(){settings.fetch=!settings.fetch;save();render()};
 q("#imageToolToggle").onclick=function(){settings.imageTool=!settings.imageTool;save();render()};
@@ -1073,6 +1141,11 @@ q("#saveSettings").onclick=function(){
 };
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
+q("#projectSelect").onchange=function(){loadProjectFields(q("#projectSelect").value)};
+q("#newProject").onclick=createProject;
+q("#saveProject").onclick=saveProject;
+q("#assignProject").onclick=assignProject;
+q("#deleteProject").onclick=deleteProject;
 q("#refreshUsage").onclick=refreshUsage;
 q("#runCompare").onclick=runCompare;
 q("#generateImage").onclick=generateImage;
