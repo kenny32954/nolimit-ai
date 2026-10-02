@@ -238,6 +238,10 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .selectionToolbar.show{display:flex}.selectionToolbar button{height:30px;padding:0 9px;border-radius:8px;color:#c8c4c0;font-size:11px}.selectionToolbar button:hover{background:rgba(255,255,255,.07);color:#fff}
 @media(max-width:520px){.selectionToolbar{max-width:calc(100vw - 20px);overflow:auto}}
 
+
+.messageflash{animation:messageFlash 1.35s ease}@keyframes messageFlash{0%{filter:none}18%{filter:drop-shadow(0 0 14px var(--accent));transform:translateY(-1px)}100%{filter:none;transform:none}}
+#status.warn{color:#f0b58d}
+
 </style>
 </head>
 <body>
@@ -329,6 +333,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button id="selQuote">Quote</button>
 <button id="selExplain">Explain</button>
 <button id="selSavePrompt">Save prompt</button>
+<button id="selScratchpad">Scratchpad</button>
 </div>
 <div class="modalShade" id="modalShade"></div>
 
@@ -702,7 +707,7 @@ function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",created:Da
 function closeSide(){q("#side").classList.remove("open");q("#shade").classList.remove("show")}
 function openModal(id){q("#modalShade").classList.add("show");q(id).classList.add("show")}
 function closeModals(){q("#modalShade").classList.remove("show");qa(".modal").forEach(function(m){m.classList.remove("show")})}
-function toast(t){var d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(function(){d.remove()},2500)}
+function toast(t){var d=document.createElement("div");d.className="toast";d.textContent=t;d.title="Click to dismiss";d.onclick=function(){d.remove()};document.body.appendChild(d);setTimeout(function(){if(d.isConnected)d.remove()},2500)}
 function toastAction(text,label,action){
   var d=document.createElement("div");d.className="toast toastaction";
   var s=document.createElement("span");s.textContent=text;
@@ -783,7 +788,10 @@ function render(){
   q("#title").textContent=(c.title||"New chat")+(cp?" · "+cp.name:"");
   q("#modelBottom").textContent=settings.model;
   var approx=approxContextTokens(c);
-  q("#status").textContent=!navigator.onLine?"Offline":((isConnected()?"Connected":"Not connected")+(approx?" · ~"+formatTokenCount(approx)+" ctx":""));
+  var modelInfo=models.find(function(m){return m.id===settings.model}),limit=modelInfo&&modelInfo.context_length?Number(modelInfo.context_length):0;
+  var ctxText=approx?" · ~"+formatTokenCount(approx)+(limit?"/"+formatTokenCount(limit):"")+" ctx":"";
+  q("#status").textContent=!navigator.onLine?"Offline":((isConnected()?"Connected":"Not connected")+ctxText);
+  q("#status").classList.toggle("warn",!!(limit&&approx/limit>.8));
   q("#topAuth").textContent=isConnected()?"Connected":"Connect";
   q("#topAuth").classList.toggle("ok",isConnected());
   q("#sideAuth").textContent=isConnected()?"OpenRouter connected":"Connect OpenRouter";
@@ -974,7 +982,7 @@ function toggleBookmark(idx){
 }
 function jumpToMessage(chatId,idx){
   active=chatId;save();closeModals();render();
-  setTimeout(function(){var el=q('[data-msg-index="'+idx+'"]');if(el)el.scrollIntoView({behavior:"smooth",block:"center"})},60)
+  setTimeout(function(){var el=q('[data-msg-index="'+idx+'"]');if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("messageflash");setTimeout(function(){el.classList.remove("messageflash")},1400)}},60)
 }
 function renderFindResults(bookmarksOnly){
   var term=(q("#findInput").value||"").toLowerCase(),box=q("#findResults");box.innerHTML="";
@@ -1037,6 +1045,10 @@ var COMMANDS=[
   {name:"Choose model",hint:"Ctrl/Cmd+K",run:loadModels},
   {name:"AI profiles",hint:"Saved model + tool setups",run:openProfiles},
   {name:"Research mode",hint:"Web + page reading",run:toggleResearch},
+  {name:"Mode: Balanced",hint:"General-purpose setup",run:function(){applyModePreset("balanced")}},
+  {name:"Mode: Fast",hint:"Low reasoning, fewer tools",run:function(){applyModePreset("fast")}},
+  {name:"Mode: Deep",hint:"High reasoning + agent/advisor",run:function(){applyModePreset("deep")}},
+  {name:"Mode: Research",hint:"Search + fetch + agent",run:function(){applyModePreset("research")}},
   {name:"Create image",hint:"Image studio",run:openImage},
   {name:"Create video",hint:"Video studio",run:openVideo},
   {name:"AI voice",hint:"Text to speech",run:function(){openVoice("")}},
@@ -2363,6 +2375,7 @@ q("#selCopy").onclick=function(){if(selectedText)navigator.clipboard.writeText(s
 q("#selQuote").onclick=function(){quoteSelection("")};
 q("#selExplain").onclick=function(){quoteSelection("Explain this selection clearly:\n\n")};
 q("#selSavePrompt").onclick=function(){if(!selectedText)return;editingPromptId="";q("#promptName").value=selectedText.slice(0,40);q("#promptBody").value=selectedText;hideSelectionToolbar();openModal("#promptsModal");renderPromptLibrary()};
+q("#selScratchpad").onclick=function(){if(!selectedText)return;var c=ensure();c.scratchpad=(c.scratchpad?c.scratchpad+"\n\n":"")+selectedText;c.updated=Date.now();save();hideSelectionToolbar();toast("Selection added to scratchpad")};
 q("#chat").addEventListener("scroll",updateScrollButton,{passive:true});
 q("#scrollBottom").onclick=function(){q("#chat").scrollTo({top:q("#chat").scrollHeight,behavior:"smooth"})};
 q("#prompt").addEventListener("paste",function(e){
