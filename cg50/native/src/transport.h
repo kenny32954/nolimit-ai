@@ -21,6 +21,7 @@ bool qb_transport_send_request(
     uint32_t request_id,
     char const *subject,
     char const *mode,
+    char const *level,
     char const *prompt
 );
 
