@@ -21,6 +21,14 @@ Everything else in this repository supports the app with documentation and autom
 - Keyboard shortcuts including Ctrl/Cmd+K for models
 - Online/offline connection status
 
+### Recovery and persistence
+- Autosaved composer drafts per conversation
+- Recoverable Trash with one-click Undo
+- Local IndexedDB persistence for image and PDF attachments
+- Automatic media cleanup when chats are permanently deleted
+- Plain workspace backups
+- Password-encrypted workspace backups using PBKDF2-SHA256 + AES-256-GCM
+
 ### Power-user workflow
 - Autosaved per-chat drafts
 - Recoverable Trash with Undo
@@ -204,9 +212,11 @@ Workflow:
 
 ## Storage
 
-Chats, settings, and a locally connected key are kept in browser localStorage.
+Chats, settings, projects, prompts, profiles, and a locally connected key are kept in browser storage.
 
-Large base64 images and PDFs are intentionally not persisted into chat history because browser storage quotas are small. Their visible filenames and textual conversation remain, but reloading the page may require reattaching large binary files.
+Image and PDF attachments are now persisted locally in IndexedDB, so supported media can survive normal page reloads and be rehydrated when the conversation needs it. Permanently deleting a chat also cleans up its stored media.
+
+Plain JSON workspace backups remain focused on workspace data and are not a substitute for a full binary-media archive. Password-encrypted workspace backups use PBKDF2-SHA256 plus AES-256-GCM and never include the OpenRouter API key.
 
 Chat backups can be exported as JSON and imported on another device.
 
@@ -227,7 +237,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v1.6
+Current app generation: v1.7
 
 Major capabilities now include:
 - phone + PC UI
