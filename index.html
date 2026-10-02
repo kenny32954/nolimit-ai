@@ -191,6 +191,16 @@ html[data-density="compact"] .chat{padding-top:14px}html[data-density="compact"]
 .modelstar.on{color:#ffd67d;background:rgba(255,196,82,.07);border-color:rgba(255,196,82,.18)}
 .modelbadges{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.modelbadge{font-size:10px;padding:3px 6px;border-radius:999px;background:rgba(255,255,255,.045);color:#97939a;border:1px solid rgba(255,255,255,.055)}
 
+
+html[data-focus="true"] .side{display:none!important}
+html[data-focus="true"] .app{grid-template-columns:1fr!important}
+html[data-focus="true"] .main{grid-column:1!important}
+html[data-focus="true"] .composeWrap{left:0!important}
+html[data-focus="true"] .toolstrip{display:none}
+html[data-focus="true"] .top .menu{display:none}
+html[data-focus="true"] .chat{padding-left:max(22px,calc((100vw - 920px)/2));padding-right:max(22px,calc((100vw - 920px)/2))}
+html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
+
 </style>
 </head>
 <body>
@@ -222,7 +232,7 @@ html[data-density="compact"] .chat{padding-top:14px}html[data-density="compact"]
 <header class="top">
 <button class="icon menu" id="menuBtn">☰</button>
 <div class="title" id="title">New chat</div>
-<div class="topActions"><button class="research" id="researchBtn">Research</button><button class="research" id="commandBtn" title="Command palette">⌘</button><button class="connect" id="topAuth">Connect</button></div>
+<div class="topActions"><button class="research" id="researchBtn">Research</button><button class="research" id="focusBtn" title="Focus mode">Focus</button><button class="research" id="commandBtn" title="Command palette">⌘</button><button class="connect" id="topAuth">Connect</button></div>
 </header>
 <section class="chat" id="chat"></section>
 <button class="scrollbottom" id="scrollBottom" title="Jump to latest">↓</button>
@@ -488,6 +498,7 @@ var settings=Object.assign({
   theme:"dark",
   accent:"coral",
   density:"cozy",
+  focusMode:false,
   denyDataCollection:false,
   fusion:false,
   cache:false,
@@ -511,6 +522,11 @@ var installPrompt=null;
 var imageReferenceData="";
 var videoFrameData="";
 var videoReferenceData="";
+var renderTimer=null;
+function scheduleRender(){
+  if(renderTimer)return;
+  renderTimer=setTimeout(function(){renderTimer=null;render()},40)
+}
 
 function q(s){return document.querySelector(s)}
 function qa(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
@@ -522,6 +538,7 @@ function applyAppearance(){
   document.documentElement.dataset.theme=settings.theme||"dark";
   document.documentElement.dataset.accent=settings.accent||"coral";
   document.documentElement.dataset.density=settings.density||"cozy";
+  document.documentElement.dataset.focus=settings.focusMode?"true":"false";
 }
 function current(){return chats.find(function(c){return c.id===active})}
 function projectForChat(c){return c&&c.projectId?projects.find(function(p){return p.id===c.projectId}):null}
@@ -595,6 +612,7 @@ function render(){
   q("#reasonToggle").classList.toggle("on",settings.reasoning!=="none");
   q("#reasonToggle").textContent="◌ Reasoning: "+settings.reasoning;
   q("#researchBtn").classList.toggle("on",!!settings.web&&!!settings.fetch);
+  q("#focusBtn").classList.toggle("on",!!settings.focusMode);
   renderHistory();
   renderChat();
   renderPending()
@@ -673,7 +691,7 @@ function renderChat(){
         var rg=document.createElement("button");rg.textContent="Regenerate";rg.onclick=function(){regenerate(idx)};
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
         tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(br);
-        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));meta.textContent=bits.join(" · ");tools.appendChild(meta);
+        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");meta.textContent=bits.join(" · ");tools.appendChild(meta);
         a.appendChild(tools);box.appendChild(a)
       }
     })
@@ -711,6 +729,7 @@ var COMMANDS=[
   {name:"Projects",hint:"Local workspaces",run:openProjects},
   {name:"Usage dashboard",hint:"OpenRouter key usage",run:openUsage},
   {name:"Diagnostics",hint:"Health check",run:openDiagnostics},
+  {name:"Toggle focus mode",hint:"Hide chrome and tools",run:function(){settings.focusMode=!settings.focusMode;save();render()}},
   {name:"Settings",hint:"Appearance + API",run:openSettings},
   {name:"Toggle temporary chat",hint:"Do not persist after reload",run:function(){var c=ensure();c.temporary=!c.temporary;save();render()}},
   {name:"Export Markdown",hint:"Current chat",run:exportChat},
@@ -948,10 +967,10 @@ async function send(){
   var c=ensure(),files=pending.slice();pending=[];q("#prompt").value="";
   var aud=files.filter(function(f){return f.kind==="audio"});
   for(var ai=0;ai<aud.length;ai++){try{toast("Transcribing "+aud[ai].name+"…");var tr=await transcribe(aud[ai].file);text+=(text?"\n\n":"")+"[Audio transcript: "+aud[ai].name+"]\n"+tr}catch(e){toast(e.message)}}
-  var m={role:"user",content:text||"Please analyze the attached file.",fileNames:files.map(function(x){return x.name}),images:files.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),pdfs:files.filter(function(x){return x.kind==="pdf"}).map(function(x){return{name:x.name,data:x.data}}),textFiles:files.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
+  var m={role:"user",created:Date.now(),content:text||"Please analyze the attached file.",fileNames:files.map(function(x){return x.name}),images:files.filter(function(x){return x.kind==="image"}).map(function(x){return x.data}),pdfs:files.filter(function(x){return x.kind==="pdf"}).map(function(x){return{name:x.name,data:x.data}}),textFiles:files.filter(function(x){return x.kind==="text"}).map(function(x){return{name:x.name,text:x.text}})};
   c.messages.push(m);if(c.title==="New chat")c.title=(text||(files[0]&&files[0].name)||"New chat").replace(/\s+/g," ").slice(0,48);c.updated=Date.now();
   var requestMessages=apiMessages(c);
-  var a={role:"assistant",content:"",model:settings.model};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";q("#send").classList.add("busy");render();
+  var a={role:"assistant",created:Date.now(),started:Date.now(),content:"",model:settings.model};c.messages.push(a);save();busy=true;controller=new AbortController();q("#send").textContent="■";q("#send").classList.add("busy");render();
   try{
     var body={model:settings.model,messages:requestMessages,temperature:Number(settings.temperature),stream:true,usage:{include:true},session_id:"nolimit-"+c.id};
     if(settings.fallbackModel){body.models=[settings.model,settings.fallbackModel];delete body.model}
@@ -972,10 +991,10 @@ async function send(){
       var z=await reader.read();if(z.done)break;buf+=dec.decode(z.value,{stream:true});var lines=buf.split("\n");buf=lines.pop();
       lines.forEach(function(line){
         line=line.trim();if(line.indexOf("data:")!==0)return;var raw=line.slice(5).trim();if(!raw||raw==="[DONE]")return;
-        try{var j=JSON.parse(raw),ch=j.choices&&j.choices[0];if(ch&&ch.delta)addDelta(ch.delta,a);if(j.usage){a.usage=j.usage;if(j.usage.cost!=null)a.cost=j.usage.cost}if(j.cost!=null)a.cost=j.cost;if(j.model)a.model=j.model;render()}catch(e){}
+        try{var j=JSON.parse(raw),ch=j.choices&&j.choices[0];if(ch&&ch.delta)addDelta(ch.delta,a);if(j.usage){a.usage=j.usage;if(j.usage.cost!=null)a.cost=j.usage.cost}if(j.cost!=null)a.cost=j.cost;if(j.model)a.model=j.model;scheduleRender()}catch(e){}
       })
     }
-    save()
+    a.finished=Date.now();save()
   }catch(e){
     if(e.name!=="AbortError"){a.content="Request failed: "+e.message;a.error=true}
     if(e.name==="AbortError"&&!a.content)c.messages.pop();
@@ -1599,6 +1618,7 @@ q("#prompt").onkeydown=function(e){
 };
 q("#topAuth").onclick=q("#sideAuth").onclick=q("#settingsBtn").onclick=openSettings;
 q("#commandBtn").onclick=openCommandPalette;
+q("#focusBtn").onclick=function(){settings.focusMode=!settings.focusMode;save();render();toast(settings.focusMode?"Focus mode on":"Focus mode off")};
 q("#diagnosticsSide").onclick=openDiagnostics;
 q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
 q("#compareSide").onclick=openCompare;
@@ -1687,9 +1707,9 @@ q("#artifactOpen").onclick=function(){
 };
 
 // Paste and drag/drop attachments.
-q("#themeSelect").onchange=function(){settings.theme=this.value;applyAppearance()};
-q("#accentSelect").onchange=function(){settings.accent=this.value;applyAppearance()};
-q("#densitySelect").onchange=function(){settings.density=this.value;applyAppearance()};
+q("#themeSelect").onchange=function(){settings.theme=this.value;save();applyAppearance()};
+q("#accentSelect").onchange=function(){settings.accent=this.value;save();applyAppearance()};
+q("#densitySelect").onchange=function(){settings.density=this.value;save();applyAppearance()};
 q("#prompt").addEventListener("input",resizePrompt);
 q("#chat").addEventListener("scroll",updateScrollButton,{passive:true});
 q("#scrollBottom").onclick=function(){q("#chat").scrollTo({top:q("#chat").scrollHeight,behavior:"smooth"})};
