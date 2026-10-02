@@ -350,7 +350,8 @@ function render(){
   var cp=projectForChat(c);
   q("#title").textContent=(c.title||"New chat")+(cp?" · "+cp.name:"");
   q("#modelBottom").textContent=settings.model;
-  q("#status").textContent=!navigator.onLine?"Offline":(isConnected()?"Connected":"Not connected");
+  var approx=approxContextTokens(c);
+  q("#status").textContent=!navigator.onLine?"Offline":((isConnected()?"Connected":"Not connected")+(approx?" · ~"+formatTokenCount(approx)+" ctx":""));
   q("#topAuth").textContent=isConnected()?"Connected":"Connect";
   q("#topAuth").classList.toggle("ok",isConnected());
   q("#sideAuth").textContent=isConnected()?"OpenRouter connected":"Connect OpenRouter";
@@ -536,12 +537,23 @@ function apiMessages(c){
   if(p&&p.instructions)systemParts.push("Project instructions:\n"+p.instructions);
   if(p&&p.knowledge)systemParts.push("Project reference knowledge:\n"+p.knowledge);
   if(systemParts.length)out.push({role:"system",content:systemParts.join("\n\n")});
-  c.messages.forEach(function(m){
+  var history=c.messages||[],limit=Math.max(0,Number(settings.historyLimit)||0);
+  if(limit>0&&history.length>limit)history=history.slice(-limit);
+  history.forEach(function(m){
     if(m.role==="assistant"){
       var a={role:"assistant",content:m.content||""};if(m.reasoning_details)a.reasoning_details=m.reasoning_details;if(m.annotations)a.annotations=m.annotations;out.push(a)
     }else out.push({role:"user",content:contentFor(m)})
   });
   return out
+}
+
+function formatTokenCount(n){n=Math.max(0,Math.round(Number(n)||0));if(n>=1000000)return (n/1000000).toFixed(1)+"M";if(n>=1000)return (n/1000).toFixed(n>=10000?0:1)+"k";return String(n)}
+function approxContextTokens(c){
+  var chars=(settings.system||"").length+(settings.memory||"").length,p=projectForChat(c);
+  if(p)chars+=(p.instructions||"").length+(p.knowledge||"").length;
+  var history=c.messages||[],limit=Math.max(0,Number(settings.historyLimit)||0);if(limit>0&&history.length>limit)history=history.slice(-limit);
+  history.forEach(function(m){chars+=String(m.content||"").length;if(m.textFiles)m.textFiles.forEach(function(f){chars+=String(f.text||"").length})});
+  return Math.ceil(chars/4)
 }
 
 function toolList(){
@@ -779,17 +791,25 @@ async function runCompare(){
 function priceZero(m){var p=m.pricing||{};return Number(p.prompt||1)===0&&Number(p.completion||1)===0}
 function perMillion(v){var n=Number(v);if(!isFinite(n))return "";return "$"+(n*1000000).toFixed(n*1000000<1?3:2)+"/M"}
 function inputs(m){var a=m.architecture||{};return a.input_modalities||[]}
+function rememberModel(id){
+  var arr=Array.isArray(settings.recentModels)?settings.recentModels.slice():[];
+  arr=arr.filter(function(x){return x!==id});arr.unshift(id);settings.recentModels=arr.slice(0,8);save()
+}
 function showModels(){
   var term=(q("#modelSearch").value||"").toLowerCase(),box=q("#models");box.innerHTML="";
-  var list=[{id:"openrouter/auto",name:"Auto Router"}].concat(models).filter(function(m){
+  var recent=Array.isArray(settings.recentModels)?settings.recentModels:[];
+  var all=[{id:"openrouter/auto",name:"Auto Router"}].concat(models);
+  all.sort(function(a,b){var ai=recent.indexOf(a.id),bi=recent.indexOf(b.id);if(ai<0)ai=999;if(bi<0)bi=999;return ai-bi});
+  var list=all.filter(function(m){
     var hay=((m.name||"")+" "+(m.id||"")).toLowerCase();if(term&&hay.indexOf(term)<0)return false;
+    if(modelFilter==="recent"&&recent.indexOf(m.id)<0)return false;
     if(modelFilter==="free"&&!priceZero(m))return false;
     if(modelFilter==="vision"&&inputs(m).indexOf("image")<0)return false;
     if(modelFilter==="reasoning"){var sp=m.supported_parameters||[];if(sp.indexOf("reasoning")<0&&sp.indexOf("reasoning_effort")<0)return false}
     return true
   }).slice(0,180);
   list.forEach(function(m){
-    var b=document.createElement("button");b.className="mrow";var st=document.createElement("strong");st.textContent=m.name||m.id;var sm=document.createElement("span");sm.className="modelmeta";var bits=[m.id];if(m.context_length)bits.push(Math.round(m.context_length/1000)+"k ctx");if(priceZero(m))bits.push("free");else if(m.pricing){if(m.pricing.prompt!=null)bits.push("in "+perMillion(m.pricing.prompt));if(m.pricing.completion!=null)bits.push("out "+perMillion(m.pricing.completion))}sm.textContent=bits.join(" · ");b.appendChild(st);b.appendChild(sm);b.onclick=function(){settings.model=m.id;save();closeModals();render();toast("Model changed")};box.appendChild(b)
+    var b=document.createElement("button");b.className="mrow";var st=document.createElement("strong");st.textContent=m.name||m.id;var sm=document.createElement("span");sm.className="modelmeta";var bits=[m.id];if(m.context_length)bits.push(Math.round(m.context_length/1000)+"k ctx");if(priceZero(m))bits.push("free");else if(m.pricing){if(m.pricing.prompt!=null)bits.push("in "+perMillion(m.pricing.prompt));if(m.pricing.completion!=null)bits.push("out "+perMillion(m.pricing.completion))}sm.textContent=bits.join(" · ");b.appendChild(st);b.appendChild(sm);b.onclick=function(){settings.model=m.id;rememberModel(m.id);closeModals();render();toast("Model changed")};box.appendChild(b)
   })
 }
 
@@ -1001,6 +1021,16 @@ function speak(text){
   speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(String(text||"").replace(/[\x60*_#>\[\]()]/g," "));speechSynthesis.speak(u)
 }
 
+async function shareChat(){
+  var c=ensure(),lines=[c.title||"NoLimit AI chat",""];
+  c.messages.forEach(function(m){lines.push(m.role==="user"?"You:":"NoLimit AI:");lines.push(m.content||"");lines.push("")});
+  var text=lines.join("\n");
+  if(navigator.share){
+    try{await navigator.share({title:c.title||"NoLimit AI chat",text:text});return}catch(e){if(e&&e.name==="AbortError")return}
+  }
+  try{await navigator.clipboard.writeText(text);toast("Chat copied for sharing")}catch(e){toast("Could not share this chat")}
+}
+
 function exportChat(){
   var c=ensure(),lines=["# "+c.title,""];c.messages.forEach(function(m){lines.push(m.role==="user"?"## You":"## NoLimit AI");lines.push("");lines.push(m.content||"");lines.push("")});
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/markdown"}));a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".md";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
@@ -1148,6 +1178,7 @@ q("#installSide").onclick=async function(){
 };
 q("#imageSide").onclick=q("#imageBtn").onclick=openImage;
 q("#videoSide").onclick=openVideo;
+q("#shareSide").onclick=shareChat;
 q("#exportSide").onclick=exportChat;
 q("#backupSide").onclick=backupChat;
 q("#importSide").onclick=function(){q("#importFile").click()};
