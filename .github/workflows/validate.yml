@@ -83,20 +83,53 @@ jobs:
           if missing:
               raise SystemExit("Missing required app markers: " + ", ".join(missing))
 
-          if re.search(r"sk-or-v1-[A-Za-z0-9_-]{20,}", html):
-              raise SystemExit("A likely OpenRouter API key was found in index.html")
+          # Catch accidental secret commits anywhere in the repository, not just index.html.
+          secret_re = re.compile(r"sk-or-v1-[A-Za-z0-9_-]{20,}")
+          for candidate in Path(".").rglob("*"):
+              if not candidate.is_file() or ".git" in candidate.parts:
+                  continue
+              if candidate.suffix.lower() not in {".html", ".js", ".md", ".json", ".yml", ".yaml", ".txt"}:
+                  continue
+              try:
+                  text = candidate.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  continue
+              if secret_re.search(text):
+                  raise SystemExit(f"A likely OpenRouter API key was found in {candidate}")
 
           for path in ["manifest.webmanifest", "sw.js", "icon.svg"]:
               if not Path(path).exists():
                   raise SystemExit(f"Missing required PWA file: {path}")
 
-          json.loads(Path("manifest.webmanifest").read_text(encoding="utf-8"))
+          manifest = json.loads(Path("manifest.webmanifest").read_text(encoding="utf-8"))
+          if manifest.get("name") != "Quantum Breaks AI":
+              raise SystemExit("PWA manifest name is not Quantum Breaks AI")
+
+          # Validate DOM id integrity and the selectors used by the single-file app.
+          ids = re.findall(r'\\bid="([^"]+)"', html)
+          duplicates = sorted({item for item in ids if ids.count(item) > 1})
+          if duplicates:
+              raise SystemExit("Duplicate HTML ids: " + ", ".join(duplicates))
 
           start = html.index("<script>") + len("<script>")
           end = html.index("</script>", start)
-          Path("/tmp/quantum-breaks-app.js").write_text(html[start:end], encoding="utf-8")
+          script = html[start:end]
+          selector_ids = sorted(set(re.findall(r'q\\("#([A-Za-z0-9_-]+)"\\)', script)))
+          missing_selector_ids = [item for item in selector_ids if item not in set(ids)]
+          if missing_selector_ids:
+              raise SystemExit("JavaScript references missing HTML ids: " + ", ".join(missing_selector_ids))
 
-          print("HTML, manifest, PWA files, and secret checks passed")
+          version_match = re.search(r'APP_VERSION="([^"]+)"', script)
+          if not version_match:
+              raise SystemExit("APP_VERSION is missing")
+          readme = Path("README.md").read_text(encoding="utf-8")
+          release_match = re.search(r"Current app generation: v([0-9.]+)", readme)
+          if not release_match or release_match.group(1) != version_match.group(1):
+              raise SystemExit("README release version does not match APP_VERSION")
+
+          Path("/tmp/quantum-breaks-app.js").write_text(script, encoding="utf-8")
+
+          print("HTML ids, selectors, manifest, versions, PWA files, and secret checks passed")
           PY
 
       - name: Check app JavaScript syntax
