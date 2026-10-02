@@ -229,6 +229,10 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .msgtime{margin-left:auto;color:#5f5c63;font-size:10px}
 @media(max-width:899px){.sfoot{max-height:46vh}}
 
+
+.contextpin{color:#9dc4ff!important}.contextpin.on{color:#6ca7ff!important;background:rgba(108,167,255,.08)!important}
+.scratchcount{font-size:10px;color:var(--muted);margin-left:6px}
+
 </style>
 </head>
 <body>
@@ -248,6 +252,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="navgroup"><div class="navlabel">Workspace</div>
 <button class="sbtn" id="projectsSide">Projects</button>
 <button class="sbtn" id="promptsSide">Prompt library</button>
+<button class="sbtn" id="scratchpadSide">Scratchpad</button>
 <button class="sbtn" id="findSide">Find in chat</button>
 <button class="sbtn" id="bookmarksSide">Bookmarks</button>
 <button class="sbtn" id="trashSide">Trash</button></div>
@@ -390,6 +395,15 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="filter" data-filter="reasoning">Reasoning</button>
 </div>
 <div class="models" id="models"></div>
+</section>
+
+<section class="modal" id="scratchpadModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Chat scratchpad</h2>
+<div class="notice">Private notes for this conversation. Keep them local, or optionally include them in the model context.</div>
+<div class="field"><textarea id="scratchpadText" style="min-height:260px" placeholder="Notes, TODOs, facts, snippets…"></textarea></div>
+<label style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><input id="scratchpadContext" type="checkbox"> Include scratchpad in AI context</label>
+<div class="row"><button class="primary" id="saveScratchpad">Save notes</button><button class="secondary" id="insertScratchpad">Insert into composer</button><button class="secondary" id="clearScratchpad">Clear</button></div>
 </section>
 
 <section class="modal" id="trashModal">
@@ -816,7 +830,8 @@ function renderChat(){
         var ua=document.createElement("div");ua.className="msgtools";ua.style.justifyContent="flex-end";
         var ed=document.createElement("button");ed.textContent="Edit";ed.onclick=function(){editUserMessage(idx)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
-        ua.appendChild(ed);ua.appendChild(bm);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});ua.appendChild(tm)}b.appendChild(ua);w.appendChild(b);box.appendChild(w)
+        var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
+        ua.appendChild(ed);ua.appendChild(bm);ua.appendChild(pin);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});ua.appendChild(tm)}b.appendChild(ua);w.appendChild(b);box.appendChild(w)
       }else{
         var a=document.createElement("div");a.className="assistant"+(m.error?" error":"");a.dataset.msgIndex=idx;
         if(m.reasoning){var rb=document.createElement("div");rb.className="reasonbox";rb.textContent=m.reasoning;a.appendChild(rb)}
@@ -830,7 +845,8 @@ function renderChat(){
         var rg=document.createElement("button");rg.textContent="Regenerate";rg.onclick=function(){regenerate(idx)};
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
-        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(br);tools.appendChild(bm);
+        var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
+        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(br);tools.appendChild(bm);tools.appendChild(pin);
         var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
@@ -848,6 +864,25 @@ function renderChat(){
   requestAnimationFrame(function(){if(stickToBottom)box.scrollTop=box.scrollHeight;updateScrollButton()})
 }
 
+
+function toggleContextPin(idx){
+  var c=ensure(),m=c.messages[idx];if(!m)return;
+  m.contextPinned=!m.contextPinned;c.updated=Date.now();save();render();toast(m.contextPinned?"Message pinned to context":"Context pin removed")
+}
+function openScratchpad(){
+  var c=ensure();q("#scratchpadText").value=c.scratchpad||"";q("#scratchpadContext").checked=!!c.scratchpadInContext;openModal("#scratchpadModal")
+}
+function saveScratchpad(){
+  var c=ensure();c.scratchpad=q("#scratchpadText").value.slice(0,100000);c.scratchpadInContext=q("#scratchpadContext").checked;c.updated=Date.now();save();render();toast("Scratchpad saved")
+}
+function clearScratchpad(){
+  if(!confirm("Clear the scratchpad for this chat?"))return;
+  var c=ensure();c.scratchpad="";c.scratchpadInContext=false;q("#scratchpadText").value="";q("#scratchpadContext").checked=false;save();render();toast("Scratchpad cleared")
+}
+function insertScratchpad(){
+  var txt=q("#scratchpadText").value;if(!txt)return toast("Scratchpad is empty");
+  q("#prompt").value=(q("#prompt").value?q("#prompt").value+"\n\n":"")+txt;closeModals();resizePrompt();q("#prompt").focus()
+}
 
 function toggleBookmark(idx){
   var c=ensure(),m=c.messages[idx];if(!m)return;m.bookmarked=!m.bookmarked;c.updated=Date.now();save();render();toast(m.bookmarked?"Message bookmarked":"Bookmark removed")
@@ -901,6 +936,7 @@ var COMMANDS=[
   {name:"Compare models",hint:"Side by side",run:openCompare},
   {name:"Projects",hint:"Local workspaces",run:openProjects},
   {name:"Prompt library",hint:"Saved reusable prompts",run:openPromptLibrary},
+  {name:"Scratchpad",hint:"Notes for this conversation",run:openScratchpad},
   {name:"Find in chat",hint:"Search current conversation",run:openFindInChat},
   {name:"Bookmarks",hint:"Saved messages",run:openBookmarks},
   {name:"Usage dashboard",hint:"OpenRouter key usage",run:openUsage},
@@ -1062,12 +1098,19 @@ function apiMessages(c){
   var out=[],systemParts=[];
   if(settings.system)systemParts.push(settings.system);
   if(settings.memory)systemParts.push("Persistent local memory:\n"+settings.memory);
+  if(c.scratchpadInContext&&c.scratchpad)systemParts.push("Chat scratchpad notes:\n"+c.scratchpad);
   var p=projectForChat(c);
   if(p&&p.instructions)systemParts.push("Project instructions:\n"+p.instructions);
   if(p&&p.knowledge)systemParts.push("Project reference knowledge:\n"+p.knowledge);
   if(systemParts.length)out.push({role:"system",content:systemParts.join("\n\n")});
-  var history=c.messages||[],limit=Math.max(0,Number(settings.historyLimit)||0);
-  if(limit>0&&history.length>limit)history=history.slice(-limit);
+  var allHistory=c.messages||[],history=allHistory,limit=Math.max(0,Number(settings.historyLimit)||0);
+  if(limit>0&&history.length>limit){
+    history=history.slice(-limit);
+    var visibleSet=new Set(history);
+    var pinned=allHistory.filter(function(m){return m.contextPinned&&!visibleSet.has(m)&&!m.error});
+    if(pinned.length)systemParts.push("Pinned conversation context kept outside the normal history window:\n"+pinned.map(function(m){return (m.role==="user"?"User":"Assistant")+": "+String(m.content||"")}).join("\n\n"));
+    if(systemParts.length&&out.length&&out[0].role==="system")out[0].content=systemParts.join("\n\n")
+  }
   history.forEach(function(m){
     if(m.error)return;
     if(m.role==="assistant"){
@@ -1964,6 +2007,7 @@ q("#compareSide").onclick=openCompare;
 q("#usageSide").onclick=openUsage;
 q("#projectsSide").onclick=openProjects;
 q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
+q("#scratchpadSide").onclick=openScratchpad;
 q("#findSide").onclick=openFindInChat;
 q("#bookmarksSide").onclick=openBookmarks;
 q("#trashSide").onclick=openTrash;
@@ -2054,6 +2098,9 @@ q("#pinChat").onclick=togglePinnedChat;
 q("#duplicateChat").onclick=duplicateManagedChat;
 q("#deleteChat").onclick=deleteManagedChat;
 q("#emptyTrash").onclick=emptyTrash;
+q("#saveScratchpad").onclick=saveScratchpad;
+q("#insertScratchpad").onclick=insertScratchpad;
+q("#clearScratchpad").onclick=clearScratchpad;
 q("#micBtn").onclick=toggleMic;
 q("#clearRunner").onclick=function(){q("#runnerOutput").textContent=""};
 q("#artifactCopy").onclick=function(){if(!artifactCode)return;navigator.clipboard.writeText(artifactCode).then(function(){toast("Artifact HTML copied")})};
