@@ -405,6 +405,9 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
   .user{margin-bottom:22px}.ub{max-width:96%!important}
 }
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+
+/* v3.1 sidebar drawers */
+.navlabel{display:flex!important;align-items:center;gap:7px;cursor:pointer;user-select:none;border-radius:8px;min-height:26px;transition:background .15s ease,color .15s ease}.navlabel:hover{background:rgba(255,255,255,.03);color:#89858e}.navlabel:before{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:5px;background:rgba(255,255,255,.035);font-size:8px;color:#77737b;letter-spacing:0}.navlabel:after{content:"⌄";margin-left:auto;font-size:11px;color:#54515a;transition:transform .18s ease,color .18s ease}.navgroup.collapsed .navlabel:after{transform:rotate(-90deg)}.navgroup.collapsed .sbtn,.navgroup.collapsed>input{display:none!important}.navgroup.collapsed{padding-bottom:4px!important;margin-bottom:1px}.navgroup.collapsed .navlabel{margin-bottom:0}.navgroup[data-nav-key="ai"] .navlabel:before{content:"✦"}.navgroup[data-nav-key="workspace"] .navlabel:before{content:"▦"}.navgroup[data-nav-key="create"] .navlabel:before{content:"◇"}.navgroup[data-nav-key="chat"] .navlabel:before{content:"◫"}.navgroup[data-nav-key="app"] .navlabel:before{content:"⚙"}.navgroup:not(.collapsed) .navlabel{color:#77737c}.navgroup:not(.collapsed) .navlabel:after{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -554,7 +557,7 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
 <h3>Reliability</h3>
 <ul><li>Interrupted streams now preserve any answer text already received instead of replacing useful partial output with an error message.</li><li>Failed, cancelled, or stalled replies expose clearer recovery state and one-click retry/continue controls.</li><li>Transient 429/502/503/504 API failures use bounded retries with Retry-After support, while the network-stall watchdog still prevents indefinite hangs.</li><li>Per-request and daily tracked-spend warnings help catch unexpectedly expensive calls before sending.</li></ul>
 <h3>Workspace</h3>
-<ul><li>Conversation branch lineage shows parent/child forks and lets you jump across alternate paths.</li><li>Conversation Tasks adds a persistent per-chat to-do board with optional AI task extraction.</li><li>Clear Messages now creates an automatic restore snapshot first, and Copy Conversation exports the current chat as readable plain text to your clipboard.</li><li>Tasks survive snapshots, branches, chat backups, and imports; media persistence, archives, trash, global search, and encrypted backups remain intact.</li></ul>
+<ul><li>The sidebar is now organized into collapsible AI, Workspace, Create, Chat, and App drawers that remember your layout locally.</li><li>High-frequency AI and Workspace drawers stay open by default, while lower-frequency tool groups start collapsed to reduce visual noise.</li><li>Conversation branches, tasks, snapshots, backups, archives, trash, global search, and encrypted workspace exports remain available.</li></ul>
 <h3>Interface</h3>
 <ul><li>v3 introduces a redesigned visual system: new brand treatment, assistant/user identities, richer chat hierarchy, animated streaming state, premium composer shell, and cleaner sidebar navigation.</li><li>Added Nebula and Cyber themes plus Cyan, Gold, and Pink accents, with improved focus states and reduced-motion support.</li><li>Mobile now hides low-priority header controls, keeps message actions usable, and gives the composer more breathing room without sacrificing tools.</li></ul>
 </div>
@@ -1036,7 +1039,7 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="3.0.0";
+var APP_VERSION="3.1.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1097,7 +1100,8 @@ var settings=Object.assign({
   webMaxResults:5,
   webMaxTotal:15,
   autoSpeak:false,
-  backgroundNotify:false
+  backgroundNotify:false,
+  navCollapsed:null
 },safeJSON(localStorage.getItem(SETSTORE),{}));
 var active=localStorage.getItem(ACTIVE)||"";
 var projects=safeJSON(localStorage.getItem(PROJECT_STORE),[]);
@@ -2015,6 +2019,27 @@ function runNextQueued(chat){
   if(!arr.length)return;
   var item=arr.shift();q("#prompt").value=String(item.text||"");chat.draft=q("#prompt").value;save();resizePrompt();renderQueued();
   setTimeout(function(){if(!busy&&current()&&current().id===chat.id)send()},180)
+}
+
+function setupSidebarGroups(){
+  var defaults={ai:false,workspace:false,create:true,chat:true,app:true};
+  if(!settings.navCollapsed||typeof settings.navCollapsed!=="object")settings.navCollapsed=Object.assign({},defaults);
+  qa("#side .navgroup").forEach(function(group){
+    var label=group.querySelector(".navlabel");if(!label)return;
+    var key=String(label.textContent||"section").trim().toLowerCase().replace(/[^a-z0-9_-]/g,"-");
+    group.dataset.navKey=key;
+    if(settings.navCollapsed[key]===undefined)settings.navCollapsed[key]=!!defaults[key];
+    function sync(){
+      var collapsed=!!settings.navCollapsed[key];group.classList.toggle("collapsed",collapsed);
+      label.setAttribute("aria-expanded",collapsed?"false":"true");
+      label.title=(collapsed?"Expand ":"Collapse ")+String(label.textContent||"section").trim()
+    }
+    label.setAttribute("role","button");label.setAttribute("tabindex","0");
+    label.onclick=function(){settings.navCollapsed[key]=!settings.navCollapsed[key];sync();save()};
+    label.onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();label.click()}};
+    sync()
+  });
+  save()
 }
 
 function setupAccessibility(){
@@ -4833,6 +4858,7 @@ function handleLaunchAction(){
   else if(action==="image")openImage();
   else if(action==="research"){settings.web=true;settings.fetch=true;settings.modePreset="research";save();render();q("#prompt").focus();toast("Research mode ready")}
 }
+setupSidebarGroups();
 setupAccessibility();
 finishAuth().then(function(){render();restoreDraft();handleLaunchAction();setTimeout(function(){ensureModelCatalog().then(function(){render()})},250)})
 })();
