@@ -36,6 +36,7 @@
 <button class="sbtn" id="installSide">Install app</button>
 <button class="sbtn" id="imageSide">Create image</button>
 <button class="sbtn" id="videoSide">Create video</button>
+<button class="sbtn" id="shareSide">Share chat</button>
 <button class="sbtn" id="exportSide">Export Markdown</button>
 <button class="sbtn" id="backupSide">Backup chat</button>
 <button class="sbtn" id="importSide">Import backup</button><input id="importFile" type="file" accept=".json,application/json" hidden>
@@ -104,6 +105,7 @@
 <div class="row">
 <div class="field" style="flex:1;min-width:180px"><label>Response format</label><select id="responseFormat"><option value="text">Normal text</option><option value="json_object">JSON object</option></select></div>
 <div class="field" style="flex:1;min-width:180px"><label>Max output tokens</label><input id="maxTokens" type="number" min="0" step="256" placeholder="0 = model default"></div>
+<div class="field" style="flex:1;min-width:180px"><label>History messages sent</label><input id="historyLimit" type="number" min="0" step="1" placeholder="0 = all"><div class="smallnote">Optional context cap. 0 sends the full conversation.</div></div>
 </div>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="denyDataCollection" type="checkbox"> Prefer providers that deny data collection</label>
 <div class="row">
@@ -123,6 +125,7 @@
 <div class="field"><input id="modelSearch" placeholder="Search models"></div>
 <div class="filterbar">
 <button class="filter on" data-filter="all">All</button>
+<button class="filter" data-filter="recent">Recent</button>
 <button class="filter" data-filter="free">Free</button>
 <button class="filter" data-filter="vision">Vision</button>
 <button class="filter" data-filter="reasoning">Reasoning</button>
@@ -264,6 +267,8 @@ var settings=Object.assign({
   providerRouting:"balanced",
   responseFormat:"text",
   maxTokens:0,
+  historyLimit:0,
+  recentModels:[],
   denyDataCollection:false,
   fusion:false,
   cache:false,
@@ -470,6 +475,7 @@ function openSettings(){
   q("#providerRouting").value=settings.providerRouting||"balanced";
   q("#responseFormat").value=settings.responseFormat||"text";
   q("#maxTokens").value=settings.maxTokens||0;
+  q("#historyLimit").value=settings.historyLimit||0;
   q("#denyDataCollection").checked=!!settings.denyDataCollection;
   q("#cacheEnabled").checked=!!settings.cache;
   q("#autoSpeak").checked=!!settings.autoSpeak;
@@ -1170,7 +1176,7 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
