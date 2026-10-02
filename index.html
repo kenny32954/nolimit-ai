@@ -336,9 +336,11 @@ function renderMarkdown(text){
   var blocks=[];
   var rx=new RegExp(fence+"([\\w-]*)\\n([\\s\\S]*?)"+fence,"g");
   raw=raw.replace(rx,function(_,lang,code){
-    var token="@@CODE"+blocks.length+"@@";
-    var preview=(String(lang||"").toLowerCase()==="html"||String(lang||"").toLowerCase()==="htm")?'<button class="codepreview" data-code="'+encodeURIComponent(code)+'">Preview</button>':"";
-    blocks.push('<pre>'+preview+'<button class="codecopy" data-code="'+encodeURIComponent(code)+'">Copy</button><code>'+escapeHTML(code)+'</code></pre>');
+    var token="@@CODE"+blocks.length+"@@",l=String(lang||"").toLowerCase(),enc=encodeURIComponent(code);
+    var preview=(l==="html"||l==="htm")?'<button class="codepreview" data-code="'+enc+'">Preview</button>':"";
+    var run=(l==="js"||l==="javascript")?'<button class="coderun" data-code="'+enc+'">Run</button>':"";
+    var download='<button class="codedownload" data-code="'+enc+'" data-lang="'+encodeURIComponent(l)+'">Download</button>';
+    blocks.push('<pre>'+download+run+preview+'<button class="codecopy" data-code="'+enc+'">Copy</button><code>'+escapeHTML(code)+'</code></pre>');
     return token
   });
   var s=escapeHTML(raw);
@@ -467,6 +469,8 @@ function renderChat(){
     q("#artifactFrame").srcdoc=artifactCode;
     openModal("#artifactModal")
   }});
+  qa(".codedownload").forEach(function(b){b.onclick=function(){downloadCode(decodeURIComponent(b.getAttribute("data-code")||""),decodeURIComponent(b.getAttribute("data-lang")||""))}});
+  qa(".coderun").forEach(function(b){b.onclick=function(){runJavaScript(decodeURIComponent(b.getAttribute("data-code")||""))}});
   requestAnimationFrame(function(){box.scrollTop=box.scrollHeight})
 }
 
@@ -1074,6 +1078,25 @@ async function shareChat(){
   try{await navigator.clipboard.writeText(text);toast("Chat copied for sharing")}catch(e){toast("Could not share this chat")}
 }
 
+function codeExtension(lang){
+  var m={javascript:"js",js:"js",typescript:"ts",ts:"ts",python:"py",py:"py",html:"html",htm:"html",css:"css",json:"json",markdown:"md",md:"md",java:"java",cpp:"cpp",c:"c",xml:"xml",yaml:"yml",yml:"yml",bash:"sh",shell:"sh",sql:"sql"};
+  return m[String(lang||"").toLowerCase()]||"txt"
+}
+function downloadCode(code,lang){
+  var ext=codeExtension(lang),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([code],{type:"text/plain"}));a.download="nolimit-code."+ext;a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
+}
+function runJavaScript(code){
+  var out=q("#runnerOutput");out.textContent="Running…";openModal("#runnerModal");
+  var pre='function __fmt(v){try{return typeof v==="string"?v:JSON.stringify(v)}catch(e){return String(v)}};console.log=(...a)=>postMessage({t:"log",v:a.map(__fmt).join(" ")});console.error=(...a)=>postMessage({t:"err",v:a.map(__fmt).join(" ")});console.warn=console.log;try{\n';
+  var post='\n;postMessage({t:"done"})}catch(e){postMessage({t:"err",v:e&&e.stack?e.stack:String(e)});postMessage({t:"done"})}';
+  var url=URL.createObjectURL(new Blob([pre+code+post],{type:"application/javascript"})),worker=new Worker(url),finished=false;
+  var lines=[];
+  function finish(msg){if(finished)return;finished=true;worker.terminate();URL.revokeObjectURL(url);if(msg)lines.push(msg);out.textContent=lines.join("\n")||"(no output)"}
+  worker.onmessage=function(e){var d=e.data||{};if(d.t==="done")finish();else{lines.push((d.t==="err"?"Error: ":"")+String(d.v||""));out.textContent=lines.join("\n")}};
+  worker.onerror=function(e){finish("Error: "+(e.message||"Worker failed"))};
+  setTimeout(function(){finish("Stopped after 5 seconds.")},5000)
+}
+
 function exportChat(){
   var c=ensure(),lines=["# "+c.title,""];c.messages.forEach(function(m){lines.push(m.role==="user"?"## You":"## NoLimit AI");lines.push("");lines.push(m.content||"");lines.push("")});
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/markdown"}));a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".md";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
@@ -1278,6 +1301,7 @@ q("#renameChat").onclick=renameManagedChat;
 q("#duplicateChat").onclick=duplicateManagedChat;
 q("#deleteChat").onclick=deleteManagedChat;
 q("#micBtn").onclick=toggleMic;
+q("#clearRunner").onclick=function(){q("#runnerOutput").textContent=""};
 q("#artifactCopy").onclick=function(){if(!artifactCode)return;navigator.clipboard.writeText(artifactCode).then(function(){toast("Artifact HTML copied")})};
 q("#artifactOpen").onclick=function(){
   if(!artifactCode)return;
