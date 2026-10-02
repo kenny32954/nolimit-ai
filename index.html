@@ -470,7 +470,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field" style="flex:1;min-width:160px"><label>Message size</label><select id="chatFontSize"><option value="15">Small</option><option value="17">Normal</option><option value="19">Large</option><option value="21">Extra large</option></select></div>
 </div>
 <div class="field"><label>System instructions</label><textarea id="systemPrompt"></textarea></div>
-<div class="field"><label>Local memory</label><textarea id="localMemory" placeholder="Facts or preferences you want Quantum Breaks AI to remember across chats on this browser"></textarea><div class="smallnote">Stored only in this browser and appended to your system context.</div></div>
+<div class="field"><label>Local memory</label><textarea id="localMemory" placeholder="Facts or preferences you want Quantum Breaks AI to remember across chats on this browser"></textarea><div class="row" style="margin-top:7px"><button class="secondary" id="suggestMemoryBtn" type="button">Suggest from this chat</button></div><div class="smallnote">Stored only in this browser and appended to your system context. Memory suggestions exclude sensitive information and require your approval.</div></div>
 <div class="row">
 <div class="field" style="flex:1;min-width:180px"><label>Temperature</label><input id="temperature" type="number" min="0" max="2" step="0.1"></div>
 <div class="field" style="flex:1;min-width:180px"><label>Reasoning effort</label><select id="reasoning"><option value="none">None</option><option value="minimal">Minimal</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">Extra high</option></select></div>
@@ -681,6 +681,14 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="row"><button class="primary" id="runCompare">Run comparison</button><button class="secondary hidden" id="synthesizeCompare">Synthesize answers</button></div>
 <div id="compareProgress" class="progress hidden"><i></i></div>
 <div id="compareOutput" class="comparegrid" style="margin-top:12px"></div>
+</section>
+
+<section class="modal" id="memorySuggestModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Memory suggestions</h2>
+<div class="notice">Quantum Breaks AI only suggests explicit, durable, non-sensitive preferences or instructions. Nothing is added until you select it.</div>
+<div id="memorySuggestList" class="promptlist"></div>
+<div class="row" style="margin-top:12px"><button class="primary" id="addMemorySuggestions">Add selected</button><button class="secondary" id="rerunMemorySuggestions">Analyze again</button></div>
 </section>
 
 <section class="modal" id="messageEditModal">
@@ -920,6 +928,7 @@ var recorderChunks=[];
 var artifactCode="";
 var manageChatId=null;
 var editMessageIndex=-1;
+var memorySuggestions=[];
 var installPrompt=null;
 var lastFocusedElement=null;
 var updateAvailable=false;
@@ -2043,6 +2052,7 @@ var SLASH_COMMANDS=[
   ["/project","Open projects"],
   ["/prompts","Open prompt library"],
   ["/history","Open recently sent prompts"],
+  ["/memory","Suggest safe local memory from this chat"],
   ["/snapshot","Open snapshots"],
   ["/mode ","Set balanced, fast, deep, or research mode"],
   ["/help","Show all commands"]
@@ -2097,6 +2107,7 @@ function handleCommand(text){
   if(cmd==="/project"){q("#prompt").value="";openProjects();return true}
   if(cmd==="/prompts"){q("#prompt").value="";openPromptLibrary();return true}
   if(cmd==="/history"){q("#prompt").value="";openPromptHistory();return true}
+  if(cmd==="/memory"){q("#prompt").value="";suggestMemoryFromChat();return true}
   if(cmd==="/snapshot"){q("#prompt").value="";openSnapshots();return true}
   if(cmd==="/mode"){
     var mode=(text.split(/\s+/)[1]||"").toLowerCase();
@@ -2106,7 +2117,7 @@ function handleCommand(text){
   }
   if(cmd==="/help"){
     q("#prompt").value="";
-    localAssistant("Available local commands:\n\n/new — new chat\n/models — choose model\n/usage — API key usage\n/compare — compare models\n/image — image generation\n/video — video generation\n/research — toggle research mode\n/web — toggle web search\n/agent — toggle subagent mode\n/advisor — toggle advisor mode\n/review — toggle second-pass review\n/focus — toggle focus mode\n/search — search the workspace\n/project — open projects\n/prompts — open prompt library\n/snapshot — open conversation snapshots\n/mode fast|balanced|deep|research — switch workflow mode\n\nKeyboard: Ctrl/Cmd+Enter sends, Ctrl/Cmd+K opens models, Ctrl/Cmd+P opens commands, Ctrl/Cmd+Shift+F searches everything, Escape closes dialogs.");
+    localAssistant("Available local commands:\n\n/new — new chat\n/models — choose model\n/usage — API key usage\n/compare — compare models\n/image — image generation\n/video — video generation\n/research — toggle research mode\n/web — toggle web search\n/agent — toggle subagent mode\n/advisor — toggle advisor mode\n/review — toggle second-pass review\n/focus — toggle focus mode\n/search — search the workspace\n/project — open projects\n/prompts — open prompt library\n/history — recent sent prompts\n/memory — suggest safe local memory from this chat\n/snapshot — open conversation snapshots\n/mode fast|balanced|deep|research — switch workflow mode\n\nKeyboard: Ctrl/Cmd+Enter sends, Ctrl/Cmd+K opens models, Ctrl/Cmd+P opens commands, Ctrl/Cmd+Shift+F searches everything, Escape closes dialogs.");
     return true
   }
   toast("Unknown command. Type /help");
@@ -3066,6 +3077,49 @@ function speak(text){
   speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(String(text||"").replace(/[\x60*_#>\[\]()]/g," "));speechSynthesis.speak(u)
 }
 
+
+function renderMemorySuggestions(){
+  var box=q("#memorySuggestList");box.innerHTML="";
+  if(!memorySuggestions.length){box.innerHTML='<div class="notice">No suitable non-sensitive memory suggestions were found in this chat.</div>';return}
+  memorySuggestions.forEach(function(item,i){
+    var card=document.createElement("label");card.className="promptcard";card.style.cursor="pointer";
+    var info=document.createElement("div"),h=document.createElement("h3"),p=document.createElement("p"),check=document.createElement("input");
+    check.type="checkbox";check.dataset.memoryIndex=String(i);check.style.marginTop="4px";
+    h.textContent=item.text||"Suggestion";p.textContent=item.reason||"Useful across future chats";
+    info.appendChild(h);info.appendChild(p);card.appendChild(info);card.appendChild(check);box.appendChild(card)
+  })
+}
+async function suggestMemoryFromChat(){
+  if(!isConnected()){openSettings();return toast("Connect OpenRouter first")}
+  var c=ensure(),material=(c.messages||[]).filter(function(m){return m.role==="user"}).slice(-30).map(function(m){return String(m.content||"")}).join("\\n\\n").slice(0,50000);
+  if(!material.trim())return toast("This chat does not have enough user text to analyze");
+  openModal("#memorySuggestModal");q("#memorySuggestList").innerHTML='<div class="notice">Analyzing this chat for safe memory suggestions…</div>';memorySuggestions=[];
+  try{
+    var schema={type:"object",properties:{suggestions:{type:"array",maxItems:8,items:{type:"object",properties:{text:{type:"string"},reason:{type:"string"}},required:["text","reason"],additionalProperties:false}}},required:["suggestions"],additionalProperties:false};
+    var body={model:settings.reviewModel||"openrouter/auto",messages:[
+      {role:"system",content:"Extract only explicit, durable, non-sensitive user preferences, recurring instructions, or stable project/workflow preferences that could help in future chats. Do not infer traits. EXCLUDE all health or medical information, political views or affiliations, religion, race or ethnicity, sexuality or sex life, precise address/location, passwords, API keys, authentication information, financial/account/ID numbers, private secrets, criminal history, and anything about other people's sensitive data. If uncertain, omit it. Return only the requested structured JSON."},
+      {role:"user",content:material}
+    ],temperature:0,response_format:{type:"json_schema",json_schema:{name:"memory_suggestions",strict:true,schema:schema}},provider:{require_parameters:true},stream:false,max_tokens:1200};
+    var rr=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
+    var j=await rr.json();
+    if(!rr.ok&&[400,422].indexOf(rr.status)>=0){
+      delete body.response_format;delete body.provider;body.messages[0].content+=" Return minified JSON with a suggestions array containing objects with text and reason.";
+      rr=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});j=await rr.json()
+    }
+    if(!rr.ok)throw new Error(errorText(j,"Memory analysis failed"));
+    var msg=j.choices&&j.choices[0]&&j.choices[0].message||{},holder={content:"",images:[]};collectOutputContent(msg.content,holder);
+    var raw=String(holder.content||"").trim().replace(/^\`\`\`(?:json)?\s*/i,"").replace(/\s*\`\`\`$/,""),parsed=JSON.parse(raw);
+    memorySuggestions=Array.isArray(parsed.suggestions)?parsed.suggestions.filter(function(x){return x&&x.text}).slice(0,8):[];
+    renderMemorySuggestions()
+  }catch(e){q("#memorySuggestList").innerHTML='<div class="notice">Memory analysis failed: '+escapeHTML(e.message)+'</div>'}
+}
+function addSelectedMemorySuggestions(){
+  var chosen=qa('#memorySuggestList input[type="checkbox"]:checked').map(function(x){return memorySuggestions[Number(x.dataset.memoryIndex)]}).filter(Boolean);
+  if(!chosen.length)return toast("Select at least one suggestion");
+  var existing=String(settings.memory||"").trim(),lines=chosen.map(function(x){return "- "+String(x.text||"").trim()}).filter(Boolean);
+  settings.memory=(existing+(existing?"\\n":"")+lines.join("\\n")).slice(0,50000);save();q("#localMemory").value=settings.memory;closeModals();toast("Added "+chosen.length+" memory suggestion"+(chosen.length===1?"":"s"))
+}
+
 function openMessageEditor(idx){
   var c=ensure(),m=c.messages[idx];if(!m||m.role!=="assistant")return;
   editMessageIndex=idx;q("#messageEditText").value=m.content||"";
@@ -4003,6 +4057,9 @@ q("#artifactOpen").onclick=function(){
 };
 
 // Paste and drag/drop attachments.
+q("#suggestMemoryBtn").onclick=suggestMemoryFromChat;
+q("#rerunMemorySuggestions").onclick=suggestMemoryFromChat;
+q("#addMemorySuggestions").onclick=addSelectedMemorySuggestions;
 q("#schemaExampleBtn").onclick=function(){
   q("#jsonSchemaName").value="answer_with_confidence";
   q("#jsonSchemaText").value=JSON.stringify({type:"object",properties:{answer:{type:"string"},confidence:{type:"number",description:"Confidence from 0 to 1"}},required:["answer","confidence"],additionalProperties:false},null,2)
