@@ -1,0 +1,19 @@
+{
+  "name": "NoLimit AI",
+  "short_name": "NoLimit AI",
+  "description": "Responsive multi-model AI client powered by OpenRouter.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#171716",
+  "theme_color": "#171716",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
