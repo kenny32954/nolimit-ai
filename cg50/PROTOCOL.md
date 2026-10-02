@@ -1,6 +1,6 @@
-# Quantum Breaks AI - CG50 serial protocol v0.1
+# Quantum Breaks AI - CG50 serial protocol v0.2
 
-This protocol connects the future native fx-CG50 add-in to the desktop bridge.
+This protocol connects the native fx-CG50 add-in to the desktop bridge.
 
 ## Link settings
 
@@ -11,19 +11,66 @@ This protocol connects the future native fx-CG50 add-in to the desktop bridge.
 - line-delimited ASCII transport
 - message text is UTF-8 encoded, then Base64 encoded for transport safety
 
-The fx-CG50 exposes a 3-pin serial port. Community-tested CG50 add-ins can access Casio's serial syscalls; a 115200 baud mode is represented by baud selector 9 in the serial configuration. The native add-in will use this path rather than relying on the restricted built-in MicroPython environment.
+## Subject-aware request
 
-## Request
+```text
+Q:<request-id>:<subject>:<mode>:<base64(prompt)>\n
+```
+
+Example:
+
+```text
+Q:42:physics:steps:<base64 of "A 2 kg object accelerates at 3 m/s^2. Find force.">
+```
+
+Supported subject identifiers:
+
+```text
+auto
+math
+algebra
+geometry
+statistics
+calculus
+biology
+chemistry
+physics
+earth
+ela
+literature
+writing
+history
+government
+economics
+business
+computer_science
+language
+health
+```
+
+`auto` lets the desktop bridge detect the subject from the prompt.
+
+Supported tutor modes:
+
+```text
+answer
+explain
+steps
+check
+quiz
+summary
+flashcards
+```
+
+## Legacy request
+
+Protocol v0.1 requests remain accepted:
 
 ```text
 Q:<request-id>:<base64(prompt)>\n
 ```
 
-Example logical payload before Base64:
-
-```text
-Explain why the sky is blue.
-```
+The bridge treats these as `subject=auto` and `mode=explain`.
 
 ## Response chunks
 
@@ -41,8 +88,6 @@ A:<request-id>:<sequence>:<done>:<base64(chunk)>\n
 E:<request-id>:<base64(error message)>\n
 ```
 
-## Design goals
+## Why the protocol stays small
 
-The protocol is intentionally tiny so the calculator side can parse it without a JSON library. Base64 avoids delimiter collisions and lets responses contain newlines and punctuation safely.
-
-The desktop bridge is provider-agnostic at the transport layer. The current bridge implementation accepts an OpenAI-compatible chat-completions endpoint through environment variables.
+The calculator should not need a JSON parser just to talk to the bridge. Short colon-delimited metadata plus Base64 keeps parsing predictable and leaves most intelligence on the PC/server side.
