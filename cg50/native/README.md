@@ -21,6 +21,7 @@ The native client now has the first complete live-chat path implemented in sourc
 - answer-focus view
 - per-subject offline quick-reference cards
 - connection diagnostics screen with serial/link state
+- local recent-turn history for the last four completed answers
 - timeout, cancel, and retry behavior
 - local answer-size protection
 
@@ -38,6 +39,7 @@ The bridge and native C code are automatically syntax/protocol checked in GitHub
 - **F6** - retry the current question
 - **EXE** - write a new question
 - **UP/DOWN** - scroll answer
+- **LEFT/RIGHT** - browse recent completed questions/answers
 - **EXIT** - cancel a local wait, leave answer focus, or quit
 
 ### Prompt editor
