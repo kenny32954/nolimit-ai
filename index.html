@@ -328,6 +328,8 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
   .top{padding-left:7px;padding-right:7px}.title{font-size:15px}
   .quickgrid{grid-template-columns:1fr}
 }
+.recoverywarn{margin:10px 0;padding:9px 11px;border-radius:11px;border:1px solid rgba(232,137,137,.18);background:rgba(232,137,137,.055);color:#dba1a1;font-size:11px;line-height:1.45}
+.perfbit{color:#77737b}
 </style>
 </head>
 <body>
@@ -474,11 +476,11 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <h3>AI quality</h3>
 <ul><li>Per-chat model locks, chat-specific instructions, reasoning and temperature overrides now work alongside project and global defaults.</li><li>Strict JSON Schema output, second-pass AI review, review-driven revision, comparison synthesis, and automatic long-chat summarization remain available.</li><li>Model selection can now learn from your own local 👍/👎 ratings and pick the best-rated compatible model.</li></ul>
 <h3>Reliability</h3>
-<ul><li>Oversized requests are stopped before they hit a model context limit, with the draft and attachments restored automatically.</li><li>Transient 429/502/503/504 API failures now get a bounded retry sequence with Retry-After support before falling back to a visible error.</li><li>A configurable network-stall watchdog can abort requests that stop returning data instead of hanging forever.</li><li>Per-request and daily tracked-spend warnings help catch unexpectedly expensive calls before sending.</li></ul>
+<ul><li>Interrupted streams now preserve any answer text already received instead of replacing useful partial output with an error message.</li><li>Failed, cancelled, or stalled replies expose clearer recovery state and one-click retry/continue controls.</li><li>Transient 429/502/503/504 API failures use bounded retries with Retry-After support, while the network-stall watchdog still prevents indefinite hangs.</li><li>Per-request and daily tracked-spend warnings help catch unexpectedly expensive calls before sending.</li></ul>
 <h3>Workspace</h3>
 <ul><li>Conversation branch lineage shows parent/child forks and lets you jump across alternate paths.</li><li>Conversation Tasks adds a persistent per-chat to-do board with optional AI task extraction.</li><li>Clear Messages now creates an automatic restore snapshot first, and Copy Conversation exports the current chat as readable plain text to your clipboard.</li><li>Tasks survive snapshots, branches, chat backups, and imports; media persistence, archives, trash, global search, and encrypted backups remain intact.</li></ul>
 <h3>Interface</h3>
-<ul><li>The prompt queue now has Pause/Resume, Run next, and Clear controls so multi-turn work can be staged without losing control.</li><li>Phone layouts now use tighter composer spacing, single-column quick actions, scrollable response controls, and larger usable modal space.</li><li>You can type the next prompt while a reply is streaming, queue it with Queue or Alt+Enter, and let Quantum Breaks AI continue automatically.</li><li>Keyboard-shortcut help, clickable conversation titles, live tab titles, optional background completion notifications, and expanded model sorting improve daily use.</li></ul>
+<ul><li>Response telemetry now records time-to-first-token and approximate output tokens per second, visible in response metadata and Details.</li><li>The prompt queue has Pause/Resume, Run next, and Clear controls, while phone layouts keep response controls horizontally scrollable instead of cramming them into multiple rows.</li><li>Keyboard-shortcut help, clickable conversation titles, live tab titles, optional background completion notifications, and expanded model sorting improve daily use.</li></ul>
 </div>
 </section>
 
@@ -954,7 +956,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="2.7.0";
+var APP_VERSION="2.8.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1477,6 +1479,9 @@ function renderChat(){
         if(m.finishReason==="length"||m.finishReason==="max_tokens"){
           var fw=document.createElement("div");fw.className="finishwarn";fw.textContent="This response reached its output limit. Use Continue to finish from where it stopped.";a.appendChild(fw)
         }
+        if(m.errorMessage){
+          var ew=document.createElement("div");ew.className="recoverywarn";ew.textContent=(m.finishReason==="cancelled"?"Generation stopped: ":"Stream interrupted: ")+m.errorMessage+" Your partial response was preserved.";a.appendChild(ew)
+        }
         if(Array.isArray(m.toolCalls)&&m.toolCalls.length){
           var ta=document.createElement("details");ta.className="toolactivity";var ts=document.createElement("summary"),tb=document.createElement("div");tb.className="toolactivityBody";
           var names=m.toolCalls.map(function(x){return x&&x.function&&x.function.name?x.function.name:(x&&x.type?x.type:"tool")});ts.textContent="Tool activity · "+names.join(", ");
@@ -1514,7 +1519,8 @@ function renderChat(){
         var rd=document.createElement("button");rd.textContent="Read";rd.onclick=function(){speak(m.content||"")};
         var av=document.createElement("button");av.textContent="AI Voice";av.onclick=function(){openVoice(m.content||"")};
         var rg=document.createElement("button");rg.textContent="Regenerate";rg.onclick=function(){regenerate(idx)};
-        var ct=document.createElement("button");ct.textContent="Continue";if(m.finishReason==="length"||m.finishReason==="max_tokens")ct.className="continuehot";ct.onclick=function(){continueResponse(idx)};
+        var retry=document.createElement("button");retry.textContent="Retry";retry.className=(m.error||m.errorMessage)?"continuehot":"hidden";retry.title="Retry from the original user request";retry.onclick=function(){regenerate(idx)};
+        var ct=document.createElement("button");ct.textContent="Continue";if(m.finishReason==="length"||m.finishReason==="max_tokens"||m.finishReason==="cancelled"||m.finishReason==="stalled"||m.finishReason==="error")ct.className="continuehot";ct.onclick=function(){continueResponse(idx)};
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
         var cm=document.createElement("button");cm.textContent="Compare";cm.onclick=function(){compareFromMessage(idx)};
         var vr=document.createElement("button");vr.textContent="Review";vr.onclick=function(){reviewMessageAt(idx)};
@@ -1523,8 +1529,8 @@ function renderChat(){
         var down=document.createElement("button");down.textContent="👎";down.title="Not helpful";down.className="ratingbtn"+(m.rating===-1?" on":"");down.onclick=function(){rateMessage(idx,-1)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
-        tools.appendChild(cp);tools.appendChild(srcs);tools.appendChild(eda);tools.appendChild(sv);tools.appendChild(vers);tools.appendChild(dt);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(fq);tools.appendChild(up);tools.appendChild(down);tools.appendChild(bm);tools.appendChild(pin);
-        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");var sourceCount=citationLinks(m.annotations).length;if(sourceCount)bits.push(sourceCount+" source"+(sourceCount===1?"":"s"));if(m.revisionNote)bits.push(m.revisionNote);if(m.editedByUser)bits.push("locally edited");if(m.finishReason&&m.finishReason!=="stop")bits.push("finish "+m.finishReason);if(m.cacheStatus)bits.push("cache "+String(m.cacheStatus).toLowerCase()+(m.cacheAge?" "+m.cacheAge+"s":""));if(m.contextTrimmed)bits.push("fit -"+m.contextTrimmed+" msgs");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
+        tools.appendChild(cp);tools.appendChild(srcs);tools.appendChild(eda);tools.appendChild(sv);tools.appendChild(vers);tools.appendChild(dt);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(retry);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(fq);tools.appendChild(up);tools.appendChild(down);tools.appendChild(bm);tools.appendChild(pin);
+        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");if(m.started&&m.firstTokenAt)bits.push("TTFT "+((m.firstTokenAt-m.started)/1000).toFixed(2)+"s");var perfTokens=m.usage&&(m.usage.completion_tokens!=null?m.usage.completion_tokens:m.usage.output_tokens),perfSeconds=m.firstTokenAt&&m.finished?(m.finished-m.firstTokenAt)/1000:0;if(perfTokens!=null&&perfSeconds>.05)bits.push((Number(perfTokens)/perfSeconds).toFixed(1)+" tok/s");var sourceCount=citationLinks(m.annotations).length;if(sourceCount)bits.push(sourceCount+" source"+(sourceCount===1?"":"s"));if(m.revisionNote)bits.push(m.revisionNote);if(m.editedByUser)bits.push("locally edited");if(m.finishReason&&m.finishReason!=="stop")bits.push("finish "+m.finishReason);if(m.cacheStatus)bits.push("cache "+String(m.cacheStatus).toLowerCase()+(m.cacheAge?" "+m.cacheAge+"s":""));if(m.contextTrimmed)bits.push("fit -"+m.contextTrimmed+" msgs");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
     })
@@ -2333,7 +2339,12 @@ function applyStreamPayload(raw,a){
   var j=JSON.parse(raw);
   if(j.error)throw new Error(errorText(j,"Streaming request failed"));
   var ch=j.choices&&j.choices[0];
-  if(ch&&ch.delta)addDelta(ch.delta,a);
+  if(ch&&ch.delta){
+    var beforeDeltaChars=String(a.content||"").length+String(a.reasoning||"").length;
+    addDelta(ch.delta,a);
+    var afterDeltaChars=String(a.content||"").length+String(a.reasoning||"").length;
+    if(!a.firstTokenAt&&afterDeltaChars>beforeDeltaChars)a.firstTokenAt=Date.now()
+  }
   if(ch&&ch.finish_reason)a.finishReason=ch.finish_reason;
   if(j.usage){a.usage=j.usage;if(j.usage.cost!=null)a.cost=j.usage.cost}
   if(j.cost!=null)a.cost=j.cost;
@@ -2754,9 +2765,19 @@ async function send(){
     a.finished=Date.now();requestSucceeded=true;save()
   }catch(e){
     if(e.name==="AbortError")requestAborted=true;
-    if(e.name==="AbortError"&&stalled){a.content="Request stopped because no response data arrived for "+stallSeconds+" seconds. You can retry, choose another model, or increase the Network stall timeout in Settings.";a.error=true;a.finished=Date.now()}
-    else if(e.name!=="AbortError"){a.content="Request failed: "+e.message;a.error=true}
-    else if(!a.content)c.messages.pop();
+    var recoveryMessage="";
+    if(e.name==="AbortError"&&stalled){
+      recoveryMessage="No response data arrived for "+stallSeconds+" seconds. Retry, continue from the partial answer, choose another model, or increase the Network stall timeout in Settings.";
+      if(a.content){a.errorMessage=recoveryMessage;a.finishReason="stalled";a.finished=Date.now()}
+      else{a.content="Request stopped because "+recoveryMessage;a.error=true;a.finishReason="stalled";a.finished=Date.now()}
+    }else if(e.name!=="AbortError"){
+      recoveryMessage=e.message||"Unknown request error";
+      if(a.content){a.errorMessage=recoveryMessage;a.finishReason="error";a.finished=Date.now()}
+      else{a.content="Request failed: "+recoveryMessage;a.error=true;a.finishReason="error";a.finished=Date.now()}
+    }else if(a.content){
+      a.errorMessage="The response was stopped before the model finished.";
+      a.finishReason="cancelled";a.finished=Date.now()
+    }else c.messages.pop();
     save()
   }finally{
     if(stallTimer)clearTimeout(stallTimer);
@@ -2772,7 +2793,7 @@ async function send(){
 function finishBuffered(j,a){
   var choice=j.choices&&j.choices[0],m=choice&&choice.message;
   if(m){
-    a.content="";collectOutputContent(m.content,a);
+    a.content="";collectOutputContent(m.content,a);if(!a.firstTokenAt&&a.content)a.firstTokenAt=Date.now();
     a.reasoning=m.reasoning||"";
     a.reasoning_details=m.reasoning_details;
     a.annotations=mergeAnnotations(a.annotations,m.annotations);
@@ -3600,7 +3621,7 @@ function restoreMessageOriginal(){
 
 function openMessageDetails(idx){
   var c=ensure(),m=c.messages[idx];if(!m||m.role!=="assistant")return;
-  var u=m.usage||{},rows=[
+  var u=m.usage||{},completionTokens=u.completion_tokens!=null?u.completion_tokens:(u.output_tokens!=null?u.output_tokens:null),generationSeconds=m.firstTokenAt&&m.finished?(m.finished-m.firstTokenAt)/1000:0,throughput=completionTokens!=null&&generationSeconds>.05?(Number(completionTokens)/generationSeconds):null,rows=[
     ["Model",m.model||effectiveModel(c)],
     ["Finish reason",m.finishReason||"—"],
     ["Prompt tokens",u.prompt_tokens!=null?u.prompt_tokens:(u.input_tokens!=null?u.input_tokens:"—")],
@@ -3608,6 +3629,8 @@ function openMessageDetails(idx){
     ["Total tokens",u.total_tokens!=null?u.total_tokens:"—"],
     ["Tracked cost",m.cost!=null?money(m.cost):"—"],
     ["Duration",m.started&&m.finished?((m.finished-m.started)/1000).toFixed(2)+"s":"—"],
+    ["Time to first token",m.started&&m.firstTokenAt?((m.firstTokenAt-m.started)/1000).toFixed(2)+"s":"—"],
+    ["Output throughput",throughput!=null?throughput.toFixed(1)+" tokens/s":"—"],
     ["Context trimmed",m.contextTrimmed?m.contextTrimmed+" messages":"None"],
     ["Cache",m.cacheStatus?(m.cacheStatus+(m.cacheAge?" · "+m.cacheAge+"s old":"")):"—"],
     ["Citations",citationLinks(m.annotations).length],
@@ -3617,7 +3640,7 @@ function openMessageDetails(idx){
     ["Locally edited",m.editedByUser?"Yes":"No"]
   ],grid=q("#messageDetailsGrid");grid.innerHTML="";
   rows.forEach(function(x){var d=document.createElement("div");d.className="diagcard";var s=document.createElement("span");s.textContent=x[0];var b=document.createElement("b");b.textContent=String(x[1]);d.appendChild(s);d.appendChild(b);grid.appendChild(d)});
-  q("#messageDetailsRaw").textContent=JSON.stringify({usage:u,cost:m.cost,model:m.model,finishReason:m.finishReason,cacheStatus:m.cacheStatus,cacheAge:m.cacheAge,cacheTTL:m.cacheTTL,contextTrimmed:m.contextTrimmed,toolCalls:m.toolCalls||[],review:m.review||null},null,2);
+  q("#messageDetailsRaw").textContent=JSON.stringify({usage:u,cost:m.cost,model:m.model,finishReason:m.finishReason,errorMessage:m.errorMessage||null,started:m.started||null,firstTokenAt:m.firstTokenAt||null,finished:m.finished||null,throughputTokensPerSecond:throughput,cacheStatus:m.cacheStatus,cacheAge:m.cacheAge,cacheTTL:m.cacheTTL,contextTrimmed:m.contextTrimmed,toolCalls:m.toolCalls||[],review:m.review||null},null,2);
   openModal("#messageDetailsModal")
 }
 
