@@ -634,7 +634,14 @@ function renderCitations(parent,annotations){
 function renderChat(){
   var c=ensure(),box=q("#chat");box.innerHTML="";
   if(!c.messages.length){
-    box.innerHTML='<div class="welcome"><div class="logo"></div><h1>How can I help?</h1><p>Chat across OpenRouter models, attach images and PDFs, research the web, transcribe audio, and generate images.</p></div>'
+    box.innerHTML='<div class="welcome"><div class="logo"></div><h1>Build, research, create.</h1><p>One workspace for multi-model chat, web research, files, images, audio, video, code, and projects.</p><div class="quickgrid"><button class="quickcard" data-quick="research"><b>Research the web</b><span>Search, read pages, and cite sources</span></button><button class="quickcard" data-quick="build"><b>Build something</b><span>Generate code and preview artifacts</span></button><button class="quickcard" data-quick="image"><b>Create an image</b><span>Open the image studio</span></button><button class="quickcard" data-quick="compare"><b>Compare models</b><span>Run the same prompt across models</span></button></div></div>';
+    qa(".quickcard").forEach(function(b){b.onclick=function(){
+      var a=b.getAttribute("data-quick");
+      if(a==="research"){settings.web=true;settings.fetch=true;save();render();q("#prompt").value="Research ";q("#prompt").focus()}
+      else if(a==="build"){q("#prompt").value="Build me ";q("#prompt").focus()}
+      else if(a==="image")openImage();
+      else if(a==="compare")openCompare()
+    }})
   }else{
     c.messages.forEach(function(m,idx){
       if(m.role==="user"){
@@ -682,12 +689,87 @@ function renderPending(){
   })
 }
 
+
+var COMMANDS=[
+  {name:"New chat",hint:"Ctrl/Cmd+N",run:newChat},
+  {name:"Choose model",hint:"Ctrl/Cmd+K",run:loadModels},
+  {name:"Research mode",hint:"Web + page reading",run:toggleResearch},
+  {name:"Create image",hint:"Image studio",run:openImage},
+  {name:"Create video",hint:"Video studio",run:openVideo},
+  {name:"Compare models",hint:"Side by side",run:openCompare},
+  {name:"Projects",hint:"Local workspaces",run:openProjects},
+  {name:"Usage dashboard",hint:"OpenRouter key usage",run:openUsage},
+  {name:"Diagnostics",hint:"Health check",run:openDiagnostics},
+  {name:"Settings",hint:"Appearance + API",run:openSettings},
+  {name:"Toggle temporary chat",hint:"Do not persist after reload",run:function(){var c=ensure();c.temporary=!c.temporary;save();render()}},
+  {name:"Export Markdown",hint:"Current chat",run:exportChat},
+  {name:"Backup chat",hint:"JSON backup",run:backupChat}
+];
+
+function renderCommandPalette(){
+  var term=(q("#commandSearch").value||"").toLowerCase(),box=q("#commandList");box.innerHTML="";
+  COMMANDS.filter(function(x){return !term||(x.name+" "+x.hint).toLowerCase().includes(term)}).forEach(function(x){
+    var b=document.createElement("button");b.className="commandItem";
+    var left=document.createElement("span");left.textContent=x.name;
+    var right=document.createElement("small");right.textContent=x.hint||"";
+    b.appendChild(left);b.appendChild(right);b.onclick=function(){closeModals();x.run()};
+    box.appendChild(b)
+  })
+}
+
+function openCommandPalette(){
+  q("#commandSearch").value="";renderCommandPalette();openModal("#commandModal");
+  setTimeout(function(){q("#commandSearch").focus()},30)
+}
+
+var lastDiagReport="";
+async function runDiagnostics(){
+  var cards=[],issues=[];
+  function add(k,v){cards.push([k,v])}
+  add("Online",navigator.onLine?"Yes":"No");
+  add("Origin",location.protocol+"//"+location.host);
+  add("API key",isConnected()?"Connected":"Not connected");
+  add("Service worker","serviceWorker" in navigator?"Supported":"Unavailable");
+  add("Microphone",navigator.mediaDevices&&navigator.mediaDevices.getUserMedia?"Supported":"Unavailable");
+  add("Web Share",navigator.share?"Supported":"Unavailable");
+  add("Storage",Math.round(new Blob([localStorage.getItem(STORE)||""]).size/1024)+" KB chats");
+  add("Model",settings.model);
+  if(location.protocol!=="https:")issues.push("App is not running over HTTPS.");
+  if(!navigator.onLine)issues.push("Browser reports that it is offline.");
+  if(isConnected()){
+    try{
+      var kr=await fetch(BASE+"/key",{headers:{Authorization:"Bearer "+getKey()}});
+      if(kr.ok){var kj=await kr.json();add("OpenRouter","Reachable");if(kj.data&&kj.data.limit_remaining!=null)add("Remaining",money(kj.data.limit_remaining))}
+      else{add("OpenRouter","HTTP "+kr.status);issues.push("OpenRouter key check returned HTTP "+kr.status+".")}
+    }catch(e){add("OpenRouter","Unreachable");issues.push("OpenRouter could not be reached from this browser.")}
+  }
+  var grid=q("#diagGrid");grid.innerHTML="";
+  cards.forEach(function(x){var d=document.createElement("div");d.className="diagcard";var s=document.createElement("span");s.textContent=x[0];var b=document.createElement("b");b.textContent=x[1];d.appendChild(s);d.appendChild(b);grid.appendChild(d)});
+  q("#diagSummary").textContent=issues.length?issues.join(" "):"Everything checked looks healthy.";
+  lastDiagReport=cards.map(function(x){return x[0]+": "+x[1]}).join("\n")+(issues.length?"\nIssues: "+issues.join(" "):"");
+}
+
+function openDiagnostics(){
+  openModal("#diagnosticsModal");runDiagnostics()
+}
+
+function resizePrompt(){
+  var p=q("#prompt");p.style.height="auto";p.style.height=Math.min(180,Math.max(64,p.scrollHeight))+"px"
+}
+function updateScrollButton(){
+  var box=q("#chat"),distance=box.scrollHeight-box.scrollTop-box.clientHeight;
+  q("#scrollBottom").classList.toggle("show",distance>420)
+}
+
 function openSettings(){
   q("#authNotice").innerHTML=isConnected()?"<strong>Connected.</strong> Your key is stored only in this browser for this site.":"Connect through OpenRouter OAuth or paste your own OpenRouter API key locally.";
   q("#connectNow").classList.toggle("hidden",isConnected());
   q("#manualKeyBtn").classList.toggle("hidden",isConnected());
   q("#disconnectNow").classList.toggle("hidden",!isConnected());
   q("#manualKeyField").classList.add("hidden");
+  q("#themeSelect").value=settings.theme||"dark";
+  q("#accentSelect").value=settings.accent||"coral";
+  q("#densitySelect").value=settings.density||"cozy";
   q("#systemPrompt").value=settings.system;
   q("#localMemory").value=settings.memory||"";
   q("#temperature").value=settings.temperature;
@@ -1473,6 +1555,8 @@ q("#prompt").onkeydown=function(e){
   if(!e.shiftKey&&innerWidth>700){e.preventDefault();send()}
 };
 q("#topAuth").onclick=q("#sideAuth").onclick=q("#settingsBtn").onclick=openSettings;
+q("#commandBtn").onclick=openCommandPalette;
+q("#diagnosticsSide").onclick=openDiagnostics;
 q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
 q("#compareSide").onclick=openCompare;
 q("#usageSide").onclick=openUsage;
@@ -1517,8 +1601,11 @@ q("#importWorkspaceBtn").onclick=function(){q("#importWorkspaceFile").click()};
 q("#importWorkspaceFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importWorkspace(f);e.target.value=""};
 q("#saveSettings").onclick=function(){
   var mk=q("#manualKey").value.trim();if(mk){localStorage.setItem(KEYSTORE,mk);q("#manualKey").value=""}
-  settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
+  settings.theme=q("#themeSelect").value;settings.accent=q("#accentSelect").value;settings.density=q("#densitySelect").value;settings.system=q("#systemPrompt").value;settings.memory=q("#localMemory").value;settings.temperature=Math.max(0,Math.min(2,Number(q("#temperature").value)||0));settings.reasoning=q("#reasoning").value;settings.advisorModel=q("#advisorModel").value.trim()||"~anthropic/claude-opus-latest";settings.fallbackModel=q("#fallbackModel").value.trim();settings.providerRouting=q("#providerRouting").value;settings.responseFormat=q("#responseFormat").value;settings.maxTokens=Math.max(0,Math.floor(Number(q("#maxTokens").value)||0));settings.historyLimit=Math.max(0,Math.floor(Number(q("#historyLimit").value)||0));settings.denyDataCollection=q("#denyDataCollection").checked;settings.cache=q("#cacheEnabled").checked;settings.autoSpeak=q("#autoSpeak").checked;save();closeModals();render();toast("Settings saved")
 };
+q("#commandSearch").oninput=renderCommandPalette;
+q("#runDiagnostics").onclick=runDiagnostics;
+q("#copyDiagnostics").onclick=function(){navigator.clipboard.writeText(lastDiagReport||"No diagnostics run yet.").then(function(){toast("Diagnostics copied")})};
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
 q("#projectSelect").onchange=function(){loadProjectFields(q("#projectSelect").value)};
@@ -1557,6 +1644,9 @@ q("#artifactOpen").onclick=function(){
 };
 
 // Paste and drag/drop attachments.
+q("#prompt").addEventListener("input",resizePrompt);
+q("#chat").addEventListener("scroll",updateScrollButton,{passive:true});
+q("#scrollBottom").onclick=function(){q("#chat").scrollTo({top:q("#chat").scrollHeight,behavior:"smooth"})};
 q("#prompt").addEventListener("paste",function(e){
   var files=[];
   if(e.clipboardData&&e.clipboardData.items){
@@ -1573,6 +1663,7 @@ document.addEventListener("keydown",function(e){
   var mod=e.ctrlKey||e.metaKey;
   if(e.key==="Escape"){closeModals();closeSide()}
   if(mod&&e.key.toLowerCase()==="k"){e.preventDefault();loadModels()}
+  if(mod&&e.key.toLowerCase()==="p"){e.preventDefault();openCommandPalette()}
   if(mod&&e.key.toLowerCase()==="n"){e.preventDefault();newChat()}
   if(!mod&&!e.altKey&&e.key==="/"&&document.activeElement!==q("#prompt")&&document.activeElement&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();q("#prompt").focus();q("#prompt").value="/"}
 });
