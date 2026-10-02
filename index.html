@@ -297,6 +297,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="sbtn" id="snapshotsSide">Snapshots</button>
 <button class="sbtn" id="globalSearchSide">Search everything</button>
 <button class="sbtn" id="findSide">Find in chat</button>
+<button class="sbtn" id="outlineSide">Conversation outline</button>
 <button class="sbtn" id="bookmarksSide">Bookmarks</button>
 <button class="sbtn" id="archiveSide">Archived</button>
 <button class="sbtn" id="trashSide">Trash</button></div>
@@ -517,6 +518,13 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div id="trashList" class="searchresults"></div>
 <div style="height:12px"></div>
 <button class="danger" id="emptyTrash">Empty trash</button>
+</section>
+
+<section class="modal" id="outlineModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>Conversation outline</h2>
+<div class="notice">Jump through long conversations without scrolling manually.</div>
+<div id="outlineList" class="searchresults"></div>
 </section>
 
 <section class="modal" id="globalSearchModal">
@@ -1193,9 +1201,10 @@ function renderChat(){
         var ct=document.createElement("button");ct.textContent="Continue";ct.onclick=function(){continueResponse(idx)};
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
         var cm=document.createElement("button");cm.textContent="Compare";cm.onclick=function(){compareFromMessage(idx)};
+        var vr=document.createElement("button");vr.textContent="Review";vr.onclick=function(){reviewMessageAt(idx)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
-        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(bm);tools.appendChild(pin);
+        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(bm);tools.appendChild(pin);
         var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
@@ -1214,6 +1223,30 @@ function renderChat(){
   requestAnimationFrame(function(){if(stickToBottom)box.scrollTop=box.scrollHeight;updateScrollButton()})
 }
 
+
+function renderOutline(){
+  var c=ensure(),box=q("#outlineList");box.innerHTML="";
+  if(!c.messages.length){box.innerHTML='<div class="notice">This conversation is empty.</div>';return}
+  c.messages.forEach(function(m,idx){
+    var b=document.createElement("button");b.className="searchresult";
+    var h=document.createElement("b"),s=document.createElement("span"),marks=[];
+    if(m.bookmarked)marks.push("★");if(m.contextPinned)marks.push("📌");
+    h.textContent=(m.role==="user"?"You":"Quantum Breaks AI")+(marks.length?" · "+marks.join(" "):"");
+    var snippet=String(m.content||"").replace(/\s+/g," ").trim();
+    s.textContent=(idx+1)+". "+(snippet||((m.fileNames||[]).length?"Attachment message":"(empty)")).slice(0,190);
+    b.appendChild(h);b.appendChild(s);b.onclick=function(){jumpToMessage(c.id,idx)};box.appendChild(b)
+  })
+}
+function openOutline(){openModal("#outlineModal");renderOutline()}
+
+async function reviewMessageAt(idx){
+  var c=ensure(),a=c.messages[idx];if(!a||a.role!=="assistant"||!a.content)return;
+  var u=idx-1;while(u>=0&&c.messages[u].role!=="user")u--;
+  if(u<0)return toast("No user request found for this answer");
+  if(!isConnected()){openSettings();return toast("Connect OpenRouter first")}
+  if(a.reviewing)return toast("Review already in progress");
+  await reviewAnswer(c,c.messages[u].content,a)
+}
 
 function globalSearch(){
   var term=(q("#globalSearchInput").value||"").trim().toLowerCase(),box=q("#globalSearchResults");box.innerHTML="";
@@ -1400,6 +1433,7 @@ var COMMANDS=[
   {name:"Conversation snapshots",hint:"Save or restore chat states",run:openSnapshots},
   {name:"Search everything",hint:"Chats, projects, prompts, profiles",run:openGlobalSearch},
   {name:"Find in chat",hint:"Search current conversation",run:openFindInChat},
+  {name:"Conversation outline",hint:"Jump through long chats",run:openOutline},
   {name:"Bookmarks",hint:"Saved messages",run:openBookmarks},
   {name:"Archived chats",hint:"Chats hidden from sidebar",run:openArchive},
   {name:"Usage dashboard",hint:"OpenRouter key usage",run:openUsage},
@@ -1801,7 +1835,7 @@ async function send(){
     }
     var r=await fetchChatWithFallback(body,headers,controller.signal);
     var reader=r.body&&r.body.getReader?r.body.getReader():null;
-    if(!reader){var j=await r.json();finishBuffered(j,a);save();render();return}
+    if(!reader){var j=await r.json();finishBuffered(j,a);a.finished=Date.now();save();render();return}
     var dec=new TextDecoder(),buf="";
     while(true){
       var z=await reader.read();if(z.done)break;buf+=dec.decode(z.value,{stream:true});var lines=buf.split("\n");buf=lines.pop();
@@ -2921,6 +2955,7 @@ q("#scratchpadSide").onclick=openScratchpad;
 q("#snapshotsSide").onclick=openSnapshots;
 q("#globalSearchSide").onclick=openGlobalSearch;
 q("#findSide").onclick=openFindInChat;
+q("#outlineSide").onclick=openOutline;
 q("#bookmarksSide").onclick=openBookmarks;
 q("#archiveSide").onclick=openArchive;
 q("#trashSide").onclick=openTrash;
