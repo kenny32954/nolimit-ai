@@ -25,24 +25,34 @@ class FakeSerial:
 
 
 class ProtocolTests(unittest.TestCase):
-    def test_handshake(self):
+    def test_v3_handshake(self):
         ser = FakeSerial()
-        qb_bridge.handle_line(ser, "H:QBAI:2")
-        self.assertEqual(ser.lines(), ["K:QBAI:2"])
+        qb_bridge.handle_line(ser, "H:QBAI:3")
+        self.assertEqual(ser.lines(), ["K:QBAI:3"])
 
-    def test_parse_v2_request(self):
+    def test_v3_college_request(self):
+        payload = base64.b64encode(
+            "Prove the sequence is Cauchy".encode()
+        ).decode()
+        req = qb_bridge.parse_request(
+            "Q:7:real_analysis:proof:advanced:" + payload
+        )
+        self.assertEqual(req["id"], "7")
+        self.assertEqual(req["subject"], "real_analysis")
+        self.assertEqual(req["mode"], "proof")
+        self.assertEqual(req["level"], "advanced")
+
+    def test_v2_request_compatibility(self):
         payload = base64.b64encode("solve 2x+4=10".encode()).decode()
         req = qb_bridge.parse_request("Q:7:algebra:steps:" + payload)
-        self.assertEqual(req["id"], "7")
-        self.assertEqual(req["subject"], "algebra")
-        self.assertEqual(req["mode"], "steps")
-        self.assertEqual(req["prompt"], "solve 2x+4=10")
+        self.assertEqual(req["level"], "auto")
 
     def test_parse_legacy_request(self):
         payload = base64.b64encode("hello".encode()).decode()
         req = qb_bridge.parse_request("Q:2:" + payload)
         self.assertEqual(req["subject"], "auto")
         self.assertEqual(req["mode"], "explain")
+        self.assertEqual(req["level"], "auto")
         self.assertEqual(req["prompt"], "hello")
 
     def test_utf8_chunking_does_not_split_characters(self):
