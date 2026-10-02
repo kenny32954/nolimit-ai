@@ -314,6 +314,20 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .queuechip .queueText:hover{color:var(--text);background:rgba(255,255,255,.035)}
 .queuechip .queueRemove{border:0;border-left:1px solid rgba(255,255,255,.06);background:transparent;color:var(--muted);padding:8px 10px;cursor:pointer}.queuechip .queueRemove:hover{color:var(--text);background:rgba(255,255,255,.04)}
 @media(max-width:520px){.queueSend{min-width:48px;padding:0 10px}.queuechip .queueText{max-width:68vw}}
+.queueControl{display:inline-flex;align-items:center;justify-content:center;flex:none;height:34px;padding:0 10px;border-radius:10px;border:1px solid rgba(255,255,255,.075);background:rgba(255,255,255,.035);color:var(--muted);font-size:11px;cursor:pointer}
+.queueControl:hover{color:var(--text);background:rgba(255,255,255,.065)}.queueControl.on{color:var(--accent2);border-color:color-mix(in srgb,var(--accent) 28%,transparent);background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
+@media(max-width:700px){
+  .chat{padding-left:12px!important;padding-right:12px!important;padding-bottom:250px}
+  .ub{max-width:94%}
+  .composeWrap{padding-left:8px;padding-right:8px}
+  .composer{border-radius:20px;padding-left:11px;padding-right:11px}
+  .leftTools{gap:3px}.tool{width:36px;height:36px}
+  .msgtools{opacity:1;overflow-x:auto;flex-wrap:nowrap;padding-bottom:3px;scrollbar-width:none}
+  .msgtools::-webkit-scrollbar{display:none}.msgtools button,.msgtools span{flex:none}
+  .modal{width:calc(100vw - 14px);max-height:90dvh;border-radius:20px;padding:16px}
+  .top{padding-left:7px;padding-right:7px}.title{font-size:15px}
+  .quickgrid{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -462,9 +476,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <h3>Reliability</h3>
 <ul><li>Oversized requests are stopped before they hit a model context limit, with the draft and attachments restored automatically.</li><li>Transient 429/502/503/504 API failures now get a bounded retry sequence with Retry-After support before falling back to a visible error.</li><li>A configurable network-stall watchdog can abort requests that stop returning data instead of hanging forever.</li><li>Per-request and daily tracked-spend warnings help catch unexpectedly expensive calls before sending.</li></ul>
 <h3>Workspace</h3>
-<ul><li>Conversation branch lineage shows parent/child forks and lets you jump across alternate paths.</li><li>Conversation Tasks adds a persistent per-chat to-do board with optional AI task extraction.</li><li>Tasks survive snapshots, branches, chat backups, and imports; media persistence, archives, trash, global search, and encrypted backups remain intact.</li></ul>
+<ul><li>Conversation branch lineage shows parent/child forks and lets you jump across alternate paths.</li><li>Conversation Tasks adds a persistent per-chat to-do board with optional AI task extraction.</li><li>Clear Messages now creates an automatic restore snapshot first, and Copy Conversation exports the current chat as readable plain text to your clipboard.</li><li>Tasks survive snapshots, branches, chat backups, and imports; media persistence, archives, trash, global search, and encrypted backups remain intact.</li></ul>
 <h3>Interface</h3>
-<ul><li>You can now type the next prompt while a reply is streaming, queue it with the new Queue button or Alt+Enter, and let Quantum Breaks AI continue into the next turn automatically.</li><li>Queued prompts stay attached to the conversation if a request is stopped or fails, and can be moved back into the composer or removed before they run.</li><li>Keyboard-shortcut help, clickable conversation titles, live tab titles, optional background completion notifications, and expanded model sorting improve daily use.</li></ul>
+<ul><li>The prompt queue now has Pause/Resume, Run next, and Clear controls so multi-turn work can be staged without losing control.</li><li>Phone layouts now use tighter composer spacing, single-column quick actions, scrollable response controls, and larger usable modal space.</li><li>You can type the next prompt while a reply is streaming, queue it with Queue or Alt+Enter, and let Quantum Breaks AI continue automatically.</li><li>Keyboard-shortcut help, clickable conversation titles, live tab titles, optional background completion notifications, and expanded model sorting improve daily use.</li></ul>
 </div>
 </section>
 
@@ -798,6 +812,8 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="secondary" id="branchesChat">Branches</button>
 <button class="secondary" id="resetChatOverrides">Reset AI overrides</button>
 <button class="secondary" id="duplicateChat">Duplicate</button>
+<button class="secondary" id="copyChatText">Copy conversation</button>
+<button class="danger" id="clearChatMessages">Clear messages</button>
 <button class="danger" id="deleteChat">Delete</button>
 </div>
 </section>
@@ -938,7 +954,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="2.6.0";
+var APP_VERSION="2.7.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1849,6 +1865,11 @@ function renderQueued(){
   box.innerHTML="";
   var arr=c&&Array.isArray(c.queuedPrompts)?c.queuedPrompts:[];
   box.classList.toggle("show",arr.length>0);
+  if(arr.length){
+    var pause=document.createElement("button");pause.className="queueControl"+(c.queuePaused?" on":"");pause.type="button";pause.textContent=c.queuePaused?"Resume":"Pause";pause.title=c.queuePaused?"Resume automatic queued turns":"Pause automatic queued turns";pause.onclick=toggleQueuePause;box.appendChild(pause);
+    var run=document.createElement("button");run.className="queueControl";run.type="button";run.textContent="Run next";run.title="Run the next queued prompt now";run.onclick=runQueuedNow;box.appendChild(run);
+    var clear=document.createElement("button");clear.className="queueControl";clear.type="button";clear.textContent="Clear";clear.title="Remove all queued prompts";clear.onclick=clearQueued;box.appendChild(clear)
+  }
   arr.slice(0,6).forEach(function(item,i){
     var chip=document.createElement("div");chip.className="queuechip";
     var use=document.createElement("button");use.className="queueText";use.type="button";
@@ -1869,6 +1890,23 @@ function renderQueued(){
     var extra=document.createElement("div");extra.className="filechip";extra.textContent="+"+(arr.length-6)+" more queued";box.appendChild(extra)
   }
 }
+function toggleQueuePause(){
+  var c=ensure(),arr=Array.isArray(c.queuedPrompts)?c.queuedPrompts:[];
+  if(!arr.length)return toast("Nothing is queued");
+  c.queuePaused=!c.queuePaused;c.updated=Date.now();save();renderQueued();toast(c.queuePaused?"Queued turns paused":"Queued turns resumed");
+  if(!c.queuePaused&&!busy)setTimeout(function(){runNextQueued(c)},120)
+}
+function runQueuedNow(){
+  var c=ensure(),arr=Array.isArray(c.queuedPrompts)?c.queuedPrompts:[];
+  if(!arr.length)return toast("Nothing is queued");
+  if(busy)return toast("The current response is still generating");
+  c.queuePaused=false;save();renderQueued();runNextQueued(c)
+}
+function clearQueued(){
+  var c=ensure(),arr=Array.isArray(c.queuedPrompts)?c.queuedPrompts:[];
+  if(!arr.length)return;
+  c.queuedPrompts=[];c.queuePaused=false;c.updated=Date.now();save();renderQueued();toast("Queued prompts cleared")
+}
 function queuePrompt(){
   var c=ensure(),text=q("#prompt").value.trim();
   if(!busy||c.id!==busyChatId)return toast("Queue is available while this conversation is generating");
@@ -1879,7 +1917,7 @@ function queuePrompt(){
   q("#prompt").value="";c.draft="";c.updated=Date.now();save();resizePrompt();renderQueued();toast("Queued for the next turn")
 }
 function runNextQueued(chat){
-  if(!chat||busy||!current()||current().id!==chat.id||pending.length)return;
+  if(!chat||busy||chat.queuePaused||!current()||current().id!==chat.id||pending.length)return;
   var arr=Array.isArray(chat.queuedPrompts)?chat.queuedPrompts:[];
   if(!arr.length)return;
   var item=arr.shift();q("#prompt").value=String(item.text||"");chat.draft=q("#prompt").value;save();resizePrompt();renderQueued();
@@ -2725,7 +2763,7 @@ async function send(){
     busy=false;busyChatId="";controller=null;render();if(settings.autoSpeak&&a.content&&!a.error)speak(a.content);
     if(a.content&&!a.error)notifyCompletedReply(c,a);
     if(settings.review&&a.content&&!a.error)reviewAnswer(c,m.content,a);
-    if(requestSucceeded&&!requestAborted&&Array.isArray(c.queuedPrompts)&&c.queuedPrompts.length){
+    if(requestSucceeded&&!requestAborted&&!c.queuePaused&&Array.isArray(c.queuedPrompts)&&c.queuedPrompts.length){
       setTimeout(function(){runNextQueued(c)},260)
     }
   }
@@ -3959,7 +3997,33 @@ function togglePinnedChat(){
 
 function duplicateManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
-  var copy=JSON.parse(JSON.stringify(c));copy.id=uid();copy.title=(c.title||"New chat")+" copy";copy.created=Date.now();copy.updated=Date.now();chats.unshift(copy);active=copy.id;save();closeModals();render();toast("Chat duplicated")
+  var copy=JSON.parse(JSON.stringify(c));copy.id=uid();copy.title=(c.title||"New chat")+" copy";copy.created=Date.now();copy.updated=Date.now();copy.queuedPrompts=[];copy.queuePaused=false;chats.unshift(copy);active=copy.id;save();closeModals();render();toast("Chat duplicated")
+}
+function plainConversationText(c){
+  var lines=["# "+(c.title||"Quantum Breaks AI conversation"),""];
+  (c.messages||[]).forEach(function(m){
+    lines.push((m.role==="user"?"You":"Quantum Breaks AI")+":");
+    lines.push(String(m.content||"").trim()||"(attachment or empty message)");
+    if(m.fileNames&&m.fileNames.length)lines.push("Attachments: "+m.fileNames.join(", "));
+    lines.push("")
+  });
+  return lines.join("\n").trim()
+}
+function copyManagedChatText(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  var text=plainConversationText(c);if(!(c.messages||[]).length)return toast("This conversation is empty");
+  navigator.clipboard.writeText(text).then(function(){toast("Conversation copied")}).catch(function(){toast("Clipboard access was not available")})
+}
+function clearManagedChatMessages(){
+  var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
+  if(busy&&busyChatId===c.id)return toast("Stop the current generation before clearing this conversation");
+  if(!(c.messages||[]).length)return toast("This conversation is already empty");
+  if(!confirm("Clear all messages in this conversation? A restore snapshot will be saved first."))return;
+  stashMutationUndo(c,"cleared conversation");
+  var snap=snapshotPayload(c);snap.name=("Before clear · "+new Date().toLocaleString()).slice(0,80);
+  c.snapshots=Array.isArray(c.snapshots)?c.snapshots:[];c.snapshots.unshift(snap);c.snapshots=c.snapshots.slice(0,12);
+  c.messages=[];c.compactSummary="";c.compactCount=0;c.queuedPrompts=[];c.queuePaused=false;c.updated=Date.now();
+  save();closeModals();render();restoreDraft();toast("Conversation cleared — restore snapshot saved")
 }
 
 function mediaIdsForChat(ch){
@@ -4521,6 +4585,8 @@ q("#snapshotChat").onclick=function(){closeModals();openSnapshots()};
 q("#branchesChat").onclick=function(){closeModals();openBranches()};
 q("#resetChatOverrides").onclick=resetChatOverrides;
 q("#duplicateChat").onclick=duplicateManagedChat;
+q("#copyChatText").onclick=copyManagedChatText;
+q("#clearChatMessages").onclick=clearManagedChatMessages;
 q("#deleteChat").onclick=deleteManagedChat;
 q("#emptyTrash").onclick=emptyTrash;
 q("#addTask").onclick=addTask;
