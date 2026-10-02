@@ -1685,6 +1685,7 @@ function snapshotPayload(c){
     tags:Array.isArray(c.tags)?c.tags.slice():[],
     compactSummary:c.compactSummary||"",
     compactCount:c.compactCount||0,
+    tasks:JSON.parse(JSON.stringify(c.tasks||[])),
     messages:(c.messages||[]).map(serializableMessage)
   }
 }
@@ -1699,7 +1700,7 @@ async function restoreSnapshot(id){
   var c=ensure(),snap=(c.snapshots||[]).find(function(s){return s.id===id});if(!snap)return;
   if(!confirm("Restore snapshot '"+snap.name+"'? The current conversation state will be replaced."))return;
   stashMutationUndo(c,"snapshot restore");
-  c.title=snap.title||c.title;c.tags=Array.isArray(snap.tags)?snap.tags.slice():[];c.compactSummary=snap.compactSummary||"";c.compactCount=snap.compactCount||0;c.messages=JSON.parse(JSON.stringify(snap.messages||[]));c.updated=Date.now();
+  c.title=snap.title||c.title;c.tags=Array.isArray(snap.tags)?snap.tags.slice():[];c.compactSummary=snap.compactSummary||"";c.compactCount=snap.compactCount||0;c.tasks=JSON.parse(JSON.stringify(snap.tasks||[]));c.messages=JSON.parse(JSON.stringify(snap.messages||[]));c.updated=Date.now();
   save();await hydrateChatMedia(c);closeModals();render();restoreDraft();toast("Snapshot restored")
 }
 function deleteSnapshot(id){
@@ -2732,7 +2733,8 @@ function branchConversation(idx){
     parentChatId:c.id,branchFromIndex:idx,branchCreated:Date.now(),
     modelOverride:c.modelOverride||"",reasoningOverride:c.reasoningOverride!==undefined?c.reasoningOverride:"",
     temperatureOverride:c.temperatureOverride!==undefined?c.temperatureOverride:"",
-    scratchpad:c.scratchpad||"",scratchpadInContext:!!c.scratchpadInContext
+    scratchpad:c.scratchpad||"",scratchpadInContext:!!c.scratchpadInContext,
+    tasks:JSON.parse(JSON.stringify(c.tasks||[]))
   };
   chats.unshift(copy);active=copy.id;save();render();restoreDraft();toast("Created a branch with this chat’s context")
 }
@@ -3695,6 +3697,7 @@ async function importBackup(file){
       scratchpadInContext:!!chat.scratchpadInContext,
       compactSummary:String(chat.compactSummary||""),
       compactCount:Number(chat.compactCount)||0,
+      tasks:Array.isArray(chat.tasks)?chat.tasks.map(function(t){return {id:t.id||uid(),text:normalizeTaskText(t.text),done:!!t.done,created:t.created||Date.now(),updated:t.updated||0,source:t.source||""}}).filter(function(t){return !!t.text}):[],
       pinned:false,
       archivedAt:0,
       trashedAt:0
