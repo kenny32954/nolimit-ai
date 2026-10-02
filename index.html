@@ -1783,11 +1783,11 @@ async function fetchChatWithFallback(body,headers,signal){
     if(r.status===402)throw new Error("OpenRouter reports insufficient credits for this request.");
     if(r.status===429)throw new Error("OpenRouter rate limit reached. Wait a moment and try again.");
     if(r.status!==400&&r.status!==422)throw new Error(errorRaw(raw,"HTTP "+r.status));
-    var simpler=Object.assign({},body);
-    delete simpler.reasoning;delete simpler.tools;delete simpler.provider;delete simpler.session_id;delete simpler.response_format;delete simpler.max_tokens;delete simpler.plugins;delete simpler.usage;
+    var simpler=Object.assign({},body),mustRequireParams=!!(body.response_format&&body.response_format.type==="json_schema")||!!settings.requireParameters;
+    delete simpler.reasoning;delete simpler.tools;delete simpler.provider;delete simpler.session_id;delete simpler.usage;
+    if(mustRequireParams)simpler.provider={require_parameters:true};
     if(simpler.models){var primary=simpler.models[0]||settings.model;delete simpler.models;simpler.model=primary}
-    if(simpler.plugins&&simpler.plugins.length===0)delete simpler.plugins;
-    toast("Retrying with compatibility mode…");
+    toast("Retrying without optional agent/reasoning features…");
     var retry=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(simpler),signal:signal});
     if(!retry.ok)throw new Error(errorRaw(await retry.text(),"HTTP "+retry.status));
     return retry
