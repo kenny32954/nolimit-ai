@@ -222,6 +222,13 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .trashrow b{display:block;font-size:13px}.trashrow span{display:block;margin-top:4px;font-size:11px;color:var(--muted)}.trashactions{display:flex;gap:6px}.trashactions button{height:32px;border-radius:9px;padding:0 9px;font-size:11px;background:rgba(255,255,255,.055);color:#bbb}.trashactions .permadelete{background:rgba(173,65,65,.15);color:#e9a3a3}
 .modebadge{font-weight:600}
 
+
+.sfoot{display:block!important;padding:10px 2px 0!important}.navgroup{padding:4px 0 10px}.navgroup+.navgroup{border-top:1px solid rgba(255,255,255,.045);padding-top:10px}.navlabel{padding:0 11px 5px;font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#5f5c63}.navgroup .sbtn{width:100%;height:36px}
+.homestats{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:12px}.homestat{padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);font-size:11px;color:var(--muted)}.homestat b{color:#d8d4cf;font-weight:650}
+.toastaction{display:flex;align-items:center;gap:10px}.toastaction button{height:28px;border-radius:8px;padding:0 9px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent2);font-size:11px;font-weight:650}
+.msgtime{margin-left:auto;color:#5f5c63;font-size:10px}
+@media(max-width:899px){.sfoot{max-height:46vh}}
+
 </style>
 </head>
 <body>
@@ -232,26 +239,35 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <input class="search" id="chatSearch" placeholder="Search chats">
 <div class="hist" id="history"></div>
 <div class="sfoot">
+<div class="navgroup"><div class="navlabel">AI</div>
 <button class="sbtn" id="modelsBtn">Models</button>
 <button class="sbtn" id="compareSide">Compare models</button>
 <button class="sbtn" id="usageSide">Usage</button>
+<button class="sbtn" id="diagnosticsSide">Diagnostics</button></div>
+
+<div class="navgroup"><div class="navlabel">Workspace</div>
 <button class="sbtn" id="projectsSide">Projects</button>
 <button class="sbtn" id="promptsSide">Prompt library</button>
 <button class="sbtn" id="findSide">Find in chat</button>
 <button class="sbtn" id="bookmarksSide">Bookmarks</button>
-<button class="sbtn" id="trashSide">Trash</button>
-<button class="sbtn" id="installSide">Install app</button>
+<button class="sbtn" id="trashSide">Trash</button></div>
+
+<div class="navgroup"><div class="navlabel">Create</div>
 <button class="sbtn" id="imageSide">Create image</button>
 <button class="sbtn" id="videoSide">Create video</button>
 <button class="sbtn" id="voiceSide">AI voice</button>
-<button class="sbtn" id="transcribeSide">Transcribe audio</button>
+<button class="sbtn" id="transcribeSide">Transcribe audio</button></div>
+
+<div class="navgroup"><div class="navlabel">Chat</div>
 <button class="sbtn" id="shareSide">Share chat</button>
 <button class="sbtn" id="exportSide">Export Markdown</button>
 <button class="sbtn" id="backupSide">Backup chat</button>
-<button class="sbtn" id="importSide">Import backup</button><input id="importFile" type="file" accept=".json,application/json" hidden>
-<button class="sbtn" id="diagnosticsSide">Diagnostics</button>
+<button class="sbtn" id="importSide">Import backup</button><input id="importFile" type="file" accept=".json,application/json" hidden></div>
+
+<div class="navgroup"><div class="navlabel">App</div>
+<button class="sbtn" id="installSide">Install app</button>
 <button class="sbtn" id="settingsBtn">Settings</button>
-<button class="sbtn" id="sideAuth">Connect OpenRouter</button>
+<button class="sbtn" id="sideAuth">Connect OpenRouter</button></div>
 </div>
 </aside>
 <div class="shade" id="shade"></div>
@@ -636,6 +652,12 @@ function closeSide(){q("#side").classList.remove("open");q("#shade").classList.r
 function openModal(id){q("#modalShade").classList.add("show");q(id).classList.add("show")}
 function closeModals(){q("#modalShade").classList.remove("show");qa(".modal").forEach(function(m){m.classList.remove("show")})}
 function toast(t){var d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(function(){d.remove()},2500)}
+function toastAction(text,label,action){
+  var d=document.createElement("div");d.className="toast toastaction";
+  var s=document.createElement("span");s.textContent=text;
+  var b=document.createElement("button");b.textContent=label;b.onclick=function(){try{action()}finally{d.remove()}};
+  d.appendChild(s);d.appendChild(b);document.body.appendChild(d);setTimeout(function(){if(d.isConnected)d.remove()},6000)
+}
 function fmtBytes(n){if(!n)return "";if(n<1024)return n+" B";if(n<1048576)return (n/1024).toFixed(1)+" KB";return (n/1048576).toFixed(1)+" MB"}
 function money(n){if(n==null||isNaN(Number(n)))return "";var x=Number(n);return x<0.001?"$"+x.toFixed(5):"$"+x.toFixed(3)}
 function readDataURL(f){return new Promise(function(res,rej){var rd=new FileReader();rd.onload=function(){res(rd.result)};rd.onerror=rej;rd.readAsDataURL(f)})}
@@ -778,7 +800,8 @@ function renderCitations(parent,annotations){
 function renderChat(){
   var c=ensure(),box=q("#chat"),distanceBefore=box.scrollHeight-box.scrollTop-box.clientHeight,stickToBottom=distanceBefore<180||box.scrollHeight<=box.clientHeight+20;box.innerHTML="";
   if(!c.messages.length){
-    box.innerHTML='<div class="welcome"><div class="logo"></div><h1>Build, research, create.</h1><p>One workspace for multi-model chat, web research, files, images, audio, video, code, and projects.</p><div class="quickgrid"><button class="quickcard" data-quick="research"><b>Research the web</b><span>Search, read pages, and cite sources</span></button><button class="quickcard" data-quick="build"><b>Build something</b><span>Generate code and preview artifacts</span></button><button class="quickcard" data-quick="image"><b>Create an image</b><span>Open the image studio</span></button><button class="quickcard" data-quick="compare"><b>Compare models</b><span>Run the same prompt across models</span></button></div></div>';
+    var liveChats=chats.filter(function(x){return !x.trashedAt&&!x.temporary}).length;
+    box.innerHTML='<div class="welcome"><div class="logo"></div><h1>Build, research, create.</h1><p>One workspace for multi-model chat, web research, files, images, audio, video, code, and projects.</p><div class="quickgrid"><button class="quickcard" data-quick="research"><b>Research the web</b><span>Search, read pages, and cite sources</span></button><button class="quickcard" data-quick="build"><b>Build something</b><span>Generate code and preview artifacts</span></button><button class="quickcard" data-quick="image"><b>Create an image</b><span>Open the image studio</span></button><button class="quickcard" data-quick="compare"><b>Compare models</b><span>Run the same prompt across models</span></button></div><div class="homestats"><span class="homestat"><b>'+liveChats+'</b> chats</span><span class="homestat"><b>'+projects.length+'</b> projects</span><span class="homestat"><b>'+savedPrompts.length+'</b> prompts</span><span class="homestat"><b>'+((settings.favoriteModels||[]).length)+'</b> favorite models</span></div></div>';
     qa(".quickcard").forEach(function(b){b.onclick=function(){
       var a=b.getAttribute("data-quick");
       if(a==="research"){settings.web=true;settings.fetch=true;save();render();q("#prompt").value="Research ";q("#prompt").focus()}
@@ -793,7 +816,7 @@ function renderChat(){
         var ua=document.createElement("div");ua.className="msgtools";ua.style.justifyContent="flex-end";
         var ed=document.createElement("button");ed.textContent="Edit";ed.onclick=function(){editUserMessage(idx)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
-        ua.appendChild(ed);ua.appendChild(bm);b.appendChild(ua);w.appendChild(b);box.appendChild(w)
+        ua.appendChild(ed);ua.appendChild(bm);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});ua.appendChild(tm)}b.appendChild(ua);w.appendChild(b);box.appendChild(w)
       }else{
         var a=document.createElement("div");a.className="assistant"+(m.error?" error":"");a.dataset.msgIndex=idx;
         if(m.reasoning){var rb=document.createElement("div");rb.className="reasonbox";rb.textContent=m.reasoning;a.appendChild(rb)}
@@ -808,7 +831,7 @@ function renderChat(){
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(br);tools.appendChild(bm);
-        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");meta.textContent=bits.join(" · ");tools.appendChild(meta);
+        var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
     })
@@ -837,7 +860,7 @@ function renderFindResults(bookmarksOnly){
   var term=(q("#findInput").value||"").toLowerCase(),box=q("#findResults");box.innerHTML="";
   var results=[];
   if(bookmarksOnly){
-    chats.forEach(function(ch){(ch.messages||[]).forEach(function(m,idx){if(m.bookmarked)results.push({chat:ch,msg:m,idx:idx})})})
+    chats.forEach(function(ch){if(ch.trashedAt)return;(ch.messages||[]).forEach(function(m,idx){if(m.bookmarked)results.push({chat:ch,msg:m,idx:idx})})})
   }else{
     var ch=ensure();(ch.messages||[]).forEach(function(m,idx){if(!term||String(m.content||"").toLowerCase().includes(term))results.push({chat:ch,msg:m,idx:idx})})
   }
@@ -1784,7 +1807,7 @@ function deleteManagedChat(){
     var next=chats.find(function(x){return !x.trashedAt&&x.id!==manageChatId});
     active=next?next.id:""
   }
-  save();closeModals();render();toast("Chat moved to Trash")
+  save();closeModals();render();toastAction("Chat moved to Trash","Undo",function(){c.trashedAt=0;c.updated=Date.now();active=c.id;save();render();restoreDraft()})
 }
 
 function renderTrash(){
