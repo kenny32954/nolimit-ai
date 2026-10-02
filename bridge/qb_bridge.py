@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
-"""Quantum Breaks AI serial bridge for the Casio fx-CG50.
+"""Quantum Breaks AI live serial bridge for the Casio fx-CG50.
 
 Protocol v0.3:
     Handshake:
         CG50 -> PC: H:QBAI:3
         PC -> CG50: K:QBAI:3
 
-    Legacy request (v0.1):
-        Q:<id>:<base64 UTF-8 prompt>
-
-    Subject-aware request (v0.2):
-        Q:<id>:<subject>:<mode>:<base64 UTF-8 prompt>
-
-    College-capable request (v0.3):
+    Request:
         Q:<id>:<subject>:<mode>:<level>:<base64 UTF-8 prompt>
 
-    PC response:
-        A:<id>:<seq>:<done 0|1>:<base64 UTF-8 chunk>
+    Streaming response:
+        A:<id>:<seq>:0:<base64 UTF-8 chunk>
+        ...
+        A:<id>:<seq>:1:<base64 final chunk or empty payload>
 
-    PC error:
+    Error:
         E:<id>:<base64 UTF-8 error>
 
-The API endpoint is any OpenAI-compatible /chat/completions endpoint.
+The default API endpoint is OpenRouter's OpenAI-compatible
+/chat/completions endpoint with SSE streaming enabled.
 """
 
 import base64
@@ -61,9 +58,10 @@ SYSTEM_PROMPT = os.getenv(
 )
 MAX_HISTORY_MESSAGES = int(os.getenv("QB_HISTORY_MESSAGES", "12"))
 CHUNK_BYTES = max(32, int(os.getenv("QB_CHUNK_BYTES", "144")))
+HTTP_TIMEOUT = int(os.getenv("QB_HTTP_TIMEOUT", "120"))
 
-# Separate histories by subject + academic level so a proof-heavy linear algebra
-# session does not contaminate a simpler school-level session.
+# Separate histories by subject + academic level so different courses/levels
+# do not accidentally contaminate one another.
 histories = {}
 
 
@@ -80,33 +78,12 @@ def send_line(ser, line):
     ser.flush()
 
 
-def extract_text(payload):
-    choices = payload.get("choices") or []
-    if not choices:
-        return ""
-
-    message = choices[0].get("message") or {}
-    content = message.get("content", "")
-
-    if isinstance(content, str):
-        return content
-
-    if isinstance(content, list):
-        parts = []
-        for item in content:
-            if isinstance(item, dict) and item.get("type") in ("text", "output_text"):
-                parts.append(str(item.get("text", "")))
-        return "".join(parts)
-
-    return str(content)
-
-
 def parse_request(line):
     line = line.strip()
     if not line:
         return None
 
-    # v0.1: Q:<id>:<payload>
+    # v0.1 compatibility: Q:<id>:<payload>
     if line.startswith("Q:") and line.count(":") == 2:
         parts = line.split(":", 2)
         return {
@@ -117,7 +94,7 @@ def parse_request(line):
             "prompt": b64d(parts[2]).strip(),
         }
 
-    # v0.2: Q:<id>:<subject>:<mode>:<payload>
+    # v0.2 compatibility: Q:<id>:<subject>:<mode>:<payload>
     if line.startswith("Q:") and line.count(":") == 4:
         parts = line.split(":", 4)
         return {
@@ -145,67 +122,13 @@ def parse_request(line):
     return None
 
 
-def call_model(
-    prompt,
-    requested_subject="auto",
-    requested_mode="explain",
-    requested_level="auto",
-):
-    subject = resolve_subject(requested_subject, prompt)
-    mode = normalize_mode(requested_mode)
-    level = normalize_level(requested_level)
-    history_key = (subject, level)
-    history = histories.get(history_key, [])
-
-    messages = [{
-        "role": "system",
-        "content": build_system_prompt(SYSTEM_PROMPT, subject, mode, level),
-    }]
-    messages.extend(history[-MAX_HISTORY_MESSAGES:])
-    messages.append({"role": "user", "content": prompt})
-
-    body = json.dumps({
-        "model": MODEL,
-        "messages": messages,
-    }).encode("utf-8")
-
-    request = urllib.request.Request(
-        API_URL,
-        data=body,
-        method="POST",
-        headers={
-            "Authorization": "Bearer " + API_KEY,
-            "Content-Type": "application/json",
-            "User-Agent": "QuantumBreaksAI-CG50-Bridge/0.4",
-        },
-    )
-
-    try:
-        with urllib.request.urlopen(request, timeout=90) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")
-        raise RuntimeError("API HTTP %s: %s" % (exc.code, detail[:400]))
-    except urllib.error.URLError as exc:
-        raise RuntimeError("API connection error: %s" % exc.reason)
-
-    answer = extract_text(payload).strip()
-    if not answer:
-        raise RuntimeError("API returned no text.")
-
-    history.append({"role": "user", "content": prompt})
-    history.append({"role": "assistant", "content": answer})
-    histories[history_key] = history[-MAX_HISTORY_MESSAGES:]
-
-    return subject, mode, level, answer
-
-
 def utf8_chunks(text, max_bytes):
-    """Yield UTF-8 chunks without splitting a multibyte character."""
+    """Yield UTF-8 byte chunks without splitting a multibyte character."""
     current = bytearray()
 
     for char in text:
         encoded = char.encode("utf-8")
+
         if current and len(current) + len(encoded) > max_bytes:
             yield bytes(current)
             current.clear()
@@ -222,9 +145,205 @@ def utf8_chunks(text, max_bytes):
         yield bytes(current)
 
 
-def send_answer(ser, req_id, text):
-    chunks = list(utf8_chunks(text or "(empty response)", CHUNK_BYTES))
+def delta_text(payload):
+    """Extract visible text from an OpenAI-compatible SSE delta."""
+    choices = payload.get("choices") or []
+    if not choices:
+        return ""
 
+    delta = choices[0].get("delta") or {}
+    content = delta.get("content", "")
+
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") in ("text", "output_text"):
+                value = item.get("text", "")
+                if isinstance(value, str):
+                    parts.append(value)
+                elif isinstance(value, dict):
+                    parts.append(str(value.get("value", "")))
+        return "".join(parts)
+
+    return ""
+
+
+def build_messages(prompt, requested_subject, requested_mode, requested_level):
+    subject = resolve_subject(requested_subject, prompt)
+    mode = normalize_mode(requested_mode)
+    level = normalize_level(requested_level)
+    history_key = (subject, level)
+    history = histories.get(history_key, [])
+
+    messages = [{
+        "role": "system",
+        "content": build_system_prompt(SYSTEM_PROMPT, subject, mode, level),
+    }]
+    messages.extend(history[-MAX_HISTORY_MESSAGES:])
+    messages.append({"role": "user", "content": prompt})
+
+    return subject, mode, level, history_key, history, messages
+
+
+def stream_model(prompt, requested_subject="auto", requested_mode="explain",
+                 requested_level="auto"):
+    """Yield visible model text as SSE events arrive.
+
+    Returns metadata through StopIteration.value:
+        (subject, mode, level, history_key, history, full_answer)
+    """
+    subject, mode, level, history_key, history, messages = build_messages(
+        prompt,
+        requested_subject,
+        requested_mode,
+        requested_level,
+    )
+
+    body = json.dumps({
+        "model": MODEL,
+        "messages": messages,
+        "stream": True,
+    }).encode("utf-8")
+
+    request = urllib.request.Request(
+        API_URL,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": "Bearer " + API_KEY,
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+            "User-Agent": "QuantumBreaksAI-CG50-Bridge/0.5",
+            "X-Title": "Quantum Breaks AI CG50",
+        },
+    )
+
+    answer_parts = []
+
+    try:
+        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
+            for raw in response:
+                line = raw.decode("utf-8", "replace").strip()
+
+                if not line or line.startswith(":"):
+                    continue
+                if not line.startswith("data:"):
+                    continue
+
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    break
+
+                try:
+                    payload = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+
+                # Some OpenAI-compatible providers can emit an error object
+                # inside a 200 streaming response.
+                if payload.get("error"):
+                    error = payload["error"]
+                    if isinstance(error, dict):
+                        message = error.get("message") or str(error)
+                    else:
+                        message = str(error)
+                    raise RuntimeError("API stream error: " + message)
+
+                piece = delta_text(payload)
+                if piece:
+                    answer_parts.append(piece)
+                    yield piece
+
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")
+        raise RuntimeError("API HTTP %s: %s" % (exc.code, detail[:400]))
+    except urllib.error.URLError as exc:
+        raise RuntimeError("API connection error: %s" % exc.reason)
+
+    answer = "".join(answer_parts).strip()
+    if not answer:
+        raise RuntimeError("API returned no text.")
+
+    history.append({"role": "user", "content": prompt})
+    history.append({"role": "assistant", "content": answer})
+    histories[history_key] = history[-MAX_HISTORY_MESSAGES:]
+
+    return subject, mode, level, history_key, history, answer
+
+
+def send_streaming_answer(ser, req_id, iterator):
+    """Forward model output to the calculator while it is being generated."""
+    seq = 0
+    pending = ""
+    full = []
+
+    while True:
+        try:
+            piece = next(iterator)
+        except StopIteration as stop:
+            metadata = stop.value
+            break
+
+        if not piece:
+            continue
+
+        full.append(piece)
+        pending += piece
+
+        # Flush complete CHUNK_BYTES-sized UTF-8-safe pieces while keeping
+        # the small tail to combine with the next SSE event.
+        encoded_pending = pending.encode("utf-8")
+        if len(encoded_pending) < CHUNK_BYTES:
+            continue
+
+        chunks = list(utf8_chunks(pending, CHUNK_BYTES))
+        if len(chunks) == 1:
+            continue
+
+        # Keep the final partial chunk buffered.
+        for raw_chunk in chunks[:-1]:
+            send_line(
+                ser,
+                "A:%s:%d:0:%s" % (
+                    req_id,
+                    seq,
+                    base64.b64encode(raw_chunk).decode("ascii"),
+                ),
+            )
+            seq += 1
+
+        pending = chunks[-1].decode("utf-8")
+
+    # Flush remaining visible text. If there is none, send an empty final
+    # frame so the calculator can still transition out of THINKING.
+    if pending:
+        raw_chunks = list(utf8_chunks(pending, CHUNK_BYTES))
+        for index, raw_chunk in enumerate(raw_chunks):
+            done = 1 if index == len(raw_chunks) - 1 else 0
+            send_line(
+                ser,
+                "A:%s:%d:%d:%s" % (
+                    req_id,
+                    seq,
+                    done,
+                    base64.b64encode(raw_chunk).decode("ascii"),
+                ),
+            )
+            seq += 1
+    else:
+        send_line(ser, "A:%s:%d:1:" % (req_id, seq))
+
+    return metadata
+
+
+def send_answer(ser, req_id, text):
+    """Non-streaming helper retained for protocol tests/fallbacks."""
+    chunks = list(utf8_chunks(text or "(empty response)", CHUNK_BYTES))
     for seq, chunk in enumerate(chunks):
         done = 1 if seq == len(chunks) - 1 else 0
         encoded = base64.b64encode(chunk).decode("ascii")
@@ -234,7 +353,6 @@ def send_answer(ser, req_id, text):
 def handle_line(ser, line):
     line = line.strip()
 
-    # Keep v2 handshake compatibility while preferring v3.
     if line == "H:QBAI:3":
         send_line(ser, "K:QBAI:3")
         return
@@ -252,22 +370,30 @@ def handle_line(ser, line):
         if not prompt:
             raise RuntimeError("Empty prompt.")
 
-        subject, mode, level, answer = call_model(
+        print("[%s] %s / %s / %s" % (
+            req_id,
+            req["subject"],
+            req["mode"],
+            req["level"],
+        ))
+        print(" > %s" % prompt.replace("\n", " ")[:220])
+
+        iterator = stream_model(
             prompt,
             req["subject"],
             req["mode"],
             req["level"],
         )
+        subject, mode, level, _, _, answer = send_streaming_answer(
+            ser, req_id, iterator
+        )
 
-        print("[%s] %s / %s / %s: %s" % (
-            req_id,
+        print(" -> %s / %s / %s" % (
             subject_label(subject),
             mode,
             level,
-            prompt,
         ))
-        print(" -> %s" % answer.replace("\n", " ")[:200])
-        send_answer(ser, req_id, answer)
+        print("    %s" % answer.replace("\n", " ")[:220])
 
     except Exception as exc:
         message = str(exc)
@@ -320,13 +446,14 @@ def main():
         print("Set QB_MODEL to the model ID you want Quantum Breaks AI to use.")
         return 2
 
-    print("Quantum Breaks AI CG50 bridge v0.4")
+    print("Quantum Breaks AI CG50 bridge v0.5 LIVE")
     print("Serial: %s @ %d" % (port, BAUD))
     print("API: %s" % API_URL)
     print("Model: %s" % MODEL)
+    print("Streaming: SSE -> live CG50 chunks")
     print("Handshake: QBAI protocol v3")
     print("Academic levels: auto, school, college, advanced")
-    print("Modes: answer, explain, steps, check, quiz, summary, flashcards, derive, proof, research")
+    print("Ready. Open QBAI on the calculator and press F5.")
 
     with serial.Serial(port, BAUD, timeout=0.25) as ser:
         time.sleep(0.5)
