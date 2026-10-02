@@ -1986,7 +1986,7 @@ async function preflightSend(files){
     try{var schema=JSON.parse(settings.jsonSchemaText||"");if(!schema||typeof schema!=="object"||Array.isArray(schema))throw new Error("Schema must be a JSON object")}
     catch(e){openSettings();toast("Fix the JSON Schema before sending: "+e.message);return false}
   }
-  var c=ensure(),modelId=effectiveModel(c),hasImages=files.some(function(f){return f.kind==="image"});if(!hasImages||modelId==="openrouter/auto")return true;
+  var c=ensure(),modelId=effectiveModel(c),needsVision=chatNeedsVision(c,files);if(!needsVision||modelId==="openrouter/auto")return true;
   await ensureModelCatalog();
   var info=models.find(function(m){return m.id===modelId});
   if(info&&inputs(info).indexOf("image")<0){
@@ -2001,7 +2001,7 @@ async function preflightSend(files){
 function apiPartChars(content){
   if(typeof content==="string")return content.length;
   if(!Array.isArray(content))return 0;
-  var chars=0;content.forEach(function(p){if(!p)return;if(p.type==="text")chars+=String(p.text||"").length;else if(p.type==="input_text")chars+=String(p.text||"").length});return chars
+  var chars=0;content.forEach(function(p){if(!p)return;if(p.type==="text"||p.type==="input_text"||p.type==="output_text")chars+=String(p.text||"").length});return chars
 }
 function estimatedMessageTokens(m){return Math.ceil((apiPartChars(m&&m.content)+24)/4)}
 function fitRequestMessages(messages,modelId){
@@ -2301,7 +2301,17 @@ async function runCompare(){
     var meta=document.createElement("div");meta.className="comparemeta";
     if(!res.error){var bits=[];if(res.served!==res.requested)bits.push("served by "+res.served);if(res.usage&&res.usage.total_tokens!=null)bits.push(res.usage.total_tokens+" tokens");if(res.cost!=null)bits.push(money(res.cost));meta.textContent=bits.join(" · ")}
     card.appendChild(meta);
-    var cp=document.createElement("button");cp.className="secondary";cp.style.marginTop="9px";cp.textContent="Copy answer";cp.onclick=function(){navigator.clipboard.writeText(res.text||"").then(function(){toast("Copied")})};card.appendChild(cp);
+    var actions=document.createElement("div");actions.className="row";actions.style.marginTop="9px";
+    var cp=document.createElement("button");cp.className="secondary";cp.textContent="Copy answer";cp.onclick=function(){navigator.clipboard.writeText(res.text||"").then(function(){toast("Copied")})};actions.appendChild(cp);
+    if(!res.error){
+      var use=document.createElement("button");use.className="secondary";use.textContent="Use in chat";use.onclick=function(){
+        var ch=ensure();
+        ch.messages.push({role:"user",created:Date.now(),content:prompt});
+        ch.messages.push({role:"assistant",created:Date.now(),finished:Date.now(),content:res.text||"",model:res.served||res.requested,usage:res.usage||{},cost:res.cost});
+        if(ch.title==="New chat")ch.title=prompt.replace(/\s+/g," ").slice(0,48);ch.updated=Date.now();save();closeModals();render();toast("Comparison answer added to chat")
+      };actions.appendChild(use)
+    }
+    card.appendChild(actions);
     q("#compareOutput").appendChild(card)
   });
   q("#runCompare").disabled=false;q("#compareProgress").classList.add("hidden")
@@ -2339,10 +2349,21 @@ function openModelInfo(m){
   openModal("#modelInfoModal")
 }
 
+function relevantRawHistory(c){
+  if(!c)return [];
+  var history=c.messages||[];
+  if(c.compactSummary&&Number(c.compactCount)>0)history=history.slice(Math.min(history.length,Number(c.compactCount)||0));
+  var limit=Math.max(0,Number(settings.historyLimit)||0);if(limit>0&&history.length>limit)history=history.slice(-limit);
+  return history
+}
+function chatNeedsVision(c,files){
+  if((files||[]).some(function(f){return f.kind==="image"}))return true;
+  return relevantRawHistory(c).some(function(m){return (m.images&&m.images.length)||(m.imageRefs&&m.imageRefs.length)})
+}
 function modelCompatibleNow(m){
   if(!m||m.id==="openrouter/auto")return true;
   var ins=inputs(m),sp=m.supported_parameters||[];
-  if(pending.some(function(f){return f.kind==="image"})&&ins.indexOf("image")<0)return false;
+  if(chatNeedsVision(current(),pending)&&ins.indexOf("image")<0)return false;
   if(settings.reasoning!=="none"&&sp.length&&sp.indexOf("reasoning")<0&&sp.indexOf("reasoning_effort")<0)return false;
   if(settings.responseFormat==="json_schema"&&sp.length&&sp.indexOf("structured_outputs")<0&&sp.indexOf("response_format")<0)return false;
   return true
