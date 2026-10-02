@@ -553,7 +553,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>Choose model</h2>
 <div class="field"><input id="modelSearch" placeholder="Search models"></div>
-<div class="row" style="margin-bottom:10px"><input id="customModelId" style="flex:1;min-width:200px" placeholder="Custom model ID, e.g. provider/model"><button class="secondary" id="useCustomModel">Use custom</button><select id="modelSort" style="min-width:155px"><option value="recent">Recent first</option><option value="name">Name</option><option value="context">Largest context</option><option value="cheap">Lowest listed cost</option></select></div>
+<div class="row" style="margin-bottom:10px"><input id="customModelId" style="flex:1;min-width:200px" placeholder="Custom model ID, e.g. provider/model"><button class="secondary" id="useCustomModel">Use custom</button><select id="modelSort" style="min-width:155px"><option value="recent">Recent first</option><option value="name">Name</option><option value="context">Largest context</option><option value="cheap">Lowest listed cost</option><option value="helpful">Best local helpfulness</option><option value="fastlocal">Fastest locally</option><option value="costlocal">Lowest actual local cost</option></select></div>
 <div class="filterbar">
 <button class="filter on" data-filter="all">All</button>
 <button class="filter" data-filter="recent">Recent</button>
@@ -564,7 +564,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="filter" data-filter="structured">Structured</button>
 <button class="filter" data-filter="compatible">Compatible now</button>
 </div>
-<div class="row" style="margin:0 0 10px"><button class="secondary" id="pickFreeCompatible">Largest-context free compatible</button><button class="secondary" id="pickCheapestCompatible">Lowest-cost compatible</button></div>
+<div class="row" style="margin:0 0 10px"><button class="secondary" id="pickFreeCompatible">Largest-context free compatible</button><button class="secondary" id="pickCheapestCompatible">Lowest-cost compatible</button><button class="secondary" id="pickRatedCompatible">Best-rated compatible</button></div>
 <div class="models" id="models"></div>
 </section>
 
@@ -2877,27 +2877,32 @@ async function pickTechnicalModel(mode){
   await ensureModelCatalog();
   var candidates=models.filter(function(m){return modelCompatibleNow(m)});
   if(mode==="free")candidates=candidates.filter(priceZero);
-  if(!candidates.length)return toast(mode==="free"?"No free compatible models were found":"No compatible models were found");
+  if(mode==="rated")candidates=candidates.filter(function(m){return localModelStats(m.id).rated>0});
+  if(!candidates.length)return toast(mode==="free"?"No free compatible models were found":(mode==="rated"?"Rate some model replies first so Quantum Breaks AI can learn your local preference.":"No compatible models were found"));
   if(mode==="free"){
     candidates.sort(function(a,b){return Number(b.context_length||0)-Number(a.context_length||0)})
+  }else if(mode==="rated"){
+    candidates.sort(function(a,b){var aa=localModelStats(a.id),bb=localModelStats(b.id),d=bb.bayes-aa.bayes;if(d)return d;return bb.rated-aa.rated})
   }else{
     candidates.sort(function(a,b){
       function cost(m){var p=m.pricing||{},x=Number(p.prompt),y=Number(p.completion);if(!isFinite(x))x=Infinity;if(!isFinite(y))y=Infinity;return x+y}
       var d=cost(a)-cost(b);if(d)return d;return Number(b.context_length||0)-Number(a.context_length||0)
     })
   }
-  var chosen=candidates[0];setActiveModel(chosen.id);closeModals();toast((mode==="free"?"Selected free compatible model: ":"Selected lowest-cost compatible model: ")+chosen.id)
+  var chosen=candidates[0];setActiveModel(chosen.id);closeModals();toast((mode==="free"?"Selected free compatible model: ":(mode==="rated"?"Selected your best-rated compatible model: ":"Selected lowest-cost compatible model: "))+chosen.id)
 }
 
 function localModelStats(id){
-  var count=0,time=0,timeCount=0,cost=0,costCount=0,tokens=0,tokenCount=0;
+  var count=0,time=0,timeCount=0,cost=0,costCount=0,tokens=0,tokenCount=0,up=0,down=0;
   chats.forEach(function(ch){(ch.messages||[]).forEach(function(msg){
     if(msg.role!=="assistant"||msg.model!==id)return;count++;
     if(msg.started&&msg.finished){time+=Math.max(0,msg.finished-msg.started);timeCount++}
     if(msg.cost!=null){cost+=Number(msg.cost)||0;costCount++}
     if(msg.usage&&msg.usage.total_tokens!=null){tokens+=Number(msg.usage.total_tokens)||0;tokenCount++}
+    if(msg.rating===1)up++;else if(msg.rating===-1)down++
   })});
-  return {count:count,avgTime:timeCount?time/timeCount:0,avgCost:costCount?cost/costCount:null,avgTokens:tokenCount?tokens/tokenCount:0}
+  var rated=up+down,helpfulness=rated?up/rated:null,bayes=(up+1)/(rated+2);
+  return {count:count,avgTime:timeCount?time/timeCount:0,avgCost:costCount?cost/costCount:null,avgTokens:tokenCount?tokens/tokenCount:0,up:up,down:down,rated:rated,helpfulness:helpfulness,bayes:bayes}
 }
 function openModelInfo(m){
   modelInfoCurrent=m;
@@ -2914,7 +2919,8 @@ function openModelInfo(m){
     ["Local replies",local.count],
     ["Avg response time",local.avgTime?(local.avgTime/1000).toFixed(1)+"s":"—"],
     ["Avg tracked cost",local.avgCost!=null?money(local.avgCost):"—"],
-    ["Avg tracked tokens",local.avgTokens?formatTokenCount(local.avgTokens):"—"]
+    ["Avg tracked tokens",local.avgTokens?formatTokenCount(local.avgTokens):"—"],
+    ["Local helpfulness",local.rated?Math.round(local.helpfulness*100)+"% ("+local.rated+" rated)":"—"]
   ];
   rows.forEach(function(x){var d=document.createElement("div");d.className="diagcard";var s=document.createElement("span");s.textContent=x[0];var b=document.createElement("b");b.textContent=x[1];d.appendChild(s);d.appendChild(b);grid.appendChild(d)});
   var params=q("#modelInfoParams");params.innerHTML="";(m.supported_parameters||[]).slice(0,40).forEach(function(x){var tag=document.createElement("span");tag.className="modelbadge";tag.textContent=x;params.appendChild(tag)});
@@ -2963,6 +2969,17 @@ function showModels(){
     if(modelSort==="cheap"){
       function pc(m){var p=m.pricing||{},x=Number(p.prompt),y=Number(p.completion);return (isFinite(x)?x:1e9)+(isFinite(y)?y:1e9)}
       return pc(a)-pc(b)
+    }
+    if(modelSort==="helpful"){
+      var ah=localModelStats(a.id),bh=localModelStats(b.id);
+      if(ah.rated!==bh.rated&&(!ah.rated||!bh.rated))return bh.rated-ah.rated;
+      var hd=bh.bayes-ah.bayes;if(hd)return hd;return bh.rated-ah.rated
+    }
+    if(modelSort==="fastlocal"){
+      var af=localModelStats(a.id),bf=localModelStats(b.id),at=af.avgTime||Infinity,bt=bf.avgTime||Infinity;if(at!==bt)return at-bt;return bf.count-af.count
+    }
+    if(modelSort==="costlocal"){
+      var ac=localModelStats(a.id),bc=localModelStats(b.id),av=ac.avgCost==null?Infinity:ac.avgCost,bv=bc.avgCost==null?Infinity:bc.avgCost;if(av!==bv)return av-bv;return bc.count-ac.count
     }
     var ai=recent.indexOf(a.id),bi=recent.indexOf(b.id);if(ai<0)ai=999;if(bi<0)bi=999;return ai-bi
   });
@@ -4283,6 +4300,7 @@ q("#clearMediaStorage").onclick=clearAllMedia;
 q("#copyDiagnostics").onclick=function(){navigator.clipboard.writeText(lastDiagReport||"No diagnostics run yet.").then(function(){toast("Diagnostics copied")})};
 q("#pickFreeCompatible").onclick=function(){pickTechnicalModel("free")};
 q("#pickCheapestCompatible").onclick=function(){pickTechnicalModel("cheap")};
+q("#pickRatedCompatible").onclick=function(){pickTechnicalModel("rated")};
 q("#useModelInfo").onclick=function(){if(!modelInfoCurrent)return;setActiveModel(modelInfoCurrent.id);closeModals();toast("Model changed to "+modelInfoCurrent.id)};
 q("#copyModelId").onclick=function(){if(!modelInfoCurrent)return;navigator.clipboard.writeText(modelInfoCurrent.id||"").then(function(){toast("Model ID copied")})};
 q("#useCustomModel").onclick=function(){var id=q("#customModelId").value.trim();if(!id)return toast("Enter a model ID");setActiveModel(id);closeModals();toast("Using custom model "+id)};
