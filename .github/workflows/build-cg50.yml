@@ -1,0 +1,108 @@
+name: Build CG50 QBAI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [cg50-integration]
+    paths:
+      - "cg50/native/**"
+      - ".github/workflows/build-cg50.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-g3a:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out CG50 branch
+        uses: actions/checkout@v4
+        with:
+          ref: cg50-integration
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git curl cmake python3 python3-pip \
+            build-essential pkg-config \
+            libpng-dev libusb-1.0-0-dev libudev-dev \
+            libsdl2-dev libncurses-dev zip
+
+      - name: Install GiteaPC
+        run: |
+          curl -L \
+            "https://git.planet-casio.com/Lephenixnoir/GiteaPC/raw/branch/master/install.sh" \
+            -o /tmp/giteapc-install.sh
+          bash /tmp/giteapc-install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install fxSDK and SH toolchain
+        run: |
+          source "$HOME/.profile" 2>/dev/null || true
+          giteapc install \
+            Lephenixnoir/fxsdk:noudisks2 \
+            Lephenixnoir/sh-elf-binutils \
+            Lephenixnoir/sh-elf-gcc
+
+      - name: Install CG50 libraries
+        run: |
+          source "$HOME/.profile" 2>/dev/null || true
+          giteapc install \
+            Lephenixnoir/OpenLibm \
+            Vhex-Kernel-Core/fxlibc \
+            Lephenixnoir/gint
+
+      - name: Build QBAI.g3a
+        working-directory: cg50/native
+        run: |
+          source "$HOME/.profile" 2>/dev/null || true
+          fxsdk build-cg
+
+      - name: Locate and verify output
+        id: locate
+        run: |
+          set -e
+          G3A_PATH="$(find cg50/native -type f -name 'QBAI.g3a' -print -quit)"
+          if [ -z "$G3A_PATH" ]; then
+            echo "QBAI.g3a was not produced"
+            find cg50/native -maxdepth 4 -type f -print
+            exit 1
+          fi
+          echo "path=$G3A_PATH" >> "$GITHUB_OUTPUT"
+          ls -lh "$G3A_PATH"
+          sha256sum "$G3A_PATH"
+
+      - name: Package exact build for retrieval
+        run: |
+          set -e
+          G3A_PATH="${{ steps.locate.outputs.path }}"
+          mkdir -p release
+          base64 -w 0 "$G3A_PATH" > release/QBAI.g3a.b64
+          printf '\n' >> release/QBAI.g3a.b64
+          sha256sum "$G3A_PATH" | awk '{print $1}' > release/QBAI.g3a.sha256
+          cp "$G3A_PATH" /tmp/QBAI.g3a
+          zip -9 /tmp/QBAI-CG50.zip "$G3A_PATH"
+
+      - name: Upload calculator binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: QBAI-CG50
+          path: |
+            /tmp/QBAI.g3a
+            /tmp/QBAI-CG50.zip
+          if-no-files-found: error
+
+      - name: Publish build encoding to branch
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add release/QBAI.g3a.b64 release/QBAI.g3a.sha256
+          if git diff --cached --quiet; then
+            echo "Build encoding unchanged"
+          else
+            git commit -m "Build QBAI.g3a [skip ci]"
+            git push origin HEAD:cg50-integration
+          fi
