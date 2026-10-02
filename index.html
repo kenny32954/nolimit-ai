@@ -1218,7 +1218,7 @@ function render(){
   q("#modeBtn").classList.toggle("on",(settings.modePreset||"balanced")!=="balanced");
   var currentReasoning=effectiveReasoning(c);
   q("#reasonToggle").classList.toggle("on",currentReasoning!=="none");
-  q("#reasonToggle").textContent="◌ Reasoning: "+currentReasoning+(c.reasoningOverride!==undefined&&c.reasoningOverride!==""?" 🔒":"");
+  q("#reasonToggle").textContent="◌ Reasoning: "+currentReasoning+(c.reasoningOverride!==undefined&&c.reasoningOverride!==""?" 🔒":(cp&&cp.reasoning!==undefined&&cp.reasoning!==""?" ◆":""));
   q("#researchBtn").classList.toggle("on",!!settings.web&&!!settings.fetch);
   q("#focusBtn").classList.toggle("on",!!settings.focusMode);
   var activeBusy=busy&&c.id===busyChatId;
