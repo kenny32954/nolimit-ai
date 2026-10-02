@@ -1,4 +1,4 @@
-const CACHE="quantum-breaks-ai-v9";
+const CACHE="quantum-breaks-ai-v10";
 const APP_SHELL=["./","./index.html","./manifest.webmanifest","./icon.svg"];
 
 self.addEventListener("install",event=>{
