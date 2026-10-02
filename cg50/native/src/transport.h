@@ -14,6 +14,7 @@ typedef enum {
 void qb_transport_init(void);
 void qb_transport_close(void);
 bool qb_transport_ready(void);
+bool qb_transport_serial_open(void);
 bool qb_transport_probe(void);
 
 bool qb_transport_send_request(
