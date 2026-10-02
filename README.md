@@ -21,6 +21,22 @@ Everything else in this repository supports the app with documentation and autom
 - Keyboard shortcuts including Ctrl/Cmd+K for models
 - Online/offline connection status
 
+### Power-user workflow
+- Autosaved per-chat drafts
+- Recoverable Trash with Undo
+- Chat history grouped by Pinned, Today, Yesterday, Previous 7 days, and Older
+- Smart Fast, Balanced, Deep, and Research modes
+- Per-chat scratchpad with optional AI-context inclusion
+- Pin individual messages so important context survives history trimming
+- Workspace-wide search across chats, messages, projects, prompts, and AI profiles
+- Saved AI profiles for instant model/tool/system-prompt switching
+- Reusable prompt variables such as `{{topic}}`
+- AI-generated conversation titles
+- Manual long-chat context compression
+- Clean Print / Save PDF conversation view
+- Password-encrypted full workspace backups using PBKDF2 + AES-GCM
+- Text-selection toolbar for copy, quote, explain, prompt saving, and scratchpad capture
+
 ### Chat
 - Per-chat token/cost stats when usage is available
 - Streaming OpenRouter chat completions
@@ -211,7 +227,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v1.4
+Current app generation: v1.6
 
 Major capabilities now include:
 - phone + PC UI
