@@ -3300,7 +3300,10 @@ window.addEventListener("storage",function(e){
 });
 window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();installPrompt=e});
 if("serviceWorker" in navigator&&location.protocol==="https:"){
-  navigator.serviceWorker.register("./sw.js").catch(function(){})
+  navigator.serviceWorker.register("./sw.js").then(function(reg){
+    setInterval(function(){reg.update().catch(function(){})},1800000);
+    document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")reg.update().catch(function(){})})
+  }).catch(function(){})
 }
 function handleLaunchAction(){
   var params=new URLSearchParams(location.search),action=params.get("action");if(!action)return;
