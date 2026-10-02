@@ -651,6 +651,10 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field"><label>Tags</label><input id="chatTagsInput" maxlength="160" placeholder="coding, research, school"><div class="smallnote">Comma-separated. Tags are searchable from the sidebar and global search.</div></div>
 <div class="field"><label>Chat instructions</label><textarea id="chatInstructions" placeholder="Instructions that apply only to this conversation"></textarea><div class="smallnote">Sent with this chat only. Useful for tone, format, constraints, or project-specific rules.</div></div>
 <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><input id="lockChatModel" type="checkbox"> Lock the selected model to this conversation <span class="smallnote" id="chatModelLockLabel"></span></label>
+<div class="row">
+<div class="field" style="flex:1;min-width:170px"><label>Chat reasoning</label><select id="chatReasoningOverride"><option value="">Use global setting</option><option value="none">None</option><option value="minimal">Minimal</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">Extra high</option></select></div>
+<div class="field" style="flex:1;min-width:170px"><label>Chat temperature</label><input id="chatTemperatureOverride" type="number" min="0" max="2" step="0.1" placeholder="Use global setting"></div>
+</div>
 <div class="notice" id="chatStats"></div>
 <div class="row">
 <button class="primary" id="renameChat">Rename</button>
@@ -907,6 +911,8 @@ function applyAppearance(){
 }
 function current(){return chats.find(function(c){return c.id===active&&!c.trashedAt})}
 function effectiveModel(c){return c&&c.modelOverride?c.modelOverride:settings.model}
+function effectiveReasoning(c){return c&&c.reasoningOverride!==undefined&&c.reasoningOverride!==""?c.reasoningOverride:settings.reasoning}
+function effectiveTemperature(c){return c&&c.temperatureOverride!==undefined&&c.temperatureOverride!==""?Math.max(0,Math.min(2,Number(c.temperatureOverride))):Number(settings.temperature)}
 function setActiveModel(id){var c=current();if(c&&c.modelOverride)c.modelOverride=id;else settings.model=id;rememberModel(id);save();render()}
 function projectForChat(c){return c&&c.projectId?projects.find(function(p){return p.id===c.projectId}):null}
 function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save()}return c}
@@ -1124,8 +1130,9 @@ function render(){
   q("#tempToggle").classList.toggle("on",!!c.temporary);
   q("#modeBtn").textContent="⚡ Mode: "+(settings.modePreset||"balanced");
   q("#modeBtn").classList.toggle("on",(settings.modePreset||"balanced")!=="balanced");
-  q("#reasonToggle").classList.toggle("on",settings.reasoning!=="none");
-  q("#reasonToggle").textContent="◌ Reasoning: "+settings.reasoning;
+  var currentReasoning=effectiveReasoning(c);
+  q("#reasonToggle").classList.toggle("on",currentReasoning!=="none");
+  q("#reasonToggle").textContent="◌ Reasoning: "+currentReasoning+(c.reasoningOverride!==undefined&&c.reasoningOverride!==""?" 🔒":"");
   q("#researchBtn").classList.toggle("on",!!settings.web&&!!settings.fetch);
   q("#focusBtn").classList.toggle("on",!!settings.focusMode);
   renderHistory();
@@ -2035,7 +2042,7 @@ async function send(){
   if(fit.trimmed)toast("Context fit skipped "+fit.trimmed+" older message"+(fit.trimmed===1?"":"s")+" for this request");
   if(fit.over)toast("This request is still close to or over the selected model's context limit.");
   try{
-    var body={model:requestModel,messages:requestMessages,temperature:Number(settings.temperature),stream:true,usage:{include:true},session_id:"quantum-breaks-"+c.id};
+    var body={model:requestModel,messages:requestMessages,temperature:effectiveTemperature(c),stream:true,usage:{include:true},session_id:"quantum-breaks-"+c.id};
     if(settings.fallbackModel){
       var fallbacks=settings.fallbackModel.split(",").map(function(x){return x.trim()}).filter(Boolean).filter(function(x,i,a){return x!==requestModel&&a.indexOf(x)===i}).slice(0,4);
       if(fallbacks.length){body.models=[requestModel].concat(fallbacks);delete body.model}
@@ -2046,7 +2053,7 @@ async function send(){
     if(settings.responseFormat==="json_object")body.response_format={type:"json_object"};
     if(settings.responseFormat==="json_schema")body.response_format={type:"json_schema",json_schema:{name:settings.jsonSchemaName||"structured_response",strict:true,schema:JSON.parse(settings.jsonSchemaText)}};
     if(Number(settings.maxTokens)>0)body.max_tokens=Math.floor(Number(settings.maxTokens));
-    if(settings.reasoning!=="none")body.reasoning={effort:settings.reasoning,summary:"auto"};
+    var requestReasoning=effectiveReasoning(c);if(requestReasoning!=="none")body.reasoning={effort:requestReasoning,summary:"auto"};
     var tools=toolList();if(tools.length)body.tools=tools;
     if(hasPDF(c))body.plugins=[{id:"file-parser",pdf:{engine:"cloudflare-ai"}}];
     var headers={Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"};
@@ -2147,8 +2154,15 @@ async function editUserMessage(idx){
 
 function branchConversation(idx){
   var c=ensure();
-  var copy={id:uid(),title:(c.title||"New chat")+" branch",created:Date.now(),updated:Date.now(),messages:JSON.parse(JSON.stringify(c.messages.slice(0,idx+1)))};
-  chats.unshift(copy);active=copy.id;save();render();toast("Created a branch")
+  var copy={
+    id:uid(),title:(c.title||"New chat")+" branch",created:Date.now(),updated:Date.now(),
+    messages:JSON.parse(JSON.stringify(c.messages.slice(0,idx+1))),
+    projectId:c.projectId||"",tags:Array.isArray(c.tags)?c.tags.slice():[],chatInstructions:c.chatInstructions||"",
+    modelOverride:c.modelOverride||"",reasoningOverride:c.reasoningOverride!==undefined?c.reasoningOverride:"",
+    temperatureOverride:c.temperatureOverride!==undefined?c.temperatureOverride:"",
+    scratchpad:c.scratchpad||"",scratchpadInContext:!!c.scratchpadInContext
+  };
+  chats.unshift(copy);active=copy.id;save();render();restoreDraft();toast("Created a branch with this chat’s context")
 }
 
 async function ensureModelCatalog(force){
@@ -2882,6 +2896,8 @@ function openChatManage(){
   q("#chatInstructions").value=c.chatInstructions||"";
   q("#lockChatModel").checked=!!c.modelOverride;
   q("#chatModelLockLabel").textContent=c.modelOverride?"("+c.modelOverride+")":"(currently "+effectiveModel(c)+")";
+  q("#chatReasoningOverride").value=c.reasoningOverride!==undefined?c.reasoningOverride:"";
+  q("#chatTemperatureOverride").value=c.temperatureOverride!==undefined&&c.temperatureOverride!==""?c.temperatureOverride:"";
   q("#chatStats").textContent=chatStatsText(c);
   q("#pinChat").textContent=c.pinned?"Unpin":"Pin";
   q("#archiveChat").textContent=c.archivedAt?"Unarchive":"Archive";
@@ -2897,7 +2913,7 @@ function toggleChatModelLock(){
 }
 function renameManagedChat(){
   var c=chats.find(function(x){return x.id===manageChatId});if(!c)return;
-  c.title=q("#chatTitleInput").value.trim().slice(0,80)||"New chat";c.tags=q("#chatTagsInput").value.split(",").map(function(x){return x.trim().replace(/^#/,"").slice(0,24)}).filter(Boolean).slice(0,12);c.chatInstructions=q("#chatInstructions").value.slice(0,50000);c.updated=Date.now();save();closeModals();render()
+  c.title=q("#chatTitleInput").value.trim().slice(0,80)||"New chat";c.tags=q("#chatTagsInput").value.split(",").map(function(x){return x.trim().replace(/^#/,"").slice(0,24)}).filter(Boolean).slice(0,12);c.chatInstructions=q("#chatInstructions").value.slice(0,50000);c.reasoningOverride=q("#chatReasoningOverride").value;c.temperatureOverride=q("#chatTemperatureOverride").value===""?"":Math.max(0,Math.min(2,Number(q("#chatTemperatureOverride").value)));c.updated=Date.now();save();closeModals();render()
 }
 
 async function generateChatTitle(){
@@ -3216,7 +3232,7 @@ function newChat(){
   var parent=current(),c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[],projectId:parent&&parent.projectId?parent.projectId:""};
   chats.unshift(c);active=c.id;save();closeSide();render();restoreDraft();q("#prompt").focus()
 }
-function cycleReasoning(){var v=["none","minimal","low","medium","high","xhigh"],i=v.indexOf(settings.reasoning);settings.reasoning=v[(i+1)%v.length];save();render()}
+function cycleReasoning(){var v=["none","minimal","low","medium","high","xhigh"],c=ensure(),current=effectiveReasoning(c),i=v.indexOf(current),next=v[(i+1)%v.length];if(c.reasoningOverride!==undefined&&c.reasoningOverride!=="")c.reasoningOverride=next;else settings.reasoning=next;save();render()}
 function toggleResearch(){var on=!(settings.web&&settings.fetch);settings.web=on;settings.fetch=on;if(on&&settings.reasoning==="none")settings.reasoning="medium";save();render();toast(on?"Research tools enabled":"Research tools disabled")}
 
 q("#menuBtn").onclick=function(){q("#side").classList.add("open");q("#shade").classList.add("show")};
