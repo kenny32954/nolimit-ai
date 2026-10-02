@@ -242,6 +242,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .messageflash{animation:messageFlash 1.35s ease}@keyframes messageFlash{0%{filter:none}18%{filter:drop-shadow(0 0 14px var(--accent));transform:translateY(-1px)}100%{filter:none;transform:none}}
 #status.warn{color:#f0b58d}
 
+
+.modelrow2{grid-template-columns:minmax(0,1fr) 42px 42px!important}.modelinfo{width:42px;border-radius:11px;background:rgba(255,255,255,.026);border:1px solid rgba(255,255,255,.065);color:#8b878e}.modelinfo:hover{color:#fff;background:rgba(255,255,255,.06)}
+
 </style>
 </head>
 <body>
@@ -399,6 +402,16 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div style="height:16px"></div>
 <div class="notice"><strong>Workspace backup</strong><br>Export chats, projects, local memory, and settings. API keys are never included.</div>
 <div class="row"><button class="secondary" id="exportWorkspace">Export workspace</button><button class="secondary" id="importWorkspaceBtn">Import workspace</button><button class="secondary" id="exportEncryptedWorkspace">Encrypted export</button><button class="secondary" id="importEncryptedWorkspaceBtn">Encrypted import</button><input id="importWorkspaceFile" type="file" accept=".json,application/json" hidden><input id="importEncryptedWorkspaceFile" type="file" accept=".json,application/json" hidden></div>
+</section>
+
+<section class="modal" id="modelInfoModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2 id="modelInfoName">Model details</h2>
+<div class="notice" id="modelInfoDescription"></div>
+<div id="modelInfoGrid" class="diaggrid"></div>
+<div style="height:12px"></div>
+<div class="field"><label>Supported parameters</label><div id="modelInfoParams" class="modelbadges"></div></div>
+<div class="row"><button class="primary" id="useModelInfo">Use this model</button><button class="secondary" id="favoriteModelInfo">Favorite</button></div>
 </section>
 
 <section class="modal" id="modelsModal">
@@ -671,6 +684,7 @@ var speechModels=[];
 var transcriptionModels=[];
 var videoModels=[];
 var modelFilter="all";
+var modelInfoCurrent=null;
 var busy=false;
 var controller=null;
 var recorder=null;
@@ -1521,6 +1535,26 @@ function toggleFavoriteModel(id){
   if(arr.indexOf(id)>=0)arr=arr.filter(function(x){return x!==id});else arr.unshift(id);
   settings.favoriteModels=arr.slice(0,30);save();showModels()
 }
+
+function openModelInfo(m){
+  modelInfoCurrent=m;
+  q("#modelInfoName").textContent=m.name||m.id;
+  q("#modelInfoDescription").textContent=m.description||m.id||"No description available.";
+  var grid=q("#modelInfoGrid");grid.innerHTML="";
+  var p=m.pricing||{},a=m.architecture||{},rows=[
+    ["Model ID",m.id||""],
+    ["Context",m.context_length?formatTokenCount(m.context_length)+" tokens":"Unknown"],
+    ["Input",Array.isArray(a.input_modalities)?a.input_modalities.join(", "):(a.modality||"Unknown")],
+    ["Output",Array.isArray(a.output_modalities)?a.output_modalities.join(", "):"text"],
+    ["Input price",p.prompt!=null?perMillion(p.prompt):"Unknown"],
+    ["Output price",p.completion!=null?perMillion(p.completion):"Unknown"]
+  ];
+  rows.forEach(function(x){var d=document.createElement("div");d.className="diagcard";var s=document.createElement("span");s.textContent=x[0];var b=document.createElement("b");b.textContent=x[1];d.appendChild(s);d.appendChild(b);grid.appendChild(d)});
+  var params=q("#modelInfoParams");params.innerHTML="";(m.supported_parameters||[]).slice(0,40).forEach(function(x){var tag=document.createElement("span");tag.className="modelbadge";tag.textContent=x;params.appendChild(tag)});
+  q("#favoriteModelInfo").textContent=(settings.favoriteModels||[]).indexOf(m.id)>=0?"Unfavorite":"Favorite";
+  openModal("#modelInfoModal")
+}
+
 function showModels(){
   var term=(q("#modelSearch").value||"").toLowerCase(),box=q("#models");box.innerHTML="";
   var recent=Array.isArray(settings.recentModels)?settings.recentModels:[];
@@ -1553,7 +1587,8 @@ function showModels(){
     if(caps.length)b.appendChild(badges);
     b.onclick=function(){settings.model=m.id;rememberModel(m.id);closeModals();render();toast("Model changed to "+m.id)};
     var star=document.createElement("button");star.className="modelstar"+(favorites.indexOf(m.id)>=0?" on":"");star.textContent=favorites.indexOf(m.id)>=0?"★":"☆";star.title="Favorite model";star.onclick=function(){toggleFavoriteModel(m.id)};
-    row.appendChild(b);row.appendChild(star);box.appendChild(row)
+    var info=document.createElement("button");info.className="modelinfo";info.textContent="i";info.title="Model details";info.onclick=function(){openModelInfo(m)};
+    row.appendChild(b);row.appendChild(star);row.appendChild(info);box.appendChild(row)
   })
 }
 
@@ -2347,6 +2382,8 @@ q("#saveSettings").onclick=function(){
 q("#commandSearch").oninput=renderCommandPalette;
 q("#runDiagnostics").onclick=runDiagnostics;
 q("#copyDiagnostics").onclick=function(){navigator.clipboard.writeText(lastDiagReport||"No diagnostics run yet.").then(function(){toast("Diagnostics copied")})};
+q("#useModelInfo").onclick=function(){if(!modelInfoCurrent)return;settings.model=modelInfoCurrent.id;rememberModel(modelInfoCurrent.id);closeModals();render();toast("Model changed to "+modelInfoCurrent.id)};
+q("#favoriteModelInfo").onclick=function(){if(!modelInfoCurrent)return;toggleFavoriteModel(modelInfoCurrent.id);q("#favoriteModelInfo").textContent=(settings.favoriteModels||[]).indexOf(modelInfoCurrent.id)>=0?"Unfavorite":"Favorite"};
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
 q("#globalSearchInput").oninput=globalSearch;
