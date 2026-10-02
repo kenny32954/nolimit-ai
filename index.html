@@ -213,6 +213,10 @@
 <div class="field"><label>Prompt</label><textarea id="videoPrompt" placeholder="Describe the video you want"></textarea></div>
 <div class="field"><label>Video model</label><select id="videoModel"></select></div>
 <div class="row">
+<div class="field" style="flex:1;min-width:180px"><label>First frame image</label><input id="videoFrameInput" type="file" accept="image/*"><div class="smallnote" id="videoFrameName">Optional image-to-video first frame.</div></div>
+<div class="field" style="flex:1;min-width:180px"><label>Reference image</label><input id="videoReferenceInput" type="file" accept="image/*"><div class="smallnote" id="videoReferenceName">Optional style/content reference.</div></div>
+</div>
+<div class="row">
 <div class="field" style="flex:1;min-width:130px"><label>Duration</label><select id="videoDuration"><option value="4">4 sec</option><option value="6">6 sec</option><option value="8">8 sec</option></select></div>
 <div class="field" style="flex:1;min-width:130px"><label>Resolution</label><select id="videoResolution"><option value="720p">720p</option><option value="1080p">1080p</option></select></div>
 <div class="field" style="flex:1;min-width:130px"><label>Aspect ratio</label><select id="videoRatio"><option>16:9</option><option>9:16</option><option>1:1</option></select></div>
@@ -230,9 +234,13 @@
 <div class="notice">Image generation uses OpenRouter image models and may consume credits.</div>
 <div class="field"><label>Prompt</label><textarea id="imagePrompt" placeholder="Describe the image you want"></textarea></div>
 <div class="field"><label>Model</label><select id="imageModel"></select></div>
+<div class="field"><label>Reference image</label><input id="imageReferenceInput" type="file" accept="image/*"><div class="smallnote" id="imageReferenceName">Optional image-to-image reference.</div></div>
 <div class="row">
 <div class="field" style="flex:1;min-width:160px"><label>Aspect ratio</label><select id="imageRatio"><option>1:1</option><option>16:9</option><option>9:16</option><option>4:3</option><option>3:4</option></select></div>
 <div class="field" style="flex:1;min-width:160px"><label>Format</label><select id="imageFormat"><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="webp">WebP</option></select></div>
+<div class="field" style="flex:1;min-width:160px"><label>Quality</label><select id="imageQuality"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+<div class="field" style="flex:1;min-width:160px"><label>Background</label><select id="imageBackground"><option value="auto">Auto</option><option value="transparent">Transparent</option><option value="opaque">Opaque</option></select></div>
+<div class="field" style="flex:1;min-width:160px"><label>Images</label><select id="imageCount"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
 </div>
 <button class="primary" id="generateImage">Generate</button>
 <div id="imageProgress" class="progress hidden"><i></i></div>
@@ -289,6 +297,9 @@ var recorderChunks=[];
 var artifactCode="";
 var manageChatId=null;
 var installPrompt=null;
+var imageReferenceData="";
+var videoFrameData="";
+var videoReferenceData="";
 
 function q(s){return document.querySelector(s)}
 function qa(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
