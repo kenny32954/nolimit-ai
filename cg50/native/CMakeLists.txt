@@ -29,6 +29,7 @@ endif()
 add_executable(qbai_cg50
   src/main.c
   src/diagnostics.c
+  src/offline.c
   src/editor.c
   src/picker.c
   src/reference.c
