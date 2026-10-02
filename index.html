@@ -605,6 +605,8 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="primary" id="saveProject">Save project</button>
 <button class="secondary" id="newProject">New project</button>
 <button class="secondary" id="assignProject">Assign current chat</button>
+<button class="secondary" id="exportProject">Export project</button>
+<button class="secondary" id="importProjectBtn">Import project</button><input id="importProjectFile" type="file" accept=".json,application/json" hidden>
 <button class="danger" id="deleteProject">Delete project</button>
 </div>
 </section>
@@ -3288,6 +3290,25 @@ function assignProject(){
   c.projectId=id||"";c.updated=Date.now();save();renderProjectChats(id);render();toast(id?"Chat assigned to project":"Chat removed from project")
 }
 
+async function exportSelectedProject(){
+  var id=q("#projectSelect").value,p=projects.find(function(x){return x.id===id});if(!p)return toast("Choose a project first");
+  var projectChats=chats.filter(function(ch){return ch.projectId===id&&!ch.temporary}).map(function(ch){return Object.assign({},ch,{messages:(ch.messages||[]).map(serializableMessage)})});
+  var ids=new Set();projectChats.forEach(function(ch){mediaIdsForChat(ch).forEach(function(mid){ids.add(mid)})});
+  var records=await listMediaRecords(),data={type:"quantum-breaks-ai-project",version:1,exported_at:new Date().toISOString(),project:Object.assign({},p),chats:projectChats,media:records.filter(function(rec){return ids.has(rec.id)})};
+  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download=(p.name||"project").replace(/[^\w-]+/g,"_")+".quantum-project.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000);toast("Project exported")
+}
+async function importProjectFile(file){
+  try{
+    var data=JSON.parse(await file.text());if(!data||data.type!=="quantum-breaks-ai-project"||!data.project)throw new Error("Not a Quantum Breaks AI project backup");
+    var newId=uid(),p=Object.assign({},data.project,{id:newId,name:String(data.project.name||"Imported project").slice(0,80),created:Date.now(),updated:Date.now()});
+    projects.unshift(p);
+    if(Array.isArray(data.media))await restoreMediaRecords(data.media);
+    var importedChats=(Array.isArray(data.chats)?data.chats:[]).map(function(ch){return Object.assign({},ch,{id:uid(),projectId:newId,temporary:false,archivedAt:0,trashedAt:0,created:Date.now(),updated:Date.now()})});
+    chats=importedChats.concat(chats);if(importedChats.length)active=importedChats[0].id;
+    save();projectOptions();q("#projectSelect").value=newId;loadProjectFields(newId);render();restoreDraft();toast("Project imported with "+importedChats.length+" chat"+(importedChats.length===1?"":"s"))
+  }catch(e){toast("Project import failed: "+e.message)}
+}
+
 function deleteProject(){
   var id=q("#projectSelect").value;if(!id)return toast("Choose a project");
   var p=projects.find(function(x){return x.id===id});if(!p)return;
@@ -3487,6 +3508,9 @@ q("#projectSelect").onchange=function(){loadProjectFields(q("#projectSelect").va
 q("#newProject").onclick=createProject;
 q("#saveProject").onclick=saveProject;
 q("#assignProject").onclick=assignProject;
+q("#exportProject").onclick=exportSelectedProject;
+q("#importProjectBtn").onclick=function(){q("#importProjectFile").click()};
+q("#importProjectFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importProjectFile(f);e.target.value=""};
 q("#deleteProject").onclick=deleteProject;
 q("#saveProfile").onclick=saveCurrentProfile;
 q("#refreshUsage").onclick=refreshUsage;
