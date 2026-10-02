@@ -15,49 +15,26 @@ jobs:
   build-g3a:
     runs-on: ubuntu-latest
 
+    container:
+      image: ghcr.io/therainbowphoenix/gint-docker:main
+
     steps:
       - name: Check out CG50 branch
         uses: actions/checkout@v4
         with:
           ref: cg50-integration
+          fetch-depth: 0
 
-      - name: Install host dependencies
+      - name: Show toolchain
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git curl cmake python3 python3-pip \
-            build-essential pkg-config \
-            libpng-dev libusb-1.0-0-dev libudev-dev \
-            libsdl2-dev libncurses-dev zip
-
-      - name: Install GiteaPC
-        run: |
-          curl -L \
-            "https://git.planet-casio.com/Lephenixnoir/GiteaPC/raw/branch/master/install.sh" \
-            -o /tmp/giteapc-install.sh
-          yes | bash /tmp/giteapc-install.sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install fxSDK and SH toolchain
-        run: |
-          source "$HOME/.profile" 2>/dev/null || true
-          yes | giteapc install \
-            Lephenixnoir/fxsdk:noudisks2 \
-            Lephenixnoir/sh-elf-binutils \
-            Lephenixnoir/sh-elf-gcc
-
-      - name: Install CG50 libraries
-        run: |
-          source "$HOME/.profile" 2>/dev/null || true
-          yes | giteapc install \
-            Lephenixnoir/OpenLibm \
-            Vhex-Kernel-Core/fxlibc \
-            Lephenixnoir/gint
+          which fxsdk
+          which sh-elf-gcc
+          fxsdk --version || true
+          sh-elf-gcc --version | head -1
 
       - name: Build QBAI.g3a
         working-directory: cg50/native
         run: |
-          source "$HOME/.profile" 2>/dev/null || true
           fxsdk build-cg
 
       - name: Locate and verify output
@@ -79,19 +56,16 @@ jobs:
           set -e
           G3A_PATH="${{ steps.locate.outputs.path }}"
           mkdir -p release
-          base64 -w 0 "$G3A_PATH" > release/QBAI.g3a.b64
+          base64 "$G3A_PATH" | tr -d '\n' > release/QBAI.g3a.b64
           printf '\n' >> release/QBAI.g3a.b64
           sha256sum "$G3A_PATH" | awk '{print $1}' > release/QBAI.g3a.sha256
           cp "$G3A_PATH" /tmp/QBAI.g3a
-          zip -9 /tmp/QBAI-CG50.zip "$G3A_PATH"
 
       - name: Upload calculator binary
         uses: actions/upload-artifact@v4
         with:
           name: QBAI-CG50
-          path: |
-            /tmp/QBAI.g3a
-            /tmp/QBAI-CG50.zip
+          path: /tmp/QBAI.g3a
           if-no-files-found: error
 
       - name: Publish build encoding to branch
