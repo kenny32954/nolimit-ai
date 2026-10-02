@@ -307,6 +307,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="row" style="margin-bottom:14px">
 <button class="primary" id="connectNow">Connect OpenRouter</button>
 <button class="secondary" id="manualKeyBtn">Use my API key</button>
+<button class="secondary" id="testKeyBtn">Test connection</button>
 <button class="danger" id="disconnectNow">Disconnect</button>
 </div>
 <div class="field hidden" id="manualKeyField"><label>OpenRouter API key</label><input id="manualKey" type="password" autocomplete="off" placeholder="sk-or-v1-..."><div class="smallnote">Stored only in this browser for this site. It is not committed to GitHub.</div></div>
@@ -911,6 +912,23 @@ function openSettings(){
 function b64url(bytes){var s="";bytes.forEach(function(b){s+=String.fromCharCode(b)});return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
 async function digest(v){var h=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return b64url(new Uint8Array(h))}
 
+
+async function testConnection(){
+  var candidate=q("#manualKey").value.trim()||getKey();
+  if(!candidate)return toast("Connect OpenRouter or paste a key first");
+  q("#testKeyBtn").disabled=true;q("#testKeyBtn").textContent="Testing…";
+  try{
+    var r=await fetch(BASE+"/key",{headers:{Authorization:"Bearer "+candidate}});
+    var j=await r.json();if(!r.ok)throw new Error(errorText(j,"HTTP "+r.status));
+    var bits=["Connection works"];if(j.data&&j.data.label)bits.push(j.data.label);if(j.data&&j.data.limit_remaining!=null)bits.push(money(j.data.limit_remaining)+" remaining");
+    q("#authNotice").innerHTML="<strong>Connected.</strong> "+escapeHTML(bits.join(" · "));
+    toast("OpenRouter connection works")
+  }catch(e){
+    q("#authNotice").textContent="Connection test failed: "+e.message;toast("Connection test failed")
+  }
+  q("#testKeyBtn").disabled=false;q("#testKeyBtn").textContent="Test connection"
+}
+
 async function connect(){
   if(location.protocol==="file:"){alert("Open the GitHub Pages HTTPS version before connecting.");return}
   var a=new Uint8Array(48);crypto.getRandomValues(a);var verifier=b64url(a);
@@ -1008,8 +1026,15 @@ function addDelta(d,a){
 async function fetchChatWithFallback(body,headers,signal){
   try{
     var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body),signal:signal});
+    if(!r.ok&&[429,502,503,504].indexOf(r.status)>=0){
+      var delay=Math.min(4000,Math.max(700,Number(r.headers.get("retry-after")||1)*1000));toast("Temporary API issue — retrying…");await wait(delay);
+      r=await fetch(BASE+"/chat/completions",{method:"POST",headers:headers,body:JSON.stringify(body),signal:signal})
+    }
     if(r.ok)return r;
     var raw=await r.text();
+    if(r.status===401)throw new Error("OpenRouter rejected this API key. Reconnect or enter a valid key in Settings.");
+    if(r.status===402)throw new Error("OpenRouter reports insufficient credits for this request.");
+    if(r.status===429)throw new Error("OpenRouter rate limit reached. Wait a moment and try again.");
     if(r.status!==400&&r.status!==422)throw new Error(errorRaw(raw,"HTTP "+r.status));
     var simpler=Object.assign({},body);
     delete simpler.reasoning;delete simpler.tools;delete simpler.provider;delete simpler.session_id;delete simpler.response_format;delete simpler.max_tokens;delete simpler.plugins;delete simpler.usage;
@@ -1833,6 +1858,7 @@ q("#researchBtn").onclick=toggleResearch;
 q("#modalShade").onclick=closeModals;
 qa("[data-close]").forEach(function(b){b.onclick=closeModals});
 q("#connectNow").onclick=connect;
+q("#testKeyBtn").onclick=testConnection;
 q("#manualKeyBtn").onclick=function(){q("#manualKeyField").classList.remove("hidden");q("#manualKey").focus()};
 q("#disconnectNow").onclick=function(){localStorage.removeItem(KEYSTORE);closeModals();render();toast("Disconnected")};
 q("#exportWorkspace").onclick=exportWorkspace;
