@@ -434,12 +434,39 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
 .toast{max-width:min(88vw,520px);border-color:color-mix(in srgb,var(--accent) 13%,rgba(255,255,255,.08))!important}
 
 @media(max-width:680px){.appearanceStudio{grid-template-columns:1fr}.appearancePreview{min-height:150px}.themeGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.appearancePreviewBody{margin-top:15px}.appearancePreviewComposer{min-height:39px}}
+
+/* v3.3 desktop rail + notification polish */
+.sideHeadActions{display:flex;align-items:center;gap:2px}.railToggle{display:none!important}
+.toastStack{position:fixed;z-index:150;left:50%;bottom:225px;transform:translateX(-50%);width:min(92vw,540px);display:flex;flex-direction:column-reverse;align-items:center;gap:7px;pointer-events:none}.toastStack .toast{position:relative!important;left:auto!important;bottom:auto!important;transform:translateY(8px) scale(.985)!important;margin:0!important;width:max-content;max-width:100%;opacity:0;pointer-events:auto;transition:opacity .18s ease,transform .18s ease!important}.toastStack .toast.in{opacity:1;transform:none!important}.toastStack .toast:not(:last-child){filter:saturate(.88);opacity:.88}.toastStack .toastaction{justify-content:space-between}
+@media(min-width:900px){
+  .railToggle{display:grid!important;place-items:center}
+  html[data-sidebar-rail="true"] .app{grid-template-columns:76px 1fr!important}
+  html[data-sidebar-rail="true"] .side{width:76px!important;padding-left:7px!important;padding-right:7px!important}
+  html[data-sidebar-rail="true"] .composeWrap{left:76px!important}
+  html[data-sidebar-rail="true"] .chat{padding-left:max(50px,calc((100vw - 76px - var(--content-max,860px))/2))!important;padding-right:max(50px,calc((100vw - 76px - var(--content-max,860px))/2))!important}
+  html[data-sidebar-rail="true"] .brandText,html[data-sidebar-rail="true"] #closeSide,html[data-sidebar-rail="true"] .search,html[data-sidebar-rail="true"] .hist,html[data-sidebar-rail="true"] .navlabel,html[data-sidebar-rail="true"] .buildbadge{display:none!important}
+  html[data-sidebar-rail="true"] .shead{padding:0!important;display:grid!important;grid-template-columns:1fr!important;height:auto!important;gap:5px}
+  html[data-sidebar-rail="true"] .brand{justify-content:center;margin:7px 0 3px}
+  html[data-sidebar-rail="true"] .brandOrb{width:38px;height:38px;border-radius:12px}
+  html[data-sidebar-rail="true"] .sideHeadActions{justify-content:center}
+  html[data-sidebar-rail="true"] .railToggle{width:38px!important;height:34px!important}
+  html[data-sidebar-rail="true"] .new{width:46px!important;height:42px!important;margin:7px auto!important;padding:0!important;justify-content:center;font-size:0;border-radius:13px!important}
+  html[data-sidebar-rail="true"] .new:before{content:"＋";font-size:18px;color:var(--accent2)}
+  html[data-sidebar-rail="true"] .new:after{display:none}
+  html[data-sidebar-rail="true"] .sfoot{padding-top:4px!important;overflow:auto;max-height:calc(100dvh - 110px)}
+  html[data-sidebar-rail="true"] .navgroup{padding:2px 0!important;margin:2px 0!important;background:transparent!important}
+  html[data-sidebar-rail="true"] .navgroup.collapsed .sbtn{display:flex!important}
+  html[data-sidebar-rail="true"] .navgroup .sbtn{width:44px!important;height:40px!important;margin:2px auto!important;padding:0!important;justify-content:center;font-size:0;border-radius:12px}
+  html[data-sidebar-rail="true"] .navgroup .sbtn:before{font-size:14px;width:auto}
+  html[data-sidebar-rail="true"] .navgroup+.navgroup{border-top:1px solid rgba(255,255,255,.035)!important}
+}
+@media(max-width:899px){.toastStack{bottom:232px;width:calc(100vw - 20px)}}
 </style>
 </head>
 <body>
 <div class="app">
 <aside class="side" id="side">
-<div class="shead"><div class="brand"><div class="brandOrb">Q</div><div class="brandText"><strong>Quantum Breaks</strong><small>AI workspace</small></div></div><button class="icon" id="closeSide">✕</button></div>
+<div class="shead"><div class="brand"><div class="brandOrb">Q</div><div class="brandText"><strong>Quantum Breaks</strong><small>AI workspace</small></div></div><div class="sideHeadActions"><button class="icon railToggle" id="sideRailToggle" title="Toggle compact sidebar">↤</button><button class="icon" id="closeSide">✕</button></div></div>
 <button class="new" id="newChat">＋ New chat</button>
 <input class="search" id="chatSearch" placeholder="Search chats">
 <div class="hist" id="history"></div>
@@ -545,6 +572,7 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
 <div class="lightboxStage"><img id="lightboxImage" alt="Preview"></div>
 <div class="lightboxActions"><button id="lightboxOpen">Open original</button><button id="lightboxCopy">Copy image URL</button></div>
 </div>
+<div class="toastStack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 <div class="selectionToolbar" id="selectionToolbar">
 <button id="selCopy">Copy</button>
 <button id="selQuote">Quote</button>
@@ -585,7 +613,7 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
 <h3>Workspace</h3>
 <ul><li>The sidebar is now organized into collapsible AI, Workspace, Create, Chat, and App drawers that remember your layout locally.</li><li>High-frequency AI and Workspace drawers stay open by default, while lower-frequency tool groups start collapsed to reduce visual noise.</li><li>Conversation branches, tasks, snapshots, backups, archives, trash, global search, and encrypted workspace exports remain available.</li></ul>
 <h3>Interface</h3>
-<ul><li>Appearance settings now use a live visual studio with theme cards, accent swatches, and an instant mini-preview instead of plain dropdowns.</li><li>Sidebar tools and the command palette now share a consistent icon language, making dense navigation faster to scan.</li><li>Message action bars, active-chat indicators, scroll controls, cards, and micro-interactions received another polish pass across desktop and mobile.</li></ul>
+<ul><li>Desktop now has a remembered compact sidebar rail that shrinks navigation to a 76px icon strip and gives the conversation substantially more horizontal space.</li><li>Notifications now stack cleanly with entrance/exit motion instead of overlapping each other, and chat history always shows a useful tag or relative-time subtitle.</li><li>The live appearance studio, shared icon language, polished message actions, active-chat indicators, and responsive mobile layout remain part of the v3 design system.</li></ul>
 </div>
 </section>
 
@@ -1094,7 +1122,7 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="3.2.0";
+var APP_VERSION="3.3.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1156,7 +1184,8 @@ var settings=Object.assign({
   webMaxTotal:15,
   autoSpeak:false,
   backgroundNotify:false,
-  navCollapsed:null
+  navCollapsed:null,
+  sidebarRail:false
 },safeJSON(localStorage.getItem(SETSTORE),{}));
 var active=localStorage.getItem(ACTIVE)||"";
 var projects=safeJSON(localStorage.getItem(PROJECT_STORE),[]);
@@ -1257,6 +1286,7 @@ function applyAppearance(){
   root.dataset.accent=settings.accent||"coral";
   root.dataset.density=settings.density||"cozy";
   root.dataset.focus=settings.focusMode?"true":"false";
+  root.dataset.sidebarRail=settings.sidebarRail?"true":"false";
   root.style.setProperty("--content-max",Math.max(680,Math.min(1400,Number(settings.contentWidth)||860))+"px");
   root.style.setProperty("--chat-font",Math.max(14,Math.min(24,Number(settings.chatFontSize)||17))+"px");
   if(settings.accent==="custom"){
@@ -1274,6 +1304,13 @@ function setActiveModel(id){var c=current(),p=projectForChat(c);if(c&&(c.modelOv
 function projectForChat(c){return c&&c.projectId?projects.find(function(p){return p.id===c.projectId}):null}
 function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save()}return c}
 function closeSide(){q("#side").classList.remove("open");q("#shade").classList.remove("show")}
+function toggleSidebarRail(){
+  if(window.matchMedia&&window.matchMedia("(max-width:899px)").matches)return;
+  settings.sidebarRail=!settings.sidebarRail;save();applyAppearance();syncSidebarRailButton()
+}
+function syncSidebarRailButton(){
+  var b=q("#sideRailToggle");if(!b)return;b.textContent=settings.sidebarRail?"↦":"↤";b.title=settings.sidebarRail?"Expand sidebar":"Collapse sidebar";b.setAttribute("aria-label",b.title)
+}
 function openModal(id){
   var alreadyOpen=qa(".modal.show");
   if(!alreadyOpen.length)lastFocusedElement=document.activeElement;
@@ -1286,12 +1323,12 @@ function closeModals(){
   if(lastFocusedElement&&lastFocusedElement.focus)try{lastFocusedElement.focus()}catch(e){}
   lastFocusedElement=null
 }
-function toast(t){var d=document.createElement("div");d.className="toast";d.setAttribute("role","status");d.setAttribute("aria-live","polite");d.textContent=t;d.title="Click to dismiss";d.onclick=function(){d.remove()};document.body.appendChild(d);setTimeout(function(){if(d.isConnected)d.remove()},2500)}
+function toast(t){var d=document.createElement("div");d.className="toast";d.setAttribute("role","status");d.textContent=t;d.title="Click to dismiss";d.onclick=function(){d.remove()};(q("#toastStack")||document.body).appendChild(d);requestAnimationFrame(function(){d.classList.add("in")});setTimeout(function(){if(d.isConnected){d.classList.remove("in");setTimeout(function(){if(d.isConnected)d.remove()},180)}},2500)}
 function toastAction(text,label,action){
-  var d=document.createElement("div");d.className="toast toastaction";
+  var d=document.createElement("div");d.className="toast toastaction";d.setAttribute("role","status");
   var s=document.createElement("span");s.textContent=text;
   var b=document.createElement("button");b.textContent=label;b.onclick=function(){try{action()}finally{d.remove()}};
-  d.appendChild(s);d.appendChild(b);document.body.appendChild(d);setTimeout(function(){if(d.isConnected)d.remove()},6000)
+  d.appendChild(s);d.appendChild(b);(q("#toastStack")||document.body).appendChild(d);requestAnimationFrame(function(){d.classList.add("in")});setTimeout(function(){if(d.isConnected){d.classList.remove("in");setTimeout(function(){if(d.isConnected)d.remove()},180)}},6000)
 }
 function fmtBytes(n){if(!n)return "";if(n<1024)return n+" B";if(n<1048576)return (n/1024).toFixed(1)+" KB";return (n/1048576).toFixed(1)+" MB"}
 function money(n){if(n==null||isNaN(Number(n)))return "";var x=Number(n);return x<0.001?"$"+x.toFixed(5):"$"+x.toFixed(3)}
@@ -1542,7 +1579,10 @@ function renderHistory(){
     var row=document.createElement("div");row.className="historyitem"+(c.id===active?" on":"");
     var b=document.createElement("button");b.className="hrow";
     var ht=document.createElement("span");ht.className="histtitle";ht.textContent=(c.pinned?"◆ ":"")+(c.title||"New chat");b.appendChild(ht);
-    if(c.tags&&c.tags.length){var tg=document.createElement("span");tg.className="histtags";tg.textContent=c.tags.map(function(x){return "#"+x}).join(" ");b.appendChild(tg)}
+    var tg=document.createElement("span");tg.className="histtags";
+    if(c.tags&&c.tags.length)tg.textContent=c.tags.map(function(x){return "#"+x}).join(" ");
+    else{var age=Date.now()-Number(c.updated||c.created||Date.now()),mins=Math.max(0,Math.round(age/60000));tg.textContent=mins<1?"just now":mins<60?mins+"m ago":mins<1440?Math.round(mins/60)+"h ago":Math.round(mins/1440)+"d ago"}
+    b.appendChild(tg);
     b.onclick=function(){active=c.id;save();closeSide();render();restoreDraft()};
     var more=document.createElement("button");more.className="chatmore";more.textContent="⋯";
     more.onclick=function(e){e.stopPropagation();manageChatId=c.id;openChatManage()};
@@ -4617,6 +4657,7 @@ function toggleResearch(){var on=!(settings.web&&settings.fetch);settings.web=on
 
 q("#menuBtn").onclick=function(){q("#side").classList.add("open");q("#shade").classList.add("show")};
 q("#closeSide").onclick=q("#shade").onclick=closeSide;
+q("#sideRailToggle").onclick=toggleSidebarRail;
 q("#newChat").onclick=newChat;
 q("#chatSearch").oninput=renderHistory;
 q("#attach").onclick=function(){q("#files").click()};
@@ -4933,6 +4974,7 @@ function handleLaunchAction(){
 setupAppearanceStudio();
 setupSidebarGroups();
 setupAccessibility();
+syncSidebarRailButton();
 finishAuth().then(function(){render();restoreDraft();handleLaunchAction();setTimeout(function(){ensureModelCatalog().then(function(){render()})},250)})
 })();
 </script>
