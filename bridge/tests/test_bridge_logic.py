@@ -64,6 +64,9 @@ class BridgeProtocolTests(unittest.TestCase):
         qb_bridge.handle_line(serial, "H:QBAI:2")
         self.assertEqual(serial.lines, [b"K:QBAI:2\n"])
 
+    def test_configured_serial_port(self):
+        self.assertEqual(qb_bridge.resolve_serial_port("COM42"), "COM42")
+
     def test_subject_detection(self):
         self.assertEqual(
             resolve_subject("auto", "Balance this stoichiometry reaction"),
