@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Quantum Breaks AI serial bridge for the Casio fx-CG50.
 
-Protocol v0.2:
+Protocol v0.3:
     Handshake:
-        CG50 -> PC: H:QBAI:2
-        PC -> CG50: K:QBAI:2
+        CG50 -> PC: H:QBAI:3
+        PC -> CG50: K:QBAI:3
 
-    Legacy calculator request:
+    Legacy request (v0.1):
         Q:<id>:<base64 UTF-8 prompt>
 
-    Subject-aware request:
+    Subject-aware request (v0.2):
         Q:<id>:<subject>:<mode>:<base64 UTF-8 prompt>
+
+    College-capable request (v0.3):
+        Q:<id>:<subject>:<mode>:<level>:<base64 UTF-8 prompt>
 
     PC response:
         A:<id>:<seq>:<done 0|1>:<base64 UTF-8 chunk>
@@ -39,6 +42,7 @@ except ImportError:
 
 from subject_router import (
     build_system_prompt,
+    normalize_level,
     normalize_mode,
     resolve_subject,
     subject_label,
@@ -51,14 +55,15 @@ API_KEY = os.getenv("QB_API_KEY", "")
 MODEL = os.getenv("QB_MODEL", "")
 SYSTEM_PROMPT = os.getenv(
     "QB_SYSTEM_PROMPT",
-    "You are Quantum Breaks AI, a school-focused tutor running through a Casio fx-CG50. "
-    "Be accurate, concise, encouraging, and useful across school subjects."
+    "You are Quantum Breaks AI, an academic tutor running through a Casio fx-CG50. "
+    "You can handle secondary-school through advanced undergraduate work. "
+    "Be accurate, rigorous, concise, and clear."
 )
 MAX_HISTORY_MESSAGES = int(os.getenv("QB_HISTORY_MESSAGES", "12"))
 CHUNK_BYTES = max(32, int(os.getenv("QB_CHUNK_BYTES", "144")))
 
-# Keep separate short histories per subject so chemistry context does not
-# accidentally bleed into an English or history session.
+# Separate histories by subject + academic level so a proof-heavy linear algebra
+# session does not contaminate a simpler school-level session.
 histories = {}
 
 
@@ -79,16 +84,20 @@ def extract_text(payload):
     choices = payload.get("choices") or []
     if not choices:
         return ""
+
     message = choices[0].get("message") or {}
     content = message.get("content", "")
+
     if isinstance(content, str):
         return content
+
     if isinstance(content, list):
         parts = []
         for item in content:
             if isinstance(item, dict) and item.get("type") in ("text", "output_text"):
                 parts.append(str(item.get("text", "")))
         return "".join(parts)
+
     return str(content)
 
 
@@ -97,26 +106,37 @@ def parse_request(line):
     if not line:
         return None
 
-    # Backwards compatibility with protocol v0.1.
-    legacy = line.split(":", 2)
-    if len(legacy) == 3 and legacy[0] == "Q":
-        # A v0.2 frame has more separators; only treat this as legacy when
-        # there are exactly two colons in the full line.
-        if line.count(":") == 2:
-            return {
-                "id": legacy[1],
-                "subject": "auto",
-                "mode": "explain",
-                "prompt": b64d(legacy[2]).strip(),
-            }
+    # v0.1: Q:<id>:<payload>
+    if line.startswith("Q:") and line.count(":") == 2:
+        parts = line.split(":", 2)
+        return {
+            "id": parts[1],
+            "subject": "auto",
+            "mode": "explain",
+            "level": "auto",
+            "prompt": b64d(parts[2]).strip(),
+        }
 
-    parts = line.split(":", 4)
-    if len(parts) == 5 and parts[0] == "Q":
+    # v0.2: Q:<id>:<subject>:<mode>:<payload>
+    if line.startswith("Q:") and line.count(":") == 4:
+        parts = line.split(":", 4)
         return {
             "id": parts[1],
             "subject": parts[2],
             "mode": parts[3],
+            "level": "auto",
             "prompt": b64d(parts[4]).strip(),
+        }
+
+    # v0.3: Q:<id>:<subject>:<mode>:<level>:<payload>
+    if line.startswith("Q:") and line.count(":") == 5:
+        parts = line.split(":", 5)
+        return {
+            "id": parts[1],
+            "subject": parts[2],
+            "mode": parts[3],
+            "level": parts[4],
+            "prompt": b64d(parts[5]).strip(),
         }
 
     if line.startswith("Q:"):
@@ -125,14 +145,21 @@ def parse_request(line):
     return None
 
 
-def call_model(prompt, requested_subject="auto", requested_mode="explain"):
+def call_model(
+    prompt,
+    requested_subject="auto",
+    requested_mode="explain",
+    requested_level="auto",
+):
     subject = resolve_subject(requested_subject, prompt)
     mode = normalize_mode(requested_mode)
-    history = histories.get(subject, [])
+    level = normalize_level(requested_level)
+    history_key = (subject, level)
+    history = histories.get(history_key, [])
 
     messages = [{
         "role": "system",
-        "content": build_system_prompt(SYSTEM_PROMPT, subject, mode),
+        "content": build_system_prompt(SYSTEM_PROMPT, subject, mode, level),
     }]
     messages.extend(history[-MAX_HISTORY_MESSAGES:])
     messages.append({"role": "user", "content": prompt})
@@ -149,7 +176,7 @@ def call_model(prompt, requested_subject="auto", requested_mode="explain"):
         headers={
             "Authorization": "Bearer " + API_KEY,
             "Content-Type": "application/json",
-            "User-Agent": "QuantumBreaksAI-CG50-Bridge/0.3",
+            "User-Agent": "QuantumBreaksAI-CG50-Bridge/0.4",
         },
     )
 
@@ -168,9 +195,9 @@ def call_model(prompt, requested_subject="auto", requested_mode="explain"):
 
     history.append({"role": "user", "content": prompt})
     history.append({"role": "assistant", "content": answer})
-    histories[subject] = history[-MAX_HISTORY_MESSAGES:]
+    histories[history_key] = history[-MAX_HISTORY_MESSAGES:]
 
-    return subject, mode, answer
+    return subject, mode, level, answer
 
 
 def utf8_chunks(text, max_bytes):
@@ -183,8 +210,6 @@ def utf8_chunks(text, max_bytes):
             yield bytes(current)
             current.clear()
 
-        # A single Unicode scalar is at most 4 UTF-8 bytes, so with the
-        # enforced minimum chunk size this branch is only defensive.
         if len(encoded) > max_bytes:
             if current:
                 yield bytes(current)
@@ -209,6 +234,10 @@ def send_answer(ser, req_id, text):
 def handle_line(ser, line):
     line = line.strip()
 
+    # Keep v2 handshake compatibility while preferring v3.
+    if line == "H:QBAI:3":
+        send_line(ser, "K:QBAI:3")
+        return
     if line == "H:QBAI:2":
         send_line(ser, "K:QBAI:2")
         return
@@ -223,16 +252,18 @@ def handle_line(ser, line):
         if not prompt:
             raise RuntimeError("Empty prompt.")
 
-        subject, mode, answer = call_model(
+        subject, mode, level, answer = call_model(
             prompt,
             req["subject"],
             req["mode"],
+            req["level"],
         )
 
-        print("[%s] %s / %s: %s" % (
+        print("[%s] %s / %s / %s: %s" % (
             req_id,
             subject_label(subject),
             mode,
+            level,
             prompt,
         ))
         print(" -> %s" % answer.replace("\n", " ")[:200])
@@ -242,11 +273,13 @@ def handle_line(ser, line):
         message = str(exc)
         print(" !! " + message, file=sys.stderr)
         req_id = "0"
+
         try:
             if line.startswith("Q:"):
                 req_id = line.split(":", 2)[1]
         except Exception:
             pass
+
         send_line(ser, "E:%s:%s" % (req_id, b64e(message)))
 
 
@@ -255,6 +288,7 @@ def resolve_serial_port(configured_port):
         return configured_port
 
     ports = list(list_ports.comports())
+
     if len(ports) == 1:
         chosen = ports[0].device
         print("Auto-selected serial port: %s" % chosen)
@@ -269,6 +303,7 @@ def resolve_serial_port(configured_port):
     for port in ports:
         description = getattr(port, "description", "") or ""
         print("  %s  %s" % (port.device, description))
+
     return ""
 
 
@@ -276,24 +311,27 @@ def main():
     port = resolve_serial_port(PORT)
     if not port:
         return 2
+
     if not API_KEY:
         print("Set QB_API_KEY in your environment. Do not hard-code it.")
         return 2
+
     if not MODEL:
         print("Set QB_MODEL to the model ID you want Quantum Breaks AI to use.")
         return 2
 
-    print("Quantum Breaks AI CG50 bridge v0.3")
+    print("Quantum Breaks AI CG50 bridge v0.4")
     print("Serial: %s @ %d" % (port, BAUD))
     print("API: %s" % API_URL)
     print("Model: %s" % MODEL)
-    print("Handshake: QBAI protocol v2")
-    print("Subjects: auto + school subject packs")
-    print("Modes: answer, explain, steps, check, quiz, summary, flashcards")
+    print("Handshake: QBAI protocol v3")
+    print("Academic levels: auto, school, college, advanced")
+    print("Modes: answer, explain, steps, check, quiz, summary, flashcards, derive, proof, research")
 
     with serial.Serial(port, BAUD, timeout=0.25) as ser:
         time.sleep(0.5)
         ser.reset_input_buffer()
+
         while True:
             raw = ser.readline()
             if raw:
