@@ -662,7 +662,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="field"><label>Model 1</label><input id="compareModel1" list="modelOptions"></div>
 <div class="field"><label>Model 2</label><input id="compareModel2" list="modelOptions" placeholder="provider/model"></div>
 <div class="field"><label>Model 3 (optional)</label><input id="compareModel3" list="modelOptions" placeholder="provider/model"></div>
-<button class="primary" id="runCompare">Run comparison</button>
+<div class="row"><button class="primary" id="runCompare">Run comparison</button><button class="secondary hidden" id="synthesizeCompare">Synthesize answers</button></div>
 <div id="compareProgress" class="progress hidden"><i></i></div>
 <div id="compareOutput" class="comparegrid" style="margin-top:12px"></div>
 </section>
@@ -854,6 +854,8 @@ var transcriptionModels=[];
 var videoModels=[];
 var modelFilter="all";
 var modelInfoCurrent=null;
+var lastComparePrompt="";
+var lastCompareResults=[];
 var busy=false;
 var controller=null;
 var recorder=null;
@@ -2340,7 +2342,7 @@ async function openCompare(){
   if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
   openModal("#compareModal");
   q("#compareModel1").value=effectiveModel(ensure());
-  q("#compareOutput").innerHTML="";
+  q("#compareOutput").innerHTML="";lastComparePrompt="";lastCompareResults=[];q("#synthesizeCompare").classList.add("hidden");
   await ensureModelCatalog();fillModelDatalist()
 }
 
@@ -2351,8 +2353,8 @@ async function compareOne(model,prompt){
   if(settings.reasoning!=="none")body.reasoning={effort:settings.reasoning,summary:"auto"};
   var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
   var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Comparison request failed"));
-  var m=j.choices&&j.choices[0]&&j.choices[0].message||{};
-  return {requested:model,served:j.model||model,text:m.content||"",usage:j.usage||{},cost:j.usage&&j.usage.cost!=null?j.usage.cost:j.cost}
+  var m=j.choices&&j.choices[0]&&j.choices[0].message||{},holder={content:"",images:[]};collectOutputContent(m.content,holder);
+  return {requested:model,served:j.model||model,text:holder.content||"",usage:j.usage||{},cost:j.usage&&j.usage.cost!=null?j.usage.cost:j.cost}
 }
 
 async function runCompare(){
@@ -2365,6 +2367,8 @@ async function runCompare(){
   var results=await Promise.all(selected.map(async function(model){
     try{return await compareOne(model,prompt)}catch(e){return {requested:model,error:e.message}}
   }));
+  lastComparePrompt=prompt;lastCompareResults=results.filter(function(x){return !x.error&&x.text});
+  q("#synthesizeCompare").classList.toggle("hidden",lastCompareResults.length<2);
   results.forEach(function(res){
     var card=document.createElement("div");card.className="comparecard";
     var h=document.createElement("h3");h.textContent=res.requested;card.appendChild(h);
@@ -2386,6 +2390,32 @@ async function runCompare(){
     q("#compareOutput").appendChild(card)
   });
   q("#runCompare").disabled=false;q("#compareProgress").classList.add("hidden")
+}
+
+async function synthesizeComparison(){
+  if(lastCompareResults.length<2)return toast("Run a comparison with at least two successful answers first");
+  if(!confirm("Synthesis makes one additional model call and may use more API credits. Continue?"))return;
+  var btn=q("#synthesizeCompare");btn.disabled=true;btn.textContent="Synthesizing…";
+  try{
+    var blocks=lastCompareResults.map(function(r,i){return "ANSWER "+(i+1)+" — "+(r.served||r.requested)+"\n"+String(r.text||"")}).join("\n\n---\n\n").slice(0,120000);
+    var model=effectiveModel(ensure()),body={model:model,messages:[
+      {role:"system",content:"Synthesize the supplied candidate answers into one accurate, useful response to the original user request. Resolve disagreements when evidence in the answers supports doing so; otherwise preserve uncertainty and state the disagreement clearly. Do not mention this synthesis process unless useful. For political or electoral topics, remain neutral, factual, and do not recommend a political choice."},
+      {role:"user",content:"ORIGINAL REQUEST:\n"+lastComparePrompt+"\n\nCANDIDATE ANSWERS:\n"+blocks}
+    ],temperature:0.25,stream:false,usage:{include:true}};
+    var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
+    var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Synthesis failed"));
+    var m=j.choices&&j.choices[0]&&j.choices[0].message||{},holder={content:"",images:[]};collectOutputContent(m.content,holder);
+    var result={requested:model,served:j.model||model,text:holder.content||"",usage:j.usage||{},cost:j.usage&&j.usage.cost!=null?j.usage.cost:j.cost};
+    var card=document.createElement("div");card.className="comparecard";
+    var h=document.createElement("h3");h.textContent="Synthesis · "+result.served;card.appendChild(h);
+    var t=document.createElement("div");t.className="comparetext";t.textContent=result.text;card.appendChild(t);
+    var meta=document.createElement("div");meta.className="comparemeta";var bits=[];if(result.usage&&result.usage.total_tokens!=null)bits.push(result.usage.total_tokens+" tokens");if(result.cost!=null)bits.push(money(result.cost));meta.textContent=bits.join(" · ");card.appendChild(meta);
+    var actions=document.createElement("div");actions.className="row";actions.style.marginTop="9px";
+    var cp=document.createElement("button");cp.className="secondary";cp.textContent="Copy";cp.onclick=function(){navigator.clipboard.writeText(result.text).then(function(){toast("Copied")})};
+    var use=document.createElement("button");use.className="primary";use.textContent="Use in chat";use.onclick=function(){var ch=ensure();ch.messages.push({role:"user",created:Date.now(),content:lastComparePrompt});ch.messages.push({role:"assistant",created:Date.now(),finished:Date.now(),content:result.text,model:result.served,usage:result.usage,cost:result.cost});if(ch.title==="New chat")ch.title=lastComparePrompt.replace(/\s+/g," ").slice(0,48);ch.updated=Date.now();save();closeModals();render();toast("Synthesis added to chat")};
+    actions.appendChild(cp);actions.appendChild(use);card.appendChild(actions);q("#compareOutput").appendChild(card);card.scrollIntoView({behavior:"smooth",block:"nearest"})
+  }catch(e){toast("Synthesis failed: "+e.message)}
+  btn.disabled=false;btn.textContent="Synthesize answers"
 }
 
 function priceZero(m){var p=m.pricing||{};return Number(p.prompt||1)===0&&Number(p.completion||1)===0}
@@ -3576,6 +3606,7 @@ q("#deleteProject").onclick=deleteProject;
 q("#saveProfile").onclick=saveCurrentProfile;
 q("#refreshUsage").onclick=refreshUsage;
 q("#runCompare").onclick=runCompare;
+q("#synthesizeCompare").onclick=synthesizeComparison;
 q("#imageModel").onchange=applyImageCapabilities;
 q("#videoModel").onchange=applyVideoCapabilities;
 q("#imageReferenceInput").onchange=async function(e){
