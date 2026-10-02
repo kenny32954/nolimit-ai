@@ -1203,6 +1203,11 @@ function render(){
   q("#reasonToggle").textContent="◌ Reasoning: "+currentReasoning+(c.reasoningOverride!==undefined&&c.reasoningOverride!==""?" 🔒":"");
   q("#researchBtn").classList.toggle("on",!!settings.web&&!!settings.fetch);
   q("#focusBtn").classList.toggle("on",!!settings.focusMode);
+  var activeBusy=busy&&c.id===busyChatId;
+  q("#send").textContent=activeBusy?"■":"↑";
+  q("#send").classList.toggle("busy",activeBusy);
+  q("#send").disabled=!!(busy&&!activeBusy);
+  q("#send").title=busy&&!activeBusy?"Another chat is generating":(activeBusy?"Stop generation":"Send message");
   renderHistory();
   renderChat();
   renderPending()
@@ -1347,7 +1352,7 @@ function renderChat(){
       }
     })
   }
-  if(busy){var th=document.createElement("div");th.className="thinking";th.textContent="Thinking…";box.appendChild(th)}
+  if(busy&&c.id===busyChatId){var th=document.createElement("div");th.className="thinking";th.textContent="Generating with "+effectiveModel(c)+"…";box.appendChild(th)}
   qa(".codecopy").forEach(function(b){b.onclick=function(){navigator.clipboard.writeText(decodeURIComponent(b.getAttribute("data-code"))).then(function(){toast("Code copied")})}});
   qa(".codepreview").forEach(function(b){b.onclick=function(){
     artifactCode=decodeURIComponent(b.getAttribute("data-code")||"");
