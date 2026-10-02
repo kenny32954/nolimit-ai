@@ -1001,7 +1001,9 @@ function projectForChat(c){return c&&c.projectId?projects.find(function(p){retur
 function ensure(){var c=current();if(!c){c={id:uid(),title:"New chat",created:Date.now(),updated:Date.now(),messages:[]};chats.unshift(c);active=c.id;save()}return c}
 function closeSide(){q("#side").classList.remove("open");q("#shade").classList.remove("show")}
 function openModal(id){
-  lastFocusedElement=document.activeElement;
+  var alreadyOpen=qa(".modal.show");
+  if(!alreadyOpen.length)lastFocusedElement=document.activeElement;
+  alreadyOpen.forEach(function(m){m.classList.remove("show")});
   q("#modalShade").classList.add("show");var modal=q(id);modal.classList.add("show");
   setTimeout(function(){var f=modal.querySelector('input:not([type="hidden"]),textarea,select,button:not([disabled])');if(f)f.focus()},20)
 }
@@ -3998,6 +4000,11 @@ var composer=q(".composer");
 composer.addEventListener("drop",function(e){var fs=e.dataTransfer&&e.dataTransfer.files?Array.prototype.slice.call(e.dataTransfer.files):[];if(fs.length)addFiles(fs)});
 
 document.addEventListener("keydown",function(e){
+  var shown=q(".modal.show");
+  if(e.key==="Tab"&&shown){
+    var focusable=qa(".modal.show button:not([disabled]),.modal.show input:not([disabled]):not([type='hidden']),.modal.show textarea:not([disabled]),.modal.show select:not([disabled]),.modal.show a[href]").filter(function(x){return x.offsetParent!==null});
+    if(focusable.length){var first=focusable[0],last=focusable[focusable.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}
+  }
   var mod=e.ctrlKey||e.metaKey;
   if(e.key==="Escape"){hideSlashMenu();closeLightbox();closeModals();closeSide()}
   if(mod&&e.key.toLowerCase()==="k"){e.preventDefault();loadModels()}
