@@ -10,6 +10,13 @@ Everything else in this repository supports the app with documentation and autom
 
 ## Current feature set
 
+### App experience
+- Installable PWA support
+- Offline app-shell caching
+- Slash commands such as /help, /models, /research, /image, and /video
+- Keyboard shortcuts including Ctrl/Cmd+K for models
+- Online/offline connection status
+
 ### Chat
 - Streaming OpenRouter chat completions
 - Responsive mobile and desktop layouts
@@ -28,6 +35,14 @@ Everything else in this repository supports the app with documentation and autom
 - Detailed network errors instead of a generic "Failed to fetch"
 - Token and cost display when OpenRouter returns usage data
 
+### Projects and memory
+- Local persistent memory that is appended to system context
+- Local projects with project-specific instructions and reference knowledge
+- Assign chats to projects
+- Temporary chats that disappear after reload
+- Search across chat titles, project names, and message content
+- Full workspace export/import for chats, projects, memory, and settings
+
 ### Models and routing
 - Live OpenRouter model catalog
 - Model search
@@ -42,6 +57,12 @@ Everything else in this repository supports the app with documentation and autom
 - Optional provider data-collection denial preference
 - Reasoning effort controls from none through extra high
 - Optional response caching
+
+### Comparison and usage
+- Current-key usage dashboard using OpenRouter's key endpoint
+- Daily, weekly, monthly, total, limit, and remaining spend when available
+- Side-by-side comparison across up to three models
+- Per-comparison token and cost display
 
 ### Web and research
 - OpenRouter server-side web search
@@ -174,7 +195,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v1.2
+Current app generation: v1.3
 
 Major capabilities now include:
 - phone + PC UI
