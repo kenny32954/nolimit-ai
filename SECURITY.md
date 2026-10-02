@@ -2,7 +2,7 @@
 
 ## API keys
 
-NoLimit AI is a browser application. Anything hard-coded into index.html is public to anyone who can load the page.
+Quantum Breaks AI is a browser application. Anything hard-coded into index.html is public to anyone who can load the page.
 
 Do not commit real API keys, passwords, tokens, or other secrets.
 
@@ -16,7 +16,7 @@ The validation workflow rejects strings that look like a real OpenRouter API key
 
 The main app uses a Content Security Policy that restricts network connections to OpenRouter.
 
-Generated HTML previews run inside a sandboxed iframe without same-origin access to the NoLimit AI page.
+Generated HTML previews run inside a sandboxed iframe without same-origin access to the Quantum Breaks AI page.
 
 ## Reporting a security problem
 
