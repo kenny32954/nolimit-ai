@@ -245,6 +245,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="sfoot">
 <div class="navgroup"><div class="navlabel">AI</div>
 <button class="sbtn" id="modelsBtn">Models</button>
+<button class="sbtn" id="profilesSide">AI profiles</button>
 <button class="sbtn" id="compareSide">Compare models</button>
 <button class="sbtn" id="usageSide">Usage</button>
 <button class="sbtn" id="diagnosticsSide">Diagnostics</button></div>
@@ -449,6 +450,16 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 </div>
 </section>
 
+<section class="modal" id="profilesModal">
+<button class="icon closemodal" data-close="1">✕</button>
+<h2>AI profiles</h2>
+<div class="notice">Save a complete AI setup — model, system prompt, reasoning, mode, and tool toggles — then switch between setups instantly.</div>
+<div class="field"><label>New profile name</label><input id="profileName" maxlength="80" placeholder="e.g. Coding, Deep Research, Creative"></div>
+<div class="row"><button class="primary" id="saveProfile">Save current setup</button></div>
+<div style="height:14px"></div>
+<div id="profilesList" class="promptlist"></div>
+</section>
+
 <section class="modal" id="usageModal">
 <button class="icon closemodal" data-close="1">✕</button>
 <h2>OpenRouter usage</h2>
@@ -586,6 +597,7 @@ var KEYSTORE="nolimit_openrouter_key_v2";
 var ACTIVE="nolimit_active_v2";
 var PROJECT_STORE="nolimit_projects_v1";
 var PROMPT_STORE="nolimit_prompts_v1";
+var PROFILE_STORE="quantum_breaks_profiles_v1";
 
 function safeJSON(v,f){try{return JSON.parse(v)||f}catch(e){return f}}
 var chats=safeJSON(localStorage.getItem(STORE),[]);
@@ -625,6 +637,7 @@ var settings=Object.assign({
 var active=localStorage.getItem(ACTIVE)||"";
 var projects=safeJSON(localStorage.getItem(PROJECT_STORE),[]);
 var savedPrompts=safeJSON(localStorage.getItem(PROMPT_STORE),[]);
+var profiles=safeJSON(localStorage.getItem(PROFILE_STORE),[]);
 var pending=[];
 var models=[];
 var imageModels=[];
@@ -654,7 +667,7 @@ function qa(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
 function uid(){return Math.random().toString(36).slice(2)+Date.now().toString(36)}
 function getKey(){return localStorage.getItem(KEYSTORE)||""}
 function isConnected(){return !!getKey()}
-function save(){var light=chats.filter(function(c){return !c.temporary}).map(function(c){return Object.assign({},c,{messages:(c.messages||[]).map(function(m){var x=Object.assign({},m);if(x.role==="user"){if(x.images&&x.images.length)x.images=[];if(x.pdfs&&x.pdfs.length)x.pdfs=[];if(x.textFiles&&x.textFiles.length)x.textFiles=x.textFiles.map(function(f){return{name:f.name,text:(f.text||"").slice(0,120000)}})}if(x.images)x.images=x.images.filter(function(src){return typeof src==="string"&&src.indexOf("data:")!==0});return x})})});try{localStorage.setItem(STORE,JSON.stringify(light));localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));localStorage.setItem(PROMPT_STORE,JSON.stringify(savedPrompts));localStorage.setItem(ACTIVE,active)}catch(e){try{localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));localStorage.setItem(PROMPT_STORE,JSON.stringify(savedPrompts));localStorage.setItem(ACTIVE,active)}catch(_){}}}
+function save(){var light=chats.filter(function(c){return !c.temporary}).map(function(c){return Object.assign({},c,{messages:(c.messages||[]).map(function(m){var x=Object.assign({},m);if(x.role==="user"){if(x.images&&x.images.length)x.images=[];if(x.pdfs&&x.pdfs.length)x.pdfs=[];if(x.textFiles&&x.textFiles.length)x.textFiles=x.textFiles.map(function(f){return{name:f.name,text:(f.text||"").slice(0,120000)}})}if(x.images)x.images=x.images.filter(function(src){return typeof src==="string"&&src.indexOf("data:")!==0});return x})})});try{localStorage.setItem(STORE,JSON.stringify(light));localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));localStorage.setItem(PROMPT_STORE,JSON.stringify(savedPrompts));localStorage.setItem(PROFILE_STORE,JSON.stringify(profiles));localStorage.setItem(ACTIVE,active)}catch(e){try{localStorage.setItem(SETSTORE,JSON.stringify(settings));localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));localStorage.setItem(PROMPT_STORE,JSON.stringify(savedPrompts));localStorage.setItem(ACTIVE,active)}catch(_){}}}
 function applyAppearance(){
   document.documentElement.dataset.theme=settings.theme||"dark";
   document.documentElement.dataset.accent=settings.accent||"coral";
@@ -930,6 +943,7 @@ function renderPending(){
 var COMMANDS=[
   {name:"New chat",hint:"Ctrl/Cmd+N",run:newChat},
   {name:"Choose model",hint:"Ctrl/Cmd+K",run:loadModels},
+  {name:"AI profiles",hint:"Saved model + tool setups",run:openProfiles},
   {name:"Research mode",hint:"Web + page reading",run:toggleResearch},
   {name:"Create image",hint:"Image studio",run:openImage},
   {name:"Create video",hint:"Video studio",run:openVideo},
@@ -1777,7 +1791,7 @@ function exportChat(){
 
 function exportWorkspace(){
   var safeSettings=Object.assign({},settings);
-  var data={type:"quantum-breaks-ai-workspace",version:2,exported_at:new Date().toISOString(),settings:safeSettings,projects:projects,prompts:savedPrompts,chats:chats.filter(function(ch){return !ch.temporary})};
+  var data={type:"quantum-breaks-ai-workspace",version:3,exported_at:new Date().toISOString(),settings:safeSettings,projects:projects,prompts:savedPrompts,profiles:profiles,chats:chats.filter(function(ch){return !ch.temporary})};
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="quantum-breaks-ai-workspace.json";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
 }
 
@@ -1788,6 +1802,7 @@ async function importWorkspace(file){
     settings=Object.assign(settings,data.settings||{});
     projects=Array.isArray(data.projects)?data.projects:[];
     savedPrompts=Array.isArray(data.prompts)?data.prompts:[];
+    profiles=Array.isArray(data.profiles)?data.profiles:[];
     chats=data.chats.map(function(ch){return Object.assign({},ch,{id:ch.id||uid(),temporary:false})});
     active=chats[0]?chats[0].id:"";save();closeModals();render();toast("Workspace imported")
   }catch(e){toast("Workspace import failed: "+e.message)}
@@ -1955,6 +1970,53 @@ function savePromptEntry(){
 function newPromptEntry(){editingPromptId="";q("#promptName").value="";q("#promptBody").value="";q("#promptName").focus()}
 function saveComposerAsPrompt(){var body=q("#prompt").value.trim();if(!body)return toast("The composer is empty");editingPromptId="";q("#promptName").value=body.slice(0,40);q("#promptBody").value=body;openModal("#promptsModal");renderPromptLibrary()}
 
+function profileSnapshot(){
+  return {
+    model:settings.model,
+    temperature:settings.temperature,
+    system:settings.system,
+    reasoning:settings.reasoning,
+    modePreset:settings.modePreset,
+    web:settings.web,
+    fetch:settings.fetch,
+    imageTool:settings.imageTool,
+    agent:settings.agent,
+    advisor:settings.advisor,
+    advisorModel:settings.advisorModel,
+    fusion:settings.fusion,
+    responseFormat:settings.responseFormat,
+    maxTokens:settings.maxTokens,
+    providerRouting:settings.providerRouting,
+    denyDataCollection:settings.denyDataCollection
+  }
+}
+function openProfiles(){openModal("#profilesModal");q("#profileName").value="";renderProfiles()}
+function renderProfiles(){
+  var box=q("#profilesList");box.innerHTML="";
+  if(!profiles.length){box.innerHTML='<div class="notice">No saved profiles yet.</div>';return}
+  profiles.forEach(function(p){
+    var card=document.createElement("div");card.className="promptcard";
+    var info=document.createElement("div"),h=document.createElement("h3"),body=document.createElement("p");
+    h.textContent=p.name||"Untitled profile";
+    var s=p.settings||{};body.textContent=[s.model||"auto",s.modePreset||"balanced","reasoning "+(s.reasoning||"none")].join(" · ");
+    info.appendChild(h);info.appendChild(body);
+    var actions=document.createElement("div");actions.className="promptactions";
+    var apply=document.createElement("button");apply.textContent="Apply";apply.onclick=function(){applyProfile(p)};
+    var update=document.createElement("button");update.textContent="Update";update.onclick=function(){p.settings=profileSnapshot();p.updated=Date.now();save();renderProfiles();toast("Profile updated")};
+    var del=document.createElement("button");del.textContent="Delete";del.onclick=function(){profiles=profiles.filter(function(x){return x.id!==p.id});save();renderProfiles();toast("Profile deleted")};
+    actions.appendChild(apply);actions.appendChild(update);actions.appendChild(del);card.appendChild(info);card.appendChild(actions);box.appendChild(card)
+  })
+}
+function saveCurrentProfile(){
+  var name=q("#profileName").value.trim();if(!name)return toast("Name the profile first");
+  profiles.unshift({id:uid(),name:name.slice(0,80),settings:profileSnapshot(),created:Date.now(),updated:Date.now()});profiles=profiles.slice(0,40);save();q("#profileName").value="";renderProfiles();toast("Profile saved")
+}
+function applyProfile(p){
+  var s=p&&p.settings;if(!s)return;
+  Object.keys(s).forEach(function(k){settings[k]=s[k]});
+  save();closeModals();render();toast("Applied profile: "+p.name)
+}
+
 function projectOptions(){
   var s=q("#projectSelect");s.innerHTML="";
   var none=document.createElement("option");none.value="";none.textContent="No project";s.appendChild(none);
@@ -2054,6 +2116,7 @@ q("#commandBtn").onclick=openCommandPalette;
 q("#focusBtn").onclick=function(){settings.focusMode=!settings.focusMode;save();render();toast(settings.focusMode?"Focus mode on":"Focus mode off")};
 q("#diagnosticsSide").onclick=openDiagnostics;
 q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
+q("#profilesSide").onclick=openProfiles;
 q("#compareSide").onclick=openCompare;
 q("#usageSide").onclick=openUsage;
 q("#projectsSide").onclick=openProjects;
@@ -2124,6 +2187,7 @@ q("#newProject").onclick=createProject;
 q("#saveProject").onclick=saveProject;
 q("#assignProject").onclick=assignProject;
 q("#deleteProject").onclick=deleteProject;
+q("#saveProfile").onclick=saveCurrentProfile;
 q("#refreshUsage").onclick=refreshUsage;
 q("#runCompare").onclick=runCompare;
 q("#imageModel").onchange=applyImageCapabilities;
