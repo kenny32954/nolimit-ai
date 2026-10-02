@@ -19,6 +19,8 @@ The native client now has the first complete live-chat path implemented in sourc
 - ordered response-chunk validation
 - streamed answer assembly
 - answer-focus view
+- per-subject offline quick-reference cards
+- connection diagnostics screen with serial/link state
 - timeout, cancel, and retry behavior
 - local answer-size protection
 
@@ -31,7 +33,8 @@ The bridge and native C code are automatically syntax/protocol checked in GitHub
 - **F1** - open subject picker
 - **F2** - open tutor-mode picker
 - **F3** - open/close answer-focus view
-- **F5** - probe/link desktop bridge
+- **F4** - open the selected subject's offline quick reference
+- **F5** - open connection diagnostics and probe/link the desktop bridge
 - **F6** - retry the current question
 - **EXE** - write a new question
 - **UP/DOWN** - scroll answer
