@@ -14,33 +14,63 @@
 
 static char const *subjects[] = {
     "auto", "math", "algebra", "geometry", "statistics", "calculus",
-    "biology", "chemistry", "physics", "earth", "environmental_science",
-    "ela", "literature", "writing", "history", "social_studies",
-    "geography", "government", "economics", "business", "accounting",
-    "computer_science", "engineering", "cte", "agriculture", "psychology",
-    "sociology", "art", "music", "media", "language", "health",
-    "physical_education"
+    "linear_algebra", "discrete_math", "differential_equations",
+    "number_theory", "real_analysis", "abstract_algebra",
+    "biology", "genetics", "microbiology", "anatomy_physiology",
+    "chemistry", "organic_chemistry", "biochemistry",
+    "physics", "thermodynamics", "circuits",
+    "earth", "environmental_science",
+    "ela", "literature", "writing",
+    "history", "social_studies", "geography", "government", "political_science",
+    "economics", "finance", "business", "accounting",
+    "computer_science", "data_structures", "algorithms", "databases",
+    "computer_architecture",
+    "engineering", "statics_dynamics", "materials_science",
+    "cte", "agriculture",
+    "psychology", "research_methods", "sociology", "philosophy_logic",
+    "art", "music", "media", "language", "health", "physical_education"
 };
 
 static char const *subject_labels[] = {
     "AUTO", "MATH", "ALGEBRA", "GEOMETRY", "STATISTICS", "CALCULUS",
-    "BIOLOGY", "CHEMISTRY", "PHYSICS", "EARTH/SPACE", "ENV SCI",
-    "ELA", "LITERATURE", "WRITING", "HISTORY", "SOCIAL STUDIES",
-    "GEOGRAPHY", "GOV/CIVICS", "ECONOMICS", "BUSINESS", "ACCOUNTING",
-    "COMPUTER SCI", "ENGINEERING", "CTE", "AGRICULTURE", "PSYCHOLOGY",
-    "SOCIOLOGY", "ART", "MUSIC", "MEDIA/A-V", "LANGUAGE", "HEALTH", "PE"
+    "LINEAR ALG", "DISCRETE MATH", "DIFF EQ",
+    "NUMBER THEORY", "REAL ANALYSIS", "ABSTRACT ALG",
+    "BIOLOGY", "GENETICS", "MICROBIOLOGY", "ANATOMY/PHYS",
+    "CHEMISTRY", "ORGANIC CHEM", "BIOCHEMISTRY",
+    "PHYSICS", "THERMODYNAMICS", "CIRCUITS",
+    "EARTH/SPACE", "ENV SCI",
+    "ELA", "LITERATURE", "WRITING",
+    "HISTORY", "SOCIAL STUDIES", "GEOGRAPHY", "GOV/CIVICS", "POLI SCI",
+    "ECONOMICS", "FINANCE", "BUSINESS", "ACCOUNTING",
+    "COMPUTER SCI", "DATA STRUCTURES", "ALGORITHMS", "DATABASES",
+    "COMP ARCH",
+    "ENGINEERING", "STATICS/DYN", "MATERIALS",
+    "CTE", "AGRICULTURE",
+    "PSYCHOLOGY", "RESEARCH", "SOCIOLOGY", "PHIL/LOGIC",
+    "ART", "MUSIC", "MEDIA/A-V", "LANGUAGE", "HEALTH", "PE"
 };
 
 static char const *modes[] = {
-    "answer", "explain", "steps", "check", "quiz", "summary", "flashcards"
+    "answer", "explain", "steps", "check", "quiz",
+    "summary", "flashcards", "derive", "proof", "research"
 };
 
 static char const *mode_labels[] = {
-    "ANSWER", "EXPLAIN", "STEPS", "CHECK", "QUIZ", "SUMMARY", "FLASHCARDS"
+    "ANSWER", "EXPLAIN", "STEPS", "CHECK", "QUIZ",
+    "SUMMARY", "FLASHCARDS", "DERIVE", "PROOF", "RESEARCH"
+};
+
+static char const *levels[] = {
+    "auto", "school", "college", "advanced"
+};
+
+static char const *level_labels[] = {
+    "AUTO", "SCHOOL", "COLLEGE", "ADVANCED"
 };
 
 #define SUBJECT_COUNT ((int)(sizeof(subjects) / sizeof(subjects[0])))
 #define MODE_COUNT ((int)(sizeof(modes) / sizeof(modes[0])))
+#define LEVEL_COUNT ((int)(sizeof(levels) / sizeof(levels[0])))
 #define PROMPT_CAP 700
 #define ANSWER_CAP 4096
 #define RESPONSE_TIMEOUT_TICKS 12500
@@ -51,6 +81,7 @@ static char const *mode_labels[] = {
 typedef struct {
     int subject;
     int mode;
+    int level;
     int scroll;
     bool bridge_ready;
     bool waiting;
@@ -69,6 +100,7 @@ typedef struct {
     char answer[HISTORY_ANSWER_CAP];
     int subject;
     int mode;
+    int level;
 } history_turn_t;
 
 static history_turn_t recent[HISTORY_SLOTS];
@@ -91,6 +123,7 @@ static void save_history_turn(app_state_t const *state)
     recent[0].answer[HISTORY_ANSWER_CAP - 1] = '\0';
     recent[0].subject = state->subject;
     recent[0].mode = state->mode;
+    recent[0].level = state->level;
 
     if(recent_count < HISTORY_SLOTS) recent_count++;
     recent_view = 0;
@@ -107,6 +140,7 @@ static void load_history_turn(app_state_t *state, int index)
     state->answer_len = strlen(state->answer);
     state->subject = recent[index].subject;
     state->mode = recent[index].mode;
+    state->level = recent[index].level;
     state->scroll = 0;
     recent_view = index;
     snprintf(state->status, sizeof(state->status),
@@ -207,8 +241,9 @@ static void draw_answer_focus(app_state_t const *state)
     dclear(bg);
     drect(0, 0, DWIDTH - 1, 31, panel);
     dtext(10, 8, blue, "QBAI ANSWER");
-    dtext(112, 8, muted, subject_labels[state->subject]);
-    dtext(258, 8, accent, mode_labels[state->mode]);
+    dtext(106, 8, muted, subject_labels[state->subject]);
+    dtext(238, 8, accent, mode_labels[state->mode]);
+    dtext(322, 8, muted, level_labels[state->level]);
 
     draw_wrapped(
         12, 43, DWIDTH - 24,
@@ -261,6 +296,11 @@ static void draw_chat(app_state_t const *state)
     draw_badge(76, 39, 116, subject_labels[state->subject], line, text);
     dtext(206, 43, muted, "MODE");
     draw_badge(252, 39, 124, mode_labels[state->mode], accent, text);
+    dtext(10, 62, muted, "LEVEL");
+    dtext(63, 62, accent, level_labels[state->level]);
+    dtext(155, 62, muted, "OPTN changes academic level");
+
+    y = 84;
 
     if(state->prompt[0]) {
         dtext(12, y, accent, "YOU");
@@ -275,9 +315,9 @@ static void draw_chat(app_state_t const *state)
         draw_wrapped(12, y, DWIDTH - 24, state->answer, text, state->scroll, -1);
     }
     else if(!state->prompt[0]) {
-        dtext(12, 86, muted, "Press EXE to ask a question.");
-        dtext(12, 105, muted, "F1 subject  F2 tutor mode");
-        dtext(12, 124, muted, "F5 connects to the desktop bridge.");
+        dtext(12, 88, muted, "Press EXE to ask a question.");
+        dtext(12, 107, muted, "F1 subject  F2 mode  OPTN level");
+        dtext(12, 126, muted, "College + advanced disciplines supported.");
     }
 
     drect(0, DHEIGHT - 31, DWIDTH - 1, DHEIGHT - 1, panel);
@@ -367,6 +407,7 @@ static bool start_request(app_state_t *state)
         id,
         subjects[state->subject],
         modes[state->mode],
+        levels[state->level],
         state->prompt
     )) {
         snprintf(state->status, sizeof(state->status), "Could not send question");
@@ -389,6 +430,7 @@ int main(void)
     app_state_t state = {
         .subject = 0,
         .mode = 1,
+        .level = 0,
         .scroll = 0,
         .bridge_ready = false,
         .waiting = false,
@@ -454,6 +496,16 @@ int main(void)
                 MODE_COUNT,
                 state.mode
             );
+        }
+        else if(!state.waiting && ev.key == KEY_OPTN) {
+            state.level = qb_picker_select(
+                "ACADEMIC LEVEL",
+                level_labels,
+                LEVEL_COUNT,
+                state.level
+            );
+            snprintf(state.status, sizeof(state.status),
+                     "Academic level: %s", level_labels[state.level]);
         }
         else if(ev.key == KEY_F3) {
             if(state.answer[0] || state.waiting) {
