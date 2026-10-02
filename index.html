@@ -594,10 +594,98 @@ function branchConversation(idx){
   chats.unshift(copy);active=copy.id;save();render();toast("Created a branch")
 }
 
+async function ensureModelCatalog(){
+  if(models.length)return models;
+  try{
+    var r=await fetch(BASE+"/models");
+    var j=await r.json();
+    models=(j.data||[]).sort(function(a,b){return(a.name||a.id).localeCompare(b.name||b.id)});
+    return models
+  }catch(e){return []}
+}
+
 async function loadModels(){
   openModal("#modelsModal");if(models.length){showModels();return}
   q("#models").innerHTML='<div class="notice">Loading models…</div>';
-  try{var r=await fetch(BASE+"/models");var j=await r.json();models=(j.data||[]).sort(function(a,b){return(a.name||a.id).localeCompare(b.name||b.id)});showModels()}catch(e){q("#models").innerHTML='<div class="notice">Could not load the model catalog. Auto Router still works.</div>'}
+  await ensureModelCatalog();
+  if(models.length)showModels();else q("#models").innerHTML='<div class="notice">Could not load the model catalog. Auto Router still works.</div>'
+}
+
+async function openUsage(){
+  if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
+  openModal("#usageModal");
+  await refreshUsage()
+}
+
+async function refreshUsage(){
+  q("#usageNotice").textContent="Loading usage for the current key…";
+  q("#usageGrid").innerHTML="";
+  try{
+    var r=await fetch(BASE+"/key",{headers:{Authorization:"Bearer "+getKey()}});
+    var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Could not load key usage"));
+    var d=j.data||{},cards=[
+      ["Total usage",money(d.usage||0)],
+      ["Today",money(d.usage_daily||0)],
+      ["This week",money(d.usage_weekly||0)],
+      ["This month",money(d.usage_monthly||0)]
+    ];
+    if(d.limit!=null)cards.push(["Limit",money(d.limit)]);
+    if(d.limit_remaining!=null)cards.push(["Remaining",money(d.limit_remaining)]);
+    if(d.byok_usage!=null&&Number(d.byok_usage)>0)cards.push(["BYOK usage",money(d.byok_usage)]);
+    if(d.expires_at)cards.push(["Expires",new Date(d.expires_at).toLocaleDateString()]);
+    cards.forEach(function(card){
+      var x=document.createElement("div");x.className="usagecard";
+      var s=document.createElement("span");s.textContent=card[0];
+      var b=document.createElement("b");b.textContent=card[1];
+      x.appendChild(s);x.appendChild(b);q("#usageGrid").appendChild(x)
+    });
+    var bits=[];if(d.label)bits.push(d.label);bits.push(d.is_free_tier?"Free tier":"Paid key");if(d.limit_reset)bits.push("limit resets "+d.limit_reset);
+    q("#usageNotice").textContent=bits.join(" · ")
+  }catch(e){q("#usageNotice").textContent="Usage could not be loaded: "+e.message}
+}
+
+async function openCompare(){
+  if(!isConnected()){openSettings();toast("Connect OpenRouter first");return}
+  openModal("#compareModal");
+  q("#compareModel1").value=settings.model;
+  q("#compareOutput").innerHTML="";
+  await ensureModelCatalog();
+  var dl=q("#modelOptions");dl.innerHTML="";
+  models.slice(0,500).forEach(function(m){var o=document.createElement("option");o.value=m.id;dl.appendChild(o)})
+}
+
+async function compareOne(model,prompt){
+  var body={model:model,messages:[],temperature:Number(settings.temperature),stream:false,usage:{include:true}};
+  if(settings.system)body.messages.push({role:"system",content:settings.system});
+  body.messages.push({role:"user",content:prompt});
+  if(settings.reasoning!=="none")body.reasoning={effort:settings.reasoning,summary:"auto"};
+  var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-Title":"NoLimit AI"},body:JSON.stringify(body)});
+  var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Comparison request failed"));
+  var m=j.choices&&j.choices[0]&&j.choices[0].message||{};
+  return {requested:model,served:j.model||model,text:m.content||"",usage:j.usage||{},cost:j.usage&&j.usage.cost!=null?j.usage.cost:j.cost}
+}
+
+async function runCompare(){
+  var prompt=q("#comparePrompt").value.trim();if(!prompt)return toast("Enter a comparison prompt");
+  var selected=[q("#compareModel1").value.trim(),q("#compareModel2").value.trim(),q("#compareModel3").value.trim()].filter(Boolean);
+  selected=selected.filter(function(x,i,a){return a.indexOf(x)===i});
+  if(selected.length<2)return toast("Choose at least two different models");
+  if(!confirm("This will run "+selected.length+" separate model calls and may use more API credits. Continue?"))return;
+  q("#runCompare").disabled=true;q("#compareProgress").classList.remove("hidden");q("#compareOutput").innerHTML="";
+  var results=await Promise.all(selected.map(async function(model){
+    try{return await compareOne(model,prompt)}catch(e){return {requested:model,error:e.message}}
+  }));
+  results.forEach(function(res){
+    var card=document.createElement("div");card.className="comparecard";
+    var h=document.createElement("h3");h.textContent=res.requested;card.appendChild(h);
+    var t=document.createElement("div");t.className="comparetext";t.textContent=res.error?"Error: "+res.error:res.text;card.appendChild(t);
+    var meta=document.createElement("div");meta.className="comparemeta";
+    if(!res.error){var bits=[];if(res.served!==res.requested)bits.push("served by "+res.served);if(res.usage&&res.usage.total_tokens!=null)bits.push(res.usage.total_tokens+" tokens");if(res.cost!=null)bits.push(money(res.cost));meta.textContent=bits.join(" · ")}
+    card.appendChild(meta);
+    var cp=document.createElement("button");cp.className="secondary";cp.style.marginTop="9px";cp.textContent="Copy answer";cp.onclick=function(){navigator.clipboard.writeText(res.text||"").then(function(){toast("Copied")})};card.appendChild(cp);
+    q("#compareOutput").appendChild(card)
+  });
+  q("#runCompare").disabled=false;q("#compareProgress").classList.add("hidden")
 }
 
 function priceZero(m){var p=m.pricing||{};return Number(p.prompt||1)===0&&Number(p.completion||1)===0}
@@ -886,6 +974,8 @@ q("#send").onclick=send;
 q("#prompt").onkeydown=function(e){if(e.key==="Enter"&&!e.shiftKey&&innerWidth>700){e.preventDefault();send()}};
 q("#topAuth").onclick=q("#sideAuth").onclick=q("#settingsBtn").onclick=openSettings;
 q("#modelsBtn").onclick=q("#modelBottom").onclick=loadModels;
+q("#compareSide").onclick=openCompare;
+q("#usageSide").onclick=openUsage;
 q("#imageSide").onclick=q("#imageBtn").onclick=openImage;
 q("#videoSide").onclick=openVideo;
 q("#exportSide").onclick=exportChat;
@@ -914,6 +1004,8 @@ q("#saveSettings").onclick=function(){
 };
 q("#modelSearch").oninput=showModels;
 qa(".filter").forEach(function(b){b.onclick=function(){modelFilter=b.getAttribute("data-filter");qa(".filter").forEach(function(x){x.classList.toggle("on",x===b)});showModels()}});
+q("#refreshUsage").onclick=refreshUsage;
+q("#runCompare").onclick=runCompare;
 q("#generateImage").onclick=generateImage;
 q("#generateVoice").onclick=generateVoice;
 q("#voiceModel").onchange=function(){q("#voiceName").value=defaultVoiceFor(q("#voiceModel").value)};
