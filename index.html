@@ -1020,6 +1020,7 @@ var COMMANDS=[
   {name:"Settings",hint:"Appearance + API",run:openSettings},
   {name:"Toggle temporary chat",hint:"Do not persist after reload",run:function(){var c=ensure();c.temporary=!c.temporary;save();render()}},
   {name:"Export Markdown",hint:"Current chat",run:exportChat},
+  {name:"Print / Save PDF",hint:"Clean conversation printout",run:printChat},
   {name:"Backup chat",hint:"JSON backup",run:backupChat}
 ];
 
@@ -1846,6 +1847,18 @@ function runJavaScript(code){
   setTimeout(function(){finish("Stopped after 5 seconds.")},5000)
 }
 
+function printChat(){
+  var c=ensure(),project=projectForChat(c),parts=[];
+  parts.push("<!doctype html><html><head><meta charset=\"utf-8\"><title>"+escapeHTML(c.title||"Quantum Breaks AI chat")+"</title><style>body{font:16px/1.55 system-ui,-apple-system,sans-serif;max-width:850px;margin:40px auto;padding:0 24px;color:#181818}h1{font-size:30px;margin-bottom:4px}.meta{color:#777;font-size:12px;margin-bottom:30px}.msg{margin:0 0 24px;padding:14px 16px;border-radius:14px;background:#f5f5f5}.msg.ai{background:#fff;border:1px solid #ddd}.role{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;color:#555}.content{white-space:pre-wrap;overflow-wrap:anywhere}@media print{body{margin:0;max-width:none}.msg{break-inside:avoid}}</style></head><body>");
+  parts.push("<h1>"+escapeHTML(c.title||"Quantum Breaks AI chat")+"</h1>");
+  parts.push("<div class=\"meta\">"+escapeHTML((project?"Project: "+project.name+" · ":"")+"Exported "+new Date().toLocaleString())+"</div>");
+  (c.messages||[]).forEach(function(m){
+    parts.push("<div class=\"msg "+(m.role==="assistant"?"ai":"user")+"\"><div class=\"role\">"+(m.role==="assistant"?"Quantum Breaks AI":"You")+"</div><div class=\"content\">"+escapeHTML(m.content||"(attachment)")+"</div></div>")
+  });
+  parts.push("</body></html>");
+  var w=window.open("","_blank");if(!w)return toast("Pop-up blocked. Allow pop-ups to print this chat.");
+  w.document.open();w.document.write(parts.join(""));w.document.close();w.focus();setTimeout(function(){w.print()},250)
+}
 function exportChat(){
   var c=ensure(),lines=["# "+c.title,""];c.messages.forEach(function(m){lines.push(m.role==="user"?"## You":"## Quantum Breaks AI");lines.push("");lines.push(m.content||"");lines.push("")});
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/markdown"}));a.download=(c.title||"chat").replace(/[^\w-]+/g,"_")+".md";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)
@@ -2017,11 +2030,21 @@ function renderPromptLibrary(){
     var card=document.createElement("div");card.className="promptcard";
     var info=document.createElement("div"),h=document.createElement("h3"),body=document.createElement("p");h.textContent=p.name||"Untitled prompt";body.textContent=p.body||"";info.appendChild(h);info.appendChild(body);
     var actions=document.createElement("div");actions.className="promptactions";
-    var use=document.createElement("button");use.textContent="Use";use.onclick=function(){q("#prompt").value=p.body||"";closeModals();resizePrompt();q("#prompt").focus()};
+    var use=document.createElement("button");use.textContent="Use";use.onclick=function(){q("#prompt").value=resolvePromptVariables(p.body||"");closeModals();resizePrompt();q("#prompt").focus()};
     var edit=document.createElement("button");edit.textContent="Edit";edit.onclick=function(){editingPromptId=p.id;q("#promptName").value=p.name||"";q("#promptBody").value=p.body||"";q("#promptBody").focus()};
     var del=document.createElement("button");del.textContent="Delete";del.onclick=function(){savedPrompts=savedPrompts.filter(function(x){return x.id!==p.id});save();renderPromptLibrary();toast("Prompt deleted")};
     actions.appendChild(use);actions.appendChild(edit);actions.appendChild(del);card.appendChild(info);card.appendChild(actions);box.appendChild(card)
   })
+}
+function resolvePromptVariables(body){
+  var found=[],rx=/{{\s*([^{}]+?)\s*}}/g,m;
+  while((m=rx.exec(body))){if(!found.some(function(x){return x.token===m[0]}))found.push({token:m[0],name:m[1].trim()})}
+  var out=body;
+  found.forEach(function(x){
+    var value=window.prompt("Value for "+x.name+":","");
+    if(value!==null)out=out.split(x.token).join(value)
+  });
+  return out
 }
 function savePromptEntry(){
   var name=q("#promptName").value.trim(),body=q("#promptBody").value.trim();if(!body)return toast("Enter a prompt first");
@@ -2203,6 +2226,7 @@ q("#voiceSide").onclick=function(){openVoice("")};
 q("#transcribeSide").onclick=openTranscription;
 q("#shareSide").onclick=shareChat;
 q("#exportSide").onclick=exportChat;
+q("#printSide").onclick=printChat;
 q("#backupSide").onclick=backupChat;
 q("#importSide").onclick=function(){q("#importFile").click()};
 q("#importFile").onchange=function(e){var f=e.target.files&&e.target.files[0];if(f)importBackup(f);e.target.value=""};
