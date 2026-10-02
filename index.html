@@ -281,6 +281,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 
 .slashMenu{display:none;max-width:var(--content-max,860px);width:calc(100% - 24px);margin:0 auto 7px;padding:6px;border-radius:14px;background:rgba(27,27,31,.97);border:1px solid rgba(255,255,255,.08);box-shadow:0 18px 50px rgba(0,0,0,.36);backdrop-filter:blur(18px);max-height:260px;overflow:auto}.slashMenu.show{display:grid;gap:3px}.slashOption{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;width:100%;min-height:38px;padding:7px 9px;border-radius:9px;text-align:left;color:#d4d0cb}.slashOption.active,.slashOption:hover{background:rgba(255,255,255,.065)}.slashOption code{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent2)}.slashOption span{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+
+.ratingbtn.on{color:var(--accent2)!important;background:color-mix(in srgb,var(--accent) 9%,transparent)!important}
+
 </style>
 </head>
 <body>
@@ -1287,9 +1290,11 @@ function renderChat(){
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
         var cm=document.createElement("button");cm.textContent="Compare";cm.onclick=function(){compareFromMessage(idx)};
         var vr=document.createElement("button");vr.textContent="Review";vr.onclick=function(){reviewMessageAt(idx)};
+        var up=document.createElement("button");up.textContent="👍";up.title="Helpful";up.className="ratingbtn"+(m.rating===1?" on":"");up.onclick=function(){rateMessage(idx,1)};
+        var down=document.createElement("button");down.textContent="👎";down.title="Not helpful";down.className="ratingbtn"+(m.rating===-1?" on":"");down.onclick=function(){rateMessage(idx,-1)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
-        tools.appendChild(cp);tools.appendChild(sv);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(bm);tools.appendChild(pin);
+        tools.appendChild(cp);tools.appendChild(sv);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(vr);tools.appendChild(up);tools.appendChild(down);tools.appendChild(bm);tools.appendChild(pin);
         var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");if(m.finishReason&&m.finishReason!=="stop")bits.push("finish "+m.finishReason);if(m.cacheStatus)bits.push("cache "+String(m.cacheStatus).toLowerCase()+(m.cacheAge?" "+m.cacheAge+"s":""));if(m.contextTrimmed)bits.push("fit -"+m.contextTrimmed+" msgs");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
@@ -1425,6 +1430,11 @@ function clearScratchpad(){
 function insertScratchpad(){
   var txt=q("#scratchpadText").value;if(!txt)return toast("Scratchpad is empty");
   q("#prompt").value=(q("#prompt").value?q("#prompt").value+"\n\n":"")+txt;closeModals();resizePrompt();q("#prompt").focus()
+}
+
+function rateMessage(idx,value){
+  var c=ensure(),m=c.messages[idx];if(!m||m.role!=="assistant")return;
+  m.rating=m.rating===value?0:value;c.updated=Date.now();save();render();toast(m.rating===1?"Marked helpful":m.rating===-1?"Marked not helpful":"Rating cleared")
 }
 
 function toggleBookmark(idx){
@@ -2235,17 +2245,20 @@ async function loadModels(){
 }
 
 function analyticsData(){
-  var activeChats=chats.filter(function(ch){return !ch.trashedAt}),messages=0,tokens=0,cost=0,attachments=0,modelsUsed={};
+  var activeChats=chats.filter(function(ch){return !ch.trashedAt}),messages=0,tokens=0,cost=0,attachments=0,modelsUsed={},modelRatings={};
   activeChats.forEach(function(ch){
     (ch.messages||[]).forEach(function(m){
       messages++;
       if(m.usage&&m.usage.total_tokens!=null)tokens+=Number(m.usage.total_tokens)||0;
       if(m.cost!=null)cost+=Number(m.cost)||0;
       attachments+=(m.fileNames||[]).length;
-      if(m.role==="assistant"&&m.model){modelsUsed[m.model]=(modelsUsed[m.model]||0)+1}
+      if(m.role==="assistant"&&m.model){
+        modelsUsed[m.model]=(modelsUsed[m.model]||0)+1;
+        if(m.rating===1||m.rating===-1){modelRatings[m.model]=modelRatings[m.model]||{up:0,down:0};if(m.rating===1)modelRatings[m.model].up++;else modelRatings[m.model].down++}
+      }
     })
   });
-  return {activeChats:activeChats,messages:messages,tokens:tokens,cost:cost,attachments:attachments,modelsUsed:modelsUsed}
+  return {activeChats:activeChats,messages:messages,tokens:tokens,cost:cost,attachments:attachments,modelsUsed:modelsUsed,modelRatings:modelRatings}
 }
 function renderAnalytics(){
   var d=analyticsData(),grid=q("#analyticsGrid");grid.innerHTML="";
@@ -2259,7 +2272,7 @@ function renderAnalytics(){
   var modelBox=q("#analyticsModels");modelBox.innerHTML="";
   var sorted=Object.keys(d.modelsUsed).sort(function(a,b){return d.modelsUsed[b]-d.modelsUsed[a]}).slice(0,10);
   if(!sorted.length)modelBox.innerHTML='<div class="notice">No model usage recorded yet.</div>';
-  sorted.forEach(function(id){var row=document.createElement("div");row.className="analyticsModel";var b=document.createElement("b");b.textContent=id;var s=document.createElement("span");s.textContent=d.modelsUsed[id]+" replies";row.appendChild(b);row.appendChild(s);modelBox.appendChild(row)})
+  sorted.forEach(function(id){var row=document.createElement("div");row.className="analyticsModel";var b=document.createElement("b");b.textContent=id;var s=document.createElement("span"),rating=d.modelRatings[id],ratingText="";if(rating){var total=rating.up+rating.down;if(total)ratingText=" · "+Math.round(rating.up/total*100)+"% helpful ("+total+" rated)"}s.textContent=d.modelsUsed[id]+" replies"+ratingText;row.appendChild(b);row.appendChild(s);modelBox.appendChild(row)})
 }
 function exportAnalyticsCSV(){
   var rows=[["date","chat","role","model","tokens","cost","attachments"]];
