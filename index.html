@@ -3382,11 +3382,25 @@ function profileSnapshot(){
     agent:settings.agent,
     advisor:settings.advisor,
     advisorModel:settings.advisorModel,
+    review:settings.review,
+    reviewModel:settings.reviewModel,
     fusion:settings.fusion,
+    fallbackModel:settings.fallbackModel,
     responseFormat:settings.responseFormat,
+    jsonSchemaName:settings.jsonSchemaName,
+    jsonSchemaText:settings.jsonSchemaText,
+    requireParameters:settings.requireParameters,
     maxTokens:settings.maxTokens,
+    historyLimit:settings.historyLimit,
+    autoCompressContext:settings.autoCompressContext,
+    summaryModel:settings.summaryModel,
     providerRouting:settings.providerRouting,
-    denyDataCollection:settings.denyDataCollection
+    denyDataCollection:settings.denyDataCollection,
+    cache:settings.cache,
+    cacheTTL:settings.cacheTTL,
+    webMaxResults:settings.webMaxResults,
+    webMaxTotal:settings.webMaxTotal,
+    autoSpeak:settings.autoSpeak
   }
 }
 function openProfiles(){openModal("#profilesModal");q("#profileName").value="";renderProfiles()}
@@ -3397,7 +3411,7 @@ function renderProfiles(){
     var card=document.createElement("div");card.className="promptcard";
     var info=document.createElement("div"),h=document.createElement("h3"),body=document.createElement("p");
     h.textContent=p.name||"Untitled profile";
-    var s=p.settings||{};body.textContent=[s.model||"auto",s.modePreset||"balanced","reasoning "+(s.reasoning||"none")].join(" · ");
+    var s=p.settings||{},bits=[s.model||"auto",s.modePreset||"balanced","reasoning "+(s.reasoning||"none")];if(s.web&&s.fetch)bits.push("research");if(s.review)bits.push("review");if(s.agent)bits.push("agent");if(s.responseFormat&&s.responseFormat!=="text")bits.push(s.responseFormat);body.textContent=bits.join(" · ");
     info.appendChild(h);info.appendChild(body);
     var actions=document.createElement("div");actions.className="promptactions";
     var apply=document.createElement("button");apply.textContent="Apply";apply.onclick=function(){applyProfile(p)};
