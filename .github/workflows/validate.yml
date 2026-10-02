@@ -20,6 +20,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import json
           import re
 
           html = Path("index.html").read_text(encoding="utf-8")
@@ -28,13 +29,20 @@ jobs:
               'id="prompt"',
               'id="send"',
               'id="modelsModal"',
+              'id="projectsModal"',
+              'id="compareModal"',
+              'id="usageModal"',
               'id="imageModal"',
               'id="videoModal"',
               'id="voiceModal"',
               'id="artifactModal"',
               'id="webToggle"',
+              'id="agentToggle"',
               'id="advisorToggle"',
               'id="fusionToggle"',
+              'id="tempToggle"',
+              'id="responseFormat"',
+              'id="maxTokens"',
               'id="micBtn"',
               'https://openrouter.ai/api/v1',
               'openrouter:web_search',
@@ -47,16 +55,24 @@ jobs:
           if missing:
               raise SystemExit("Missing required app markers: " + ", ".join(missing))
 
-          # Never allow a real OpenRouter key to be committed to the public app.
           if re.search(r"sk-or-v1-[A-Za-z0-9_-]{20,}", html):
               raise SystemExit("A likely OpenRouter API key was found in index.html")
+
+          for path in ["manifest.webmanifest", "sw.js", "icon.svg"]:
+              if not Path(path).exists():
+                  raise SystemExit(f"Missing required PWA file: {path}")
+
+          json.loads(Path("manifest.webmanifest").read_text(encoding="utf-8"))
 
           start = html.index("<script>") + len("<script>")
           end = html.index("</script>", start)
           Path("/tmp/nolimit-app.js").write_text(html[start:end], encoding="utf-8")
 
-          print("HTML and secret checks passed")
+          print("HTML, manifest, PWA files, and secret checks passed")
           PY
 
-      - name: Check JavaScript syntax
+      - name: Check app JavaScript syntax
         run: node --check /tmp/nolimit-app.js
+
+      - name: Check service worker syntax
+        run: node --check sw.js
