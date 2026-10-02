@@ -10,6 +10,18 @@ Everything else in this repository supports the app with documentation and autom
 
 ## Current feature set
 
+### UI and organization
+- Glassy responsive desktop and mobile interface
+- Dark, Midnight, Ember, and OLED themes
+- Coral, blue, violet, green, or fully custom accent colors
+- Adjustable chat width, message size, and compact/cozy density
+- Focus mode
+- Grouped chat history with pinned, recent, archived, and trashed conversations
+- Fullscreen image lightbox with zoom
+- Command palette with keyboard navigation
+- Global workspace search
+- Selection toolbar for quoting, explaining, copying, prompt saving, and scratchpad capture
+
 ### App experience
 - Share a chat with the Web Share API or clipboard fallback
 - Pinned chats
@@ -64,6 +76,14 @@ Everything else in this repository supports the app with documentation and autom
 - Detailed network errors instead of a generic "Failed to fetch"
 - Token and cost display when OpenRouter returns usage data
 
+### Advanced context
+- Smart Balanced, Fast, Deep, and Research modes
+- Per-chat scratchpad with optional model-context injection
+- Message-level context pins that survive history trimming
+- Manual AI context compression for long chats
+- Approximate context meter with selected-model context limits and input-cost hints
+- AI-generated conversation titles
+
 ### Projects and memory
 - Local persistent memory that is appended to system context
 - Local projects with project-specific instructions and reference knowledge
@@ -108,6 +128,13 @@ Everything else in this repository supports the app with documentation and autom
 - Configurable advisor model
 - Fusion mode for multi-model deliberation
 - Fusion remains opt-in because it can use more model calls, take longer, and cost more
+
+### Local data and media
+- IndexedDB persistence for attached images and PDFs
+- Attachment hydration after reload
+- Storage manager with quota information and orphan cleanup
+- Optional media-inclusive workspace backups for cross-device restore
+- Password-encrypted workspace backups using PBKDF2-SHA256 and AES-256-GCM
 
 ### Multimodal files
 - Image attachments for vision-capable models
@@ -237,7 +264,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v1.7
+Current app generation: v1.8
 
 Major capabilities now include:
 - phone + PC UI
