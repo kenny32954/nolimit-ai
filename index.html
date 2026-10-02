@@ -263,6 +263,11 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 .historyitem{height:50px!important}.hrow{height:50px!important;display:flex!important;flex-direction:column;align-items:flex-start!important;justify-content:center;gap:3px}.histtitle{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.histtags{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;color:#66636a;letter-spacing:.02em}.historyitem.on .histtags{color:#8e8992}
 .analyticsBars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;align-items:end;height:150px}.analyticsDay{height:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;min-width:0}.analyticsBar{min-height:3px;border-radius:8px 8px 3px 3px;background:linear-gradient(180deg,var(--accent2),var(--accent));box-shadow:0 6px 18px var(--accentGlow)}.analyticsDay span{font-size:9px;text-align:center;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.analyticsModels{display:grid;gap:7px}.analyticsModel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 12px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.025)}.analyticsModel b{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.analyticsModel span{font-size:11px;color:var(--muted)}
 
+
+.foot{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;align-items:center;gap:10px}.foot #composerMetrics{text-align:center;color:#5f5b63;white-space:nowrap}.foot #status{text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tool.loading{animation:toolPulse 1s infinite alternate;color:var(--accent2);border-color:color-mix(in srgb,var(--accent) 35%,transparent)}@keyframes toolPulse{from{opacity:.55}to{opacity:1}}
+@media(max-width:520px){.foot #composerMetrics{display:none}.foot{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}}
+
 </style>
 </head>
 <body>
@@ -341,6 +346,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <div class="leftTools">
 <button class="tool" id="attach">＋</button>
 <button class="tool" id="promptLibBtn" title="Prompt library">★</button>
+<button class="tool" id="improvePromptBtn" title="Improve prompt with AI">✧</button>
 <input id="files" type="file" hidden multiple accept="image/*,application/pdf,audio/*,.txt,.md,.json,.csv,.js,.html,.css,.py,.java,.cpp,.c,.ts,.tsx,.jsx,.xml,.yaml,.yml">
 <button class="tool" id="micBtn" title="Record and transcribe">●</button>
 <button class="tool" id="imageBtn" title="Create image">▣</button>
@@ -348,7 +354,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <button class="send" id="send">↑</button>
 </div>
 </div>
-<div class="foot"><button class="model" id="modelBottom">openrouter/auto</button><span id="status">Not connected</span></div>
+<div class="foot"><button class="model" id="modelBottom">openrouter/auto</button><span id="composerMetrics">0 draft</span><span id="status">Not connected</span></div>
 </div>
 </main>
 </div>
@@ -780,6 +786,7 @@ var selectedText="";
 var lightboxSrc="";
 var commandActiveIndex=0;
 var lastMutationUndo=null;
+var saveWarned=false;
 function scheduleRender(){
   if(renderTimer)return;
   renderTimer=setTimeout(function(){renderTimer=null;render()},40)
@@ -810,6 +817,7 @@ function save(){
     localStorage.setItem(PROFILE_STORE,JSON.stringify(profiles));
     localStorage.setItem(ACTIVE,active)
   }catch(e){
+    if(!saveWarned){saveWarned=true;setTimeout(function(){toast("Browser chat storage is nearly full. Export a workspace backup or remove old chats/media.")},0)}
     try{
       localStorage.setItem(SETSTORE,JSON.stringify(settings));
       localStorage.setItem(PROJECT_STORE,JSON.stringify(projects));
@@ -1156,11 +1164,12 @@ function renderChat(){
         var rd=document.createElement("button");rd.textContent="Read";rd.onclick=function(){speak(m.content||"")};
         var av=document.createElement("button");av.textContent="AI Voice";av.onclick=function(){openVoice(m.content||"")};
         var rg=document.createElement("button");rg.textContent="Regenerate";rg.onclick=function(){regenerate(idx)};
+        var ct=document.createElement("button");ct.textContent="Continue";ct.onclick=function(){continueResponse(idx)};
         var br=document.createElement("button");br.textContent="Branch";br.onclick=function(){branchConversation(idx)};
         var cm=document.createElement("button");cm.textContent="Compare";cm.onclick=function(){compareFromMessage(idx)};
         var bm=document.createElement("button");bm.textContent=m.bookmarked?"★":"☆";bm.className=m.bookmarked?"bookmarkon":"";bm.title="Bookmark message";bm.onclick=function(){toggleBookmark(idx)};
         var pin=document.createElement("button");pin.textContent="📌";pin.className="contextpin"+(m.contextPinned?" on":"");pin.title="Keep this message in context";pin.onclick=function(){toggleContextPin(idx)};
-        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(bm);tools.appendChild(pin);
+        tools.appendChild(cp);tools.appendChild(rd);tools.appendChild(av);tools.appendChild(rg);tools.appendChild(ct);tools.appendChild(br);tools.appendChild(cm);tools.appendChild(bm);tools.appendChild(pin);
         var meta=document.createElement("span"),bits=[];if(m.model)bits.push(m.model);if(m.usage&&m.usage.total_tokens!=null)bits.push(m.usage.total_tokens+" tokens");if(m.cost!=null)bits.push(money(m.cost));if(m.started&&m.finished)bits.push(((m.finished-m.started)/1000).toFixed(1)+"s");meta.textContent=bits.join(" · ");tools.appendChild(meta);if(m.created){var tm=document.createElement("span");tm.className="msgtime";tm.textContent=new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});tools.appendChild(tm)}
         a.appendChild(tools);box.appendChild(a)
       }
@@ -1339,7 +1348,8 @@ function renderPending(){
     var s=document.createElement("span");s.textContent=f.name+(f.size?" · "+fmtBytes(f.size):"");
     var x=document.createElement("button");x.textContent="×";x.onclick=function(){if(f.mediaId)deleteMedia(f.mediaId);pending.splice(i,1);renderPending()};
     c.appendChild(s);c.appendChild(x);p.appendChild(c)
-  })
+  });
+  updateComposerMetrics()
 }
 
 
@@ -1440,8 +1450,17 @@ function openDiagnostics(){
   openModal("#diagnosticsModal");runDiagnostics()
 }
 
+function updateComposerMetrics(){
+  var text=q("#prompt").value||"",chars=text.length;
+  pending.forEach(function(f){if(f.kind==="text")chars+=String(f.text||"").length});
+  var approx=Math.ceil(chars/4),parts=[];
+  parts.push("~"+formatTokenCount(approx)+" draft");
+  if(pending.length)parts.push(pending.length+" file"+(pending.length===1?"":"s"));
+  q("#composerMetrics").textContent=parts.join(" · ");
+  q("#composerMetrics").title="Approximate draft tokens before system prompt and chat history"
+}
 function resizePrompt(){
-  var p=q("#prompt");p.style.height="auto";p.style.height=Math.min(180,Math.max(64,p.scrollHeight))+"px"
+  var p=q("#prompt");p.style.height="auto";p.style.height=Math.min(180,Math.max(64,p.scrollHeight))+"px";updateComposerMetrics()
 }
 function updateScrollButton(){
   var box=q("#chat"),distance=box.scrollHeight-box.scrollTop-box.clientHeight;
@@ -1662,6 +1681,25 @@ function handleCommand(text){
   return true
 }
 
+async function improvePrompt(){
+  var original=q("#prompt").value.trim();if(!original)return toast("Write a prompt first");
+  if(!navigator.onLine)return toast("You are offline");
+  if(!isConnected()){openSettings();return toast("Connect OpenRouter first")}
+  var b=q("#improvePromptBtn");b.disabled=true;b.classList.add("loading");b.textContent="…";
+  try{
+    var body={model:settings.model,messages:[
+      {role:"system",content:"Rewrite the user's prompt so an AI can answer it more accurately and completely. Preserve the user's intent, constraints, tone, names, and requested output format. Add useful specificity only when it is safely implied. Do not answer the prompt. Return only the improved prompt."},
+      {role:"user",content:original}
+    ],stream:false,temperature:0.25,max_tokens:1000};
+    var r=await fetch(BASE+"/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"Quantum Breaks AI"},body:JSON.stringify(body)});
+    var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Prompt improvement failed"));
+    var improved=String(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim();
+    if(!improved)throw new Error("No improved prompt was returned");
+    q("#prompt").value=improved;resizePrompt();saveDraftSoon();toastAction("Prompt improved","Undo",function(){q("#prompt").value=original;resizePrompt();saveDraftSoon()})
+  }catch(e){toast("Prompt improvement failed: "+e.message)}
+  b.disabled=false;b.classList.remove("loading");b.textContent="✧"
+}
+
 async function preflightSend(files){
   var hasImages=files.some(function(f){return f.kind==="image"});if(!hasImages||settings.model==="openrouter/auto")return true;
   await ensureModelCatalog();
@@ -1756,6 +1794,11 @@ async function undoLastMutation(){
   var u=lastMutationUndo,c=chats.find(function(ch){return ch.id===u.chatId});if(!c)return toast("That chat is no longer available");
   c.title=u.title;c.updated=Date.now();c.compactSummary=u.compactSummary;c.compactCount=u.compactCount;c.messages=JSON.parse(JSON.stringify(u.messages));active=c.id;lastMutationUndo=null;
   save();await hydrateChatMedia(c);render();restoreDraft();toast("Restored "+u.label)
+}
+
+function continueResponse(idx){
+  if(busy)return;var c=ensure(),m=c.messages[idx];if(!m||m.role!=="assistant")return;
+  q("#prompt").value="Continue exactly where you left off. Do not repeat earlier content.";resizePrompt();send()
 }
 
 async function regenerate(idx){
@@ -2815,6 +2858,7 @@ q("#usageSide").onclick=openUsage;
 q("#analyticsSide").onclick=openAnalytics;
 q("#projectsSide").onclick=openProjects;
 q("#promptsSide").onclick=q("#promptLibBtn").onclick=openPromptLibrary;
+q("#improvePromptBtn").onclick=improvePrompt;
 q("#scratchpadSide").onclick=openScratchpad;
 q("#snapshotsSide").onclick=openSnapshots;
 q("#globalSearchSide").onclick=openGlobalSearch;
