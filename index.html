@@ -408,6 +408,32 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
 
 /* v3.1 sidebar drawers */
 .navlabel{display:flex!important;align-items:center;gap:7px;cursor:pointer;user-select:none;border-radius:8px;min-height:26px;transition:background .15s ease,color .15s ease}.navlabel:hover{background:rgba(255,255,255,.03);color:#89858e}.navlabel:before{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:5px;background:rgba(255,255,255,.035);font-size:8px;color:#77737b;letter-spacing:0}.navlabel:after{content:"⌄";margin-left:auto;font-size:11px;color:#54515a;transition:transform .18s ease,color .18s ease}.navgroup.collapsed .navlabel:after{transform:rotate(-90deg)}.navgroup.collapsed .sbtn,.navgroup.collapsed>input{display:none!important}.navgroup.collapsed{padding-bottom:4px!important;margin-bottom:1px}.navgroup.collapsed .navlabel{margin-bottom:0}.navgroup[data-nav-key="ai"] .navlabel:before{content:"✦"}.navgroup[data-nav-key="workspace"] .navlabel:before{content:"▦"}.navgroup[data-nav-key="create"] .navlabel:before{content:"◇"}.navgroup[data-nav-key="chat"] .navlabel:before{content:"◫"}.navgroup[data-nav-key="app"] .navlabel:before{content:"⚙"}.navgroup:not(.collapsed) .navlabel{color:#77737c}.navgroup:not(.collapsed) .navlabel:after{color:var(--accent)}
+
+/* v3.2 visual controls + iconography */
+.appearanceStudio{display:grid;grid-template-columns:minmax(220px,.78fr) minmax(300px,1.22fr);gap:14px;margin:4px 0 16px;padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.012));box-shadow:inset 0 1px rgba(255,255,255,.025)}
+.appearancePreview{position:relative;min-height:190px;overflow:hidden;border-radius:15px;border:1px solid rgba(255,255,255,.09);background:linear-gradient(165deg,var(--panel2),var(--bg));box-shadow:0 14px 38px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.04);padding:12px}
+.appearancePreview:before{content:"";position:absolute;width:180px;height:150px;right:-30px;top:-55px;border-radius:50%;background:radial-gradient(closest-side,var(--accentGlow),transparent);filter:blur(8px)}
+.appearancePreviewTop{position:relative;display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center}.appearanceMiniOrb{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,var(--accent2),var(--accent));box-shadow:0 6px 18px var(--accentGlow);font-size:11px;font-weight:800;color:#fff}.appearancePreviewTop div{display:grid}.appearancePreviewTop b{font-size:10px}.appearancePreviewTop small{font-size:7px;color:var(--muted);margin-top:2px}.appearancePreviewTop i{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 9px rgba(127,210,160,.45)}
+.appearancePreviewBody{position:relative;margin:22px 5px 16px;display:grid;gap:7px}.appearancePreviewBody span{height:7px;width:82%;border-radius:99px;background:rgba(255,255,255,.11)}.appearancePreviewBody span:nth-child(2){width:94%}.appearancePreviewBody span.short{width:58%;background:color-mix(in srgb,var(--accent) 20%,rgba(255,255,255,.09))}
+.appearancePreviewComposer{position:absolute;left:12px;right:12px;bottom:12px;min-height:45px;border-radius:14px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.045);display:flex;align-items:center;padding:0 8px 0 11px;gap:8px}.appearancePreviewComposer em{min-width:0;flex:1;font-style:normal;font-size:8px;color:var(--muted)}.appearancePreviewComposer strong{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg,#fff,#d9d6d1);color:#111;font-size:11px}
+.appearanceChoices{min-width:0;padding:3px 1px}.appearanceLabel{font-size:9px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:#74717a;margin:0 0 7px}.accentLabel{margin-top:13px}.themeGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.themeTile{position:relative;min-width:0;padding:6px;border:1px solid rgba(255,255,255,.065);border-radius:11px;background:rgba(255,255,255,.025);text-align:left}.themeTile:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}.themeTile.on{border-color:color-mix(in srgb,var(--accent) 55%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 9%,transparent)}.themeTile b{display:block;margin:5px 2px 1px;font-size:9px;color:#aaa}.themeThumb{display:block;height:33px;border-radius:7px;border:1px solid rgba(255,255,255,.07)}.darkThumb{background:linear-gradient(135deg,#27272c,#151517)}.midnightThumb{background:linear-gradient(135deg,#1b2540,#070b14)}.emberThumb{background:linear-gradient(135deg,#33201a,#120b08)}.nebulaThumb{background:linear-gradient(135deg,#2b1d49,#090713)}.cyberThumb{background:linear-gradient(135deg,#17343a,#050b0d)}.oledThumb{background:linear-gradient(135deg,#171717,#000)}
+.accentGrid{display:flex;flex-wrap:wrap;gap:8px}.accentSwatch{width:27px;height:27px;border-radius:9px;border:2px solid rgba(255,255,255,.09);box-shadow:inset 0 1px rgba(255,255,255,.25)}.accentSwatch:hover{transform:translateY(-1px) scale(1.04)}.accentSwatch.on{box-shadow:0 0 0 2px var(--panel),0 0 0 4px rgba(255,255,255,.42),0 5px 16px rgba(0,0,0,.2)}.accentSwatch.coral{background:#e07b5f}.accentSwatch.blue{background:#6ca7ff}.accentSwatch.violet{background:#a889ff}.accentSwatch.green{background:#68c995}.accentSwatch.cyan{background:#46c7d4}.accentSwatch.gold{background:#d8a647}.accentSwatch.pink{background:#e26aa5}.accentSwatch.custom{background:linear-gradient(135deg,#ff6577,#ffd166,#62d9d2,#8c7aff);display:grid;place-items:center}.accentSwatch.custom span{font-size:13px;font-weight:850;color:#fff;text-shadow:0 1px 5px #0008}.appearanceLegacy{display:none!important}
+
+.navgroup .sbtn{display:flex!important;align-items:center;gap:9px}.navgroup .sbtn:before{width:18px;text-align:center;flex:none;color:#77737c;font-size:12px}.navgroup .sbtn:hover:before{color:var(--accent2)}
+#modelsBtn:before{content:"◈"}#profilesSide:before{content:"◉"}#compareSide:before{content:"⇄"}#usageSide:before{content:"▥"}#analyticsSide:before{content:"⌁"}#diagnosticsSide:before{content:"✓"}#storageSide:before{content:"▤"}
+#projectsSide:before{content:"▦"}#promptsSide:before{content:"★"}#scratchpadSide:before{content:"✎"}#tasksSide:before{content:"☑"}#snapshotsSide:before{content:"◫"}#globalSearchSide:before{content:"⌕"}#findSide:before{content:"⌘"}#outlineSide:before{content:"☷"}#bookmarksSide:before{content:"◆"}#archiveSide:before{content:"▣"}#trashSide:before{content:"⌫"}
+#imageSide:before{content:"◇"}#gallerySide:before{content:"▧"}#videoSide:before{content:"▷"}#voiceSide:before{content:"◖"}#transcribeSide:before{content:"≋"}
+#shareSide:before{content:"↗"}#exportSide:before{content:"↓"}#printSide:before{content:"▤"}#backupSide:before{content:"◫"}#importSide:before{content:"↑"}
+#installSide:before{content:"⊕"}#whatsNewSide:before{content:"✦"}#shortcutsSide:before{content:"⌨"}#checkUpdateSide:before{content:"↻"}#settingsBtn:before{content:"⚙"}#sideAuth:before{content:"●"}
+
+.commandItem{position:relative;min-height:48px;padding:9px 12px 9px 50px!important}.commandItem:before{content:attr(data-command-icon);position:absolute;left:11px;width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 11%,var(--panel2)),rgba(255,255,255,.035));border:1px solid rgba(255,255,255,.055);color:var(--accent2);font-size:11px;font-weight:750}.commandItem span{font-weight:600;font-size:12px;color:#ddd}.commandItem small{font-size:10px!important}
+
+.msgtools{width:max-content;max-width:calc(100% - 37px);padding:4px 5px;border-radius:11px;border:1px solid transparent}.assistant:hover>.msgtools{background:rgba(255,255,255,.018);border-color:rgba(255,255,255,.04)}.msgtools button{border:1px solid transparent!important}.msgtools button:hover{border-color:rgba(255,255,255,.055)!important}
+.historyitem{position:relative}.historyitem.on:after{content:"";position:absolute;right:7px;width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 9px var(--accentGlow)}.historyitem.on .chatmore{margin-right:8px}
+.scrollbottom{width:40px!important;height:40px!important;border-radius:13px!important;background:rgba(31,31,35,.88)!important;border-color:rgba(255,255,255,.09)!important;color:var(--accent2)!important}
+.toast{max-width:min(88vw,520px);border-color:color-mix(in srgb,var(--accent) 13%,rgba(255,255,255,.08))!important}
+
+@media(max-width:680px){.appearanceStudio{grid-template-columns:1fr}.appearancePreview{min-height:150px}.themeGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.appearancePreviewBody{margin-top:15px}.appearancePreviewComposer{min-height:39px}}
 </style>
 </head>
 <body>
@@ -559,7 +585,7 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
 <h3>Workspace</h3>
 <ul><li>The sidebar is now organized into collapsible AI, Workspace, Create, Chat, and App drawers that remember your layout locally.</li><li>High-frequency AI and Workspace drawers stay open by default, while lower-frequency tool groups start collapsed to reduce visual noise.</li><li>Conversation branches, tasks, snapshots, backups, archives, trash, global search, and encrypted workspace exports remain available.</li></ul>
 <h3>Interface</h3>
-<ul><li>v3 introduces a redesigned visual system: new brand treatment, assistant/user identities, richer chat hierarchy, animated streaming state, premium composer shell, and cleaner sidebar navigation.</li><li>Added Nebula and Cyber themes plus Cyan, Gold, and Pink accents, with improved focus states and reduced-motion support.</li><li>Mobile now hides low-priority header controls, keeps message actions usable, and gives the composer more breathing room without sacrificing tools.</li></ul>
+<ul><li>Appearance settings now use a live visual studio with theme cards, accent swatches, and an instant mini-preview instead of plain dropdowns.</li><li>Sidebar tools and the command palette now share a consistent icon language, making dense navigation faster to scan.</li><li>Message action bars, active-chat indicators, scroll controls, cards, and micro-interactions received another polish pass across desktop and mobile.</li></ul>
 </div>
 </section>
 
@@ -602,9 +628,38 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
 <button class="danger" id="disconnectNow">Disconnect</button>
 </div>
 <div class="field hidden" id="manualKeyField"><label>OpenRouter API key</label><input id="manualKey" type="password" autocomplete="off" placeholder="sk-or-v1-..."><div class="smallnote">Stored only in this browser for this site. It is not committed to GitHub.</div></div>
+<div class="appearanceStudio">
+  <div class="appearancePreview" id="appearancePreview">
+    <div class="appearancePreviewTop"><span class="appearanceMiniOrb">Q</span><div><b>Quantum Breaks AI</b><small>Live appearance preview</small></div><i></i></div>
+    <div class="appearancePreviewBody"><span></span><span></span><span class="short"></span></div>
+    <div class="appearancePreviewComposer"><em>Message Quantum Breaks AI…</em><strong>↑</strong></div>
+  </div>
+  <div class="appearanceChoices">
+    <div class="appearanceLabel">Theme</div>
+    <div class="themeGrid" id="themeGrid">
+      <button type="button" class="themeTile" data-theme-choice="dark"><span class="themeThumb darkThumb"></span><b>Dark</b></button>
+      <button type="button" class="themeTile" data-theme-choice="midnight"><span class="themeThumb midnightThumb"></span><b>Midnight</b></button>
+      <button type="button" class="themeTile" data-theme-choice="ember"><span class="themeThumb emberThumb"></span><b>Ember</b></button>
+      <button type="button" class="themeTile" data-theme-choice="nebula"><span class="themeThumb nebulaThumb"></span><b>Nebula</b></button>
+      <button type="button" class="themeTile" data-theme-choice="cyber"><span class="themeThumb cyberThumb"></span><b>Cyber</b></button>
+      <button type="button" class="themeTile" data-theme-choice="oled"><span class="themeThumb oledThumb"></span><b>OLED</b></button>
+    </div>
+    <div class="appearanceLabel accentLabel">Accent</div>
+    <div class="accentGrid" id="accentGrid">
+      <button type="button" class="accentSwatch coral" data-accent-choice="coral" title="Coral"></button>
+      <button type="button" class="accentSwatch blue" data-accent-choice="blue" title="Blue"></button>
+      <button type="button" class="accentSwatch violet" data-accent-choice="violet" title="Violet"></button>
+      <button type="button" class="accentSwatch green" data-accent-choice="green" title="Green"></button>
+      <button type="button" class="accentSwatch cyan" data-accent-choice="cyan" title="Cyan"></button>
+      <button type="button" class="accentSwatch gold" data-accent-choice="gold" title="Gold"></button>
+      <button type="button" class="accentSwatch pink" data-accent-choice="pink" title="Pink"></button>
+      <button type="button" class="accentSwatch custom" data-accent-choice="custom" title="Custom"><span>+</span></button>
+    </div>
+  </div>
+</div>
 <div class="row">
-<div class="field" style="flex:1;min-width:160px"><label>Theme</label><select id="themeSelect"><option value="dark">Dark</option><option value="midnight">Midnight</option><option value="ember">Ember</option><option value="nebula">Nebula</option><option value="cyber">Cyber</option><option value="oled">OLED</option></select></div>
-<div class="field" style="flex:1;min-width:160px"><label>Accent</label><select id="accentSelect"><option value="coral">Coral</option><option value="blue">Blue</option><option value="violet">Violet</option><option value="green">Green</option><option value="cyan">Cyan</option><option value="gold">Gold</option><option value="pink">Pink</option><option value="custom">Custom</option></select></div>
+<div class="field appearanceLegacy" style="flex:1;min-width:160px"><label>Theme</label><select id="themeSelect"><option value="dark">Dark</option><option value="midnight">Midnight</option><option value="ember">Ember</option><option value="nebula">Nebula</option><option value="cyber">Cyber</option><option value="oled">OLED</option></select></div>
+<div class="field appearanceLegacy" style="flex:1;min-width:160px"><label>Accent</label><select id="accentSelect"><option value="coral">Coral</option><option value="blue">Blue</option><option value="violet">Violet</option><option value="green">Green</option><option value="cyan">Cyan</option><option value="gold">Gold</option><option value="pink">Pink</option><option value="custom">Custom</option></select></div>
 <div class="field" style="flex:1;min-width:160px"><label>Density</label><select id="densitySelect"><option value="cozy">Cozy</option><option value="compact">Compact</option></select></div>
 <div class="field" style="flex:1;min-width:160px"><label>Custom accent</label><input id="customAccent" type="color" value="#e07b5f"></div>
 <div class="field" style="flex:1;min-width:160px"><label>Chat width</label><select id="contentWidth"><option value="760">Narrow</option><option value="860">Normal</option><option value="1040">Wide</option><option value="1240">Ultra wide</option></select></div>
@@ -1039,7 +1094,7 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opac
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="3.1.0";
+var APP_VERSION="3.2.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
@@ -1209,6 +1264,7 @@ function applyAppearance(){
   }else{
     root.style.removeProperty("--accent");root.style.removeProperty("--accent2");root.style.removeProperty("--accentGlow")
   }
+  if(q("#appearancePreview"))syncAppearanceStudio()
 }
 function current(){return chats.find(function(c){return c.id===active&&!c.trashedAt})}
 function effectiveModel(c){var p=projectForChat(c);return c&&c.modelOverride?c.modelOverride:(p&&p.model?p.model:settings.model)}
@@ -2021,6 +2077,20 @@ function runNextQueued(chat){
   setTimeout(function(){if(!busy&&current()&&current().id===chat.id)send()},180)
 }
 
+function syncAppearanceStudio(){
+  qa("[data-theme-choice]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-theme-choice")===(settings.theme||"dark"))});
+  qa("[data-accent-choice]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-accent-choice")===(settings.accent||"coral"))});
+}
+function setupAppearanceStudio(){
+  qa("[data-theme-choice]").forEach(function(b){b.onclick=function(){settings.theme=b.getAttribute("data-theme-choice");q("#themeSelect").value=settings.theme;save();applyAppearance()}});
+  qa("[data-accent-choice]").forEach(function(b){b.onclick=function(){
+    var value=b.getAttribute("data-accent-choice");
+    if(value==="custom"){settings.accent="custom";q("#accentSelect").value="custom";save();applyAppearance();setTimeout(function(){q("#customAccent").click()},0);return}
+    settings.accent=value;q("#accentSelect").value=value;save();applyAppearance()
+  }});
+  syncAppearanceStudio()
+}
+
 function setupSidebarGroups(){
   var defaults={ai:false,workspace:false,create:true,chat:true,app:true};
   if(!settings.navCollapsed||typeof settings.navCollapsed!=="object")settings.navCollapsed=Object.assign({},defaults);
@@ -2133,6 +2203,8 @@ function renderCommandPalette(){
   var box=q("#commandList");box.innerHTML="";var matches=commandMatches();
   matches.forEach(function(x,i){
     var b=document.createElement("button");b.className="commandItem"+(i===commandActiveIndex?" active":"");
+    var commandIcons={"New chat":"＋","Choose model":"◈","AI profiles":"◉","Compare models":"⇄","Mode: Balanced":"⚡","Mode: Fast":"⚡","Mode: Deep":"◆","Mode: Research":"⌕","Create image":"◇","Media gallery":"▧","Create video":"▷","AI voice":"◖","Transcribe audio":"≋","Projects":"▦","Prompt library":"★","Scratchpad":"✎","Conversation tasks":"☑","Conversation snapshots":"◫","Global search":"⌕","Find in conversation":"⌘","Conversation outline":"☷","Bookmarks":"◆","Archived chats":"▣","Usage dashboard":"▥","Local analytics":"⌁","Diagnostics":"✓","Storage manager":"▤","Toggle focus mode":"◎","What’s new":"✦","Keyboard shortcuts":"⌨","Check for updates":"↻","Settings":"⚙","Toggle temporary chat":"◐","Export Markdown":"↓","Print / Save PDF":"▤","Backup chat":"◫"};
+    b.setAttribute("data-command-icon",commandIcons[x.name]||"›");
     var left=document.createElement("span");left.textContent=x.name;
     var right=document.createElement("small");right.textContent=x.hint||"";
     b.appendChild(left);b.appendChild(right);b.onclick=function(){closeModals();x.run()};
@@ -4858,6 +4930,7 @@ function handleLaunchAction(){
   else if(action==="image")openImage();
   else if(action==="research"){settings.web=true;settings.fetch=true;settings.modePreset="research";save();render();q("#prompt").focus();toast("Research mode ready")}
 }
+setupAppearanceStudio();
 setupSidebarGroups();
 setupAccessibility();
 finishAuth().then(function(){render();restoreDraft();handleLaunchAction();setTimeout(function(){ensureModelCatalog().then(function(){render()})},250)})
