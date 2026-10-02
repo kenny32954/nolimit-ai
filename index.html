@@ -414,7 +414,9 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 <h3>AI workflow</h3>
 <ul><li>Per-chat model locks and per-chat instructions.</li><li>Strict JSON Schema responses plus optional second-pass answer review.</li><li>Prompt improver, snapshots, context compression, tags, conversation outline, and expanded slash commands.</li></ul>
 <h3>Workspace</h3>
-<ul><li>Persistent image/PDF storage, encrypted backups, analytics, archives, trash, global search, and local profiles.</li></ul>
+<ul><li>Project default models, direct project-chat creation, text-file knowledge imports, and project export/import.</li><li>Persistent image/PDF storage, media gallery, in-app file previews, encrypted backups, analytics, archives, trash, global search, and local profiles.</li></ul>
+<h3>Interface</h3>
+<ul><li>Slash-command autocomplete, model sorting, local model performance stats, context preview inspector, and in-app update checks.</li></ul>
 </div>
 </section>
 
@@ -817,7 +819,7 @@ html[data-focus="true"] .composer,html[data-focus="true"] .foot{max-width:920px}
 "use strict";
 
 var BASE="https://openrouter.ai/api/v1";
-var APP_VERSION="2.2.0";
+var APP_VERSION="2.3.0";
 var STORE="nolimit_chats_v2";
 var SETSTORE="nolimit_settings_v2";
 var KEYSTORE="nolimit_openrouter_key_v2";
