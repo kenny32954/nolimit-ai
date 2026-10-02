@@ -840,10 +840,27 @@ async function generateImage(){
   var prompt=q("#imagePrompt").value.trim();if(!prompt)return toast("Enter an image prompt");
   q("#generateImage").disabled=true;q("#imageProgress").classList.remove("hidden");q("#imageOutput").innerHTML="";
   try{
-    var chosen=imageModels.find(function(m){return m.id===q("#imageModel").value});var params=chosen&&chosen.supported_parameters?chosen.supported_parameters:{};var imageBody={model:q("#imageModel").value,prompt:prompt,n:1};if(params.aspect_ratio||!chosen)imageBody.aspect_ratio=q("#imageRatio").value;if(params.output_format||!chosen)imageBody.output_format=q("#imageFormat").value;var r=await fetch(BASE+"/images",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify(imageBody)});
-    var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Image generation failed"));var d=j.data&&j.data[0];var src=d&&(d.b64_json?("data:image/"+q("#imageFormat").value+";base64,"+d.b64_json):(d.url||""));if(!src)throw new Error("No image was returned");
-    var img=document.createElement("img");img.src=src;img.className="imgresult";q("#imageOutput").appendChild(img);
-    var add=document.createElement("button");add.className="secondary";add.style.marginTop="8px";add.textContent="Add to current chat";add.onclick=function(){var c=ensure();c.messages.push({role:"assistant",content:"Generated image: "+prompt,model:q("#imageModel").value,images:[src]});c.updated=Date.now();save();closeModals();render()};q("#imageOutput").appendChild(add)
+    var chosen=imageModels.find(function(m){return m.id===q("#imageModel").value});
+    var params=chosen&&chosen.supported_parameters?chosen.supported_parameters:{};
+    var imageBody={model:q("#imageModel").value,prompt:prompt,n:Number(q("#imageCount").value)||1};
+    if(params.aspect_ratio||!chosen)imageBody.aspect_ratio=q("#imageRatio").value;
+    if(params.output_format||!chosen)imageBody.output_format=q("#imageFormat").value;
+    if(params.quality||!chosen)imageBody.quality=q("#imageQuality").value;
+    if(params.background||!chosen)imageBody.background=q("#imageBackground").value;
+    if(imageReferenceData){
+      if(chosen&&!params.input_references)throw new Error("This image model does not advertise reference-image support. Choose an image-to-image model.");
+      imageBody.input_references=[{type:"image_url",image_url:{url:imageReferenceData}}]
+    }
+    var r=await fetch(BASE+"/images",{method:"POST",headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},body:JSON.stringify(imageBody)});
+    var j=await r.json();if(!r.ok)throw new Error(errorText(j,"Image generation failed"));
+    var outputs=(j.data||[]).map(function(d){
+      if(d.b64_json)return "data:"+(d.media_type||("image/"+q("#imageFormat").value))+";base64,"+d.b64_json;
+      return d.url||""
+    }).filter(Boolean);
+    if(!outputs.length)throw new Error("No image was returned");
+    outputs.forEach(function(src){var img=document.createElement("img");img.src=src;img.className="imgresult";q("#imageOutput").appendChild(img)});
+    var meta=document.createElement("div");meta.className="smallnote";meta.textContent=(j.usage&&j.usage.cost!=null?("Cost "+money(j.usage.cost)+" · "):"")+outputs.length+" image"+(outputs.length===1?"":"s");q("#imageOutput").appendChild(meta);
+    var add=document.createElement("button");add.className="secondary";add.style.marginTop="8px";add.textContent="Add to current chat";add.onclick=function(){var c=ensure();c.messages.push({role:"assistant",content:(imageReferenceData?"Edited/generated image: ":"Generated image: ")+prompt,model:q("#imageModel").value,images:outputs});c.updated=Date.now();save();closeModals();render()};q("#imageOutput").appendChild(add)
   }catch(e){q("#imageOutput").innerHTML='<div class="notice">'+escapeHTML(e.message)+'</div>'}
   q("#generateImage").disabled=false;q("#imageProgress").classList.add("hidden")
 }
@@ -985,6 +1002,13 @@ async function generateVideo(){
       aspect_ratio:q("#videoRatio").value,
       generate_audio:q("#videoAudio").checked
     };
+    var chosenVideo=videoModels.find(function(m){return m.id===body.model});
+    if(videoFrameData){
+      if(chosenVideo&&Array.isArray(chosenVideo.supported_frame_images)&&chosenVideo.supported_frame_images.indexOf("first_frame")<0)throw new Error("This video model does not support a first-frame image.");
+      body.frame_images=[{type:"image_url",image_url:{url:videoFrameData},frame_type:"first_frame"}]
+    }else if(videoReferenceData){
+      body.input_references=[{type:"image_url",image_url:{url:videoReferenceData}}]
+    }
     var r=await fetch(BASE+"/videos",{
       method:"POST",
       headers:{Authorization:"Bearer "+getKey(),"Content-Type":"application/json","HTTP-Referer":location.href,"X-OpenRouter-Title":"NoLimit AI"},
@@ -1229,6 +1253,15 @@ q("#assignProject").onclick=assignProject;
 q("#deleteProject").onclick=deleteProject;
 q("#refreshUsage").onclick=refreshUsage;
 q("#runCompare").onclick=runCompare;
+q("#imageReferenceInput").onchange=async function(e){
+  var f=e.target.files&&e.target.files[0];imageReferenceData=f?await readDataURL(f):"";q("#imageReferenceName").textContent=f?("Reference: "+f.name):"Optional image-to-image reference."
+};
+q("#videoFrameInput").onchange=async function(e){
+  var f=e.target.files&&e.target.files[0];videoFrameData=f?await readDataURL(f):"";q("#videoFrameName").textContent=f?("First frame: "+f.name):"Optional image-to-video first frame."
+};
+q("#videoReferenceInput").onchange=async function(e){
+  var f=e.target.files&&e.target.files[0];videoReferenceData=f?await readDataURL(f):"";q("#videoReferenceName").textContent=f?("Reference: "+f.name):"Optional style/content reference."
+};
 q("#generateImage").onclick=generateImage;
 q("#generateVoice").onclick=generateVoice;
 q("#voiceModel").onchange=function(){q("#voiceName").value=defaultVoiceFor(q("#voiceModel").value)};
