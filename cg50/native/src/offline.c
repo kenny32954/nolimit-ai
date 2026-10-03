@@ -1107,6 +1107,7 @@ static void write_contextual_fallback(char const *subject, char const *mode,
     char subject_name[64];
     char const *strategy;
     char const *ref;
+    char const *suggestion;
     int words;
 
     copy_topic(prompt, topic, sizeof(topic));
@@ -1428,6 +1429,9 @@ bool qb_offline_answer(
     if(!effective_subject) effective_subject = "auto";
 
     if(handle_followup(prompt, mode, level, out, out_size)) {
+        if(out[0]) {
+            snprintf(memory_answer, sizeof(memory_answer), "%.699s", out);
+        }
         return true;
     }
 
