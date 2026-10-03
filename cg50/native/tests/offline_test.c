@@ -81,6 +81,14 @@ int main(void)
     qb_offline_answer("history", "explain", "school", "tell me about thermopylae", out, sizeof(out));
     expect_contains("tell me topic", out, "thermopylae");
 
+    qb_offline_answer("history", "explain", "school", "what does thermopylae mean?", out, sizeof(out));
+    expect_contains("what does topic", out, "thermopylae");
+    expect_not_contains("what does strips mean", out, "thermopylae mean");
+
+    qb_offline_answer("biology", "explain", "school", "difference between frobules and glarps", out, sizeof(out));
+    expect_contains("difference topic", out, "frobules and glarps");
+    expect_contains("difference intent", out, "comparison");
+
     qb_offline_answer("biology", "explain", "school", "why florpules reproduce", out, sizeof(out));
     expect_contains("why topic", out, "florpules reproduce");
     expect_contains("why intent", out, "WHY");
