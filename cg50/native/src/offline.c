@@ -835,7 +835,7 @@ static char const *infer_subject_local(char const *text)
     if(strstr(text, "theme") || strstr(text, "metaphor") || strstr(text, "symbol") ||
        strstr(text, "irony") || strstr(text, "literature")) return "literature";
 
-    if(strstr(text, "essay") || strstr(text, "thesis") || strstr(text, "paragraph") ||
+    if(strstr(text, "essay") || phrase_match(text, "thesis") || strstr(text, "paragraph") ||
        strstr(text, "citation") || strstr(text, "rhetoric")) return "composition";
 
     if(strstr(text, "constitution") || strstr(text, "federalism") ||
