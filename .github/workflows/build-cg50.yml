@@ -1,0 +1,106 @@
+name: Build CG50 QBAI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [cg50-integration]
+    paths:
+      - "cg50/native/**"
+      - "bridge/**"
+      - ".github/workflows/build-cg50.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-g3a:
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/therainbowphoenix/gint-docker:main
+
+    steps:
+      - name: Check out CG50 branch
+        uses: actions/checkout@v4
+        with:
+          ref: cg50-integration
+          fetch-depth: 0
+
+      - name: Show toolchain
+        run: |
+          which fxsdk
+          which sh-elf-gcc
+          fxsdk --version || true
+          sh-elf-gcc --version | head -1
+
+      - name: Build QBAI.g3a
+        working-directory: cg50/native
+        run: |
+          fxsdk build-cg
+
+      - name: Locate and verify output
+        id: locate
+        run: |
+          set -e
+          G3A_PATH="$(find cg50/native -type f -name 'QBAI.g3a' -print -quit)"
+          if [ -z "$G3A_PATH" ]; then
+            echo "QBAI.g3a was not produced"
+            find cg50/native -maxdepth 4 -type f -print
+            exit 1
+          fi
+          echo "path=$G3A_PATH" >> "$GITHUB_OUTPUT"
+          ls -lh "$G3A_PATH"
+          sha256sum "$G3A_PATH"
+
+      - name: Package exact build for retrieval
+        run: |
+          set -e
+          G3A_PATH="${{ steps.locate.outputs.path }}"
+          mkdir -p release
+          base64 "$G3A_PATH" > release/QBAI.g3a.b64
+          sha256sum "$G3A_PATH" | awk '{print $1}' > release/QBAI.g3a.sha256
+          cp "$G3A_PATH" /tmp/QBAI.g3a
+
+      - name: Package live test bundle
+        run: |
+          set -e
+          rm -rf /tmp/QBAI-LIVE
+          mkdir -p /tmp/QBAI-LIVE/bridge
+          cp /tmp/QBAI.g3a /tmp/QBAI-LIVE/QBAI.g3a
+          cp bridge/qb_bridge.py /tmp/QBAI-LIVE/bridge/
+          cp bridge/qb_launch.py /tmp/QBAI-LIVE/bridge/
+          cp bridge/subject_router.py /tmp/QBAI-LIVE/bridge/
+          cp bridge/requirements.txt /tmp/QBAI-LIVE/bridge/
+          cp bridge/INSTALL_WINDOWS.bat /tmp/QBAI-LIVE/bridge/
+          cp bridge/START_QBAI_WINDOWS.bat /tmp/QBAI-LIVE/bridge/
+          cp bridge/start_qbai.sh /tmp/QBAI-LIVE/bridge/
+          cp bridge/LIVE_TEST_README.txt /tmp/QBAI-LIVE/
+          cd /tmp
+          python3 -m zipfile -c QBAI-LIVE-PACK.zip QBAI-LIVE
+
+      - name: Upload calculator binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: QBAI-CG50
+          path: /tmp/QBAI.g3a
+          if-no-files-found: error
+
+      - name: Upload full live test pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: QBAI-LIVE-PACK
+          path: /tmp/QBAI-LIVE-PACK.zip
+          if-no-files-found: error
+
+      - name: Publish build encoding to branch
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add release/QBAI.g3a.b64 release/QBAI.g3a.sha256
+          if git diff --cached --quiet; then
+            echo "Build encoding unchanged"
+          else
+            git commit -m "Build QBAI.g3a [skip ci]"
+            git push origin HEAD:cg50-integration
+          fi

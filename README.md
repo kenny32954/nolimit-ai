@@ -327,7 +327,7 @@ Actual usage is still subject to:
 
 ## Release
 
-Current app generation: v2.5.0
+Current app generation: v4.0.0
 
 Major capabilities now include:
 - phone + PC UI
