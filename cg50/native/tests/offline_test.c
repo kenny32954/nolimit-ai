@@ -184,6 +184,23 @@ int main(void)
     qb_offline_answer("auto", "explain", "school", "???", out, sizeof(out));
     expect_contains("punctuation input", out, "only spaces/punctuation/symbols");
 
+
+    qb_offline_answer("auto", "answer", "school", "what is 2+2?", out, sizeof(out));
+    expect_contains("prefixed expression", out, "4");
+
+    qb_offline_answer("auto", "answer", "school", "calculate (7-2)*6", out, sizeof(out));
+    expect_contains("calculate expression", out, "30");
+
+    qb_offline_answer("auto", "steps", "school", "3x + 7 = 25", out, sizeof(out));
+    expect_contains("bare linear equation", out, "x = 6");
+
+    qb_offline_answer("auto", "explain", "school", "mitosis vs meiosis", out, sizeof(out));
+    expect_contains("known comparison mitosis", out, "Mitosis");
+    expect_contains("known comparison meiosis", out, "meiosis");
+
+    qb_offline_answer("auto", "explain", "school", "difference between ionic bond and covalent bond", out, sizeof(out));
+    expect_contains("bond comparison", out, "electron transfer");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
