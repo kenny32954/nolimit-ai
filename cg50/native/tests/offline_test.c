@@ -159,6 +159,31 @@ int main(void)
     qb_offline_answer("auto", "explain", "school", "give me an example", out, sizeof(out));
     expect_contains("followup example", out, "Example for");
 
+
+    qb_offline_answer("auto", "steps", "school", "solve 3x + 7 = 25", out, sizeof(out));
+    expect_contains("linear solve", out, "x = 6");
+
+    qb_offline_answer("auto", "steps", "school", "solve 2x - 4 = x + 9", out, sizeof(out));
+    expect_contains("linear both sides", out, "x = 13");
+
+    qb_offline_answer("auto", "answer", "school", "120 inches to feet", out, sizeof(out));
+    expect_contains("unit inches feet", out, "10");
+
+    qb_offline_answer("auto", "answer", "school", "5 kilometers to meters", out, sizeof(out));
+    expect_contains("unit km m", out, "5000");
+
+    qb_offline_answer("auto", "answer", "school", "72 fahrenheit to celsius", out, sizeof(out));
+    expect_contains("temperature conversion", out, "22.222");
+
+    qb_offline_answer("auto", "explain", "school", "lol", out, sizeof(out));
+    expect_contains("casual lol", out, "Fair enough");
+
+    qb_offline_answer("auto", "explain", "school", "idk", out, sizeof(out));
+    expect_contains("casual idk", out, "part you do know");
+
+    qb_offline_answer("auto", "explain", "school", "???", out, sizeof(out));
+    expect_contains("punctuation input", out, "only spaces/punctuation/symbols");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
