@@ -201,6 +201,31 @@ int main(void)
     qb_offline_answer("auto", "explain", "school", "difference between ionic bond and covalent bond", out, sizeof(out));
     expect_contains("bond comparison", out, "electron transfer");
 
+
+    qb_offline_answer("biology", "summary", "school", "summarize photosynthesis", out, sizeof(out));
+    expect_contains("summary request", out, "Summary - photosynthesis");
+
+    qb_offline_answer("algebra_1", "flashcards", "school", "flashcards on slope", out, sizeof(out));
+    expect_contains("flashcard request", out, "FLASHCARD");
+    expect_contains("flashcard topic", out, "slope");
+
+    qb_offline_answer("biology", "quiz", "school", "quiz me on mitosis", out, sizeof(out));
+    expect_contains("quiz request", out, "QUIZ");
+    expect_contains("quiz reveal instruction", out, "show answer");
+
+    qb_offline_answer("biology", "quiz", "school", "show answer", out, sizeof(out));
+    expect_contains("quiz revealed", out, "ANSWER - mitosis");
+    expect_contains("quiz answer content", out, "daughter cells");
+
+    qb_offline_answer("computer_science", "explain", "school", "https://example.com/page", out, sizeof(out));
+    expect_contains("url recognition", out, "looks like a URL");
+
+    qb_offline_answer("computer_science", "explain", "school", "print(x)", out, sizeof(out));
+    expect_contains("code recognition", out, "source code");
+
+    qb_offline_answer("auto", "explain", "school", "ZXQ", out, sizeof(out));
+    expect_contains("acronym recognition", out, "acronym or initialism");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
