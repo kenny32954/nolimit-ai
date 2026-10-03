@@ -226,6 +226,23 @@ int main(void)
     qb_offline_answer("auto", "explain", "school", "ZXQ", out, sizeof(out));
     expect_contains("acronym recognition", out, "acronym or initialism");
 
+
+    qb_offline_answer("history", "explain", "school", "I think the policy changed society", out, sizeof(out));
+    expect_contains("claim intent", out, "claim/answer");
+
+    qb_offline_answer("composition", "explain", "school", "write an essay about courage", out, sizeof(out));
+    expect_contains("writing intent", out, "Writing plan");
+    expect_contains("writing topic", out, "courage");
+
+    qb_offline_answer("algebra_1", "check", "school", "is this correct 3x+2=11 so x=3", out, sizeof(out));
+    expect_contains("check intent", out, "CHECK mode");
+
+    qb_offline_answer("biology", "explain", "school", "give me reasons why cells divide", out, sizeof(out));
+    expect_contains("reasons intent", out, "separate causes from effects");
+
+    qb_offline_answer("auto", "explain", "school", "what do you think about homework", out, sizeof(out));
+    expect_contains("opinion intent", out, "don't have personal opinions");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
