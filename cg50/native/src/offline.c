@@ -1350,6 +1350,16 @@ static void write_contextual_fallback(char const *subject, char const *mode,
     strategy = subject_strategy(subject);
     ref = qb_reference_text(subject);
     words = alpha_word_count(prompt);
+    suggestion = suggest_fact(topic);
+
+    if(suggestion) {
+        snprintf(out, out_size,
+            "I don't have an exact match for \"%s\". Did you mean \"%s\"? "
+            "If yes, ask me about \"%s\" and I'll use the stored concept. "
+            "If not, I'll keep your exact wording as the topic.",
+            topic, suggestion, suggestion);
+        return;
+    }
 
     if(starts_with(lowerbuf, "what is ") || starts_with(lowerbuf, "what are ") ||
        starts_with(lowerbuf, "what's ") || starts_with(lowerbuf, "whats ") ||
