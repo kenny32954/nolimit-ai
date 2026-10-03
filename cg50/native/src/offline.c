@@ -664,6 +664,376 @@ static bool looks_like_unknown_token(char const *text)
     return spaces == 0 && letters >= 7 && vowels == 0;
 }
 
+
+static int extract_numbers(char const *text, double *values, int cap)
+{
+    int count = 0;
+    char *end;
+
+    while(*text && count < cap) {
+        bool candidate = isdigit((unsigned char)*text) || *text == '.';
+
+        if((*text == '+' || *text == '-') &&
+           (isdigit((unsigned char)text[1]) || text[1] == '.')) {
+            candidate = true;
+        }
+
+        if(candidate) {
+            values[count] = strtod(text, &end);
+            if(end != text) {
+                count++;
+                text = end;
+                continue;
+            }
+        }
+
+        text++;
+    }
+
+    return count;
+}
+
+static bool try_natural_math(char const *text, char *out, size_t out_size)
+{
+    double v[16];
+    int n = extract_numbers(text, v, 16);
+    double result;
+
+    if((strstr(text, "square root of ") || starts_with(text, "sqrt of ")) && n >= 1) {
+        if(v[0] < 0.0) {
+            snprintf(out, out_size, "The real square root of %.12g is not defined.", v[0]);
+        }
+        else {
+            snprintf(out, out_size, "sqrt(%.12g) = %.12g", v[0], sqrt(v[0]));
+        }
+        return true;
+    }
+
+    if(strstr(text, " percent of ") && n >= 2) {
+        result = (v[0] / 100.0) * v[1];
+        snprintf(out, out_size, "%.12g%% of %.12g = %.12g", v[0], v[1], result);
+        return true;
+    }
+
+    if((strstr(text, " plus ") || strstr(text, " added to ")) && n >= 2) {
+        snprintf(out, out_size, "%.12g + %.12g = %.12g", v[0], v[1], v[0] + v[1]);
+        return true;
+    }
+
+    if((strstr(text, " minus ") || strstr(text, " subtract ")) && n >= 2) {
+        snprintf(out, out_size, "%.12g - %.12g = %.12g", v[0], v[1], v[0] - v[1]);
+        return true;
+    }
+
+    if((strstr(text, " times ") || strstr(text, " multiplied by ")) && n >= 2) {
+        snprintf(out, out_size, "%.12g * %.12g = %.12g", v[0], v[1], v[0] * v[1]);
+        return true;
+    }
+
+    if((strstr(text, " divided by ") || strstr(text, " over ")) && n >= 2) {
+        if(v[1] == 0.0) {
+            snprintf(out, out_size, "Division by zero is undefined.");
+        }
+        else {
+            snprintf(out, out_size, "%.12g / %.12g = %.12g", v[0], v[1], v[0] / v[1]);
+        }
+        return true;
+    }
+
+    if((strstr(text, "power of ") || strstr(text, " raised to ")) && n >= 2) {
+        snprintf(out, out_size, "%.12g ^ %.12g = %.12g", v[0], v[1], pow(v[0], v[1]));
+        return true;
+    }
+
+    if((strstr(text, "average of ") || strstr(text, "mean of ")) && n >= 1) {
+        int i;
+        result = 0.0;
+        for(i = 0; i < n; i++) result += v[i];
+        result /= n;
+        snprintf(out, out_size, "Mean of %d values = %.12g", n, result);
+        return true;
+    }
+
+    if(strstr(text, "area") && strstr(text, "circle") &&
+       (strstr(text, "radius") || strstr(text, " r ")) && n >= 1) {
+        result = 3.14159265358979323846 * v[0] * v[0];
+        snprintf(out, out_size, "Circle area = pi*r^2 = %.12g", result);
+        return true;
+    }
+
+    if((strstr(text, "circumference") || strstr(text, "perimeter of a circle")) &&
+       n >= 1) {
+        result = 2.0 * 3.14159265358979323846 * v[0];
+        snprintf(out, out_size, "Circumference = 2*pi*r = %.12g", result);
+        return true;
+    }
+
+    if(strstr(text, "area") && strstr(text, "rectangle") && n >= 2) {
+        snprintf(out, out_size, "Rectangle area = length*width = %.12g", v[0] * v[1]);
+        return true;
+    }
+
+    if(strstr(text, "perimeter") && strstr(text, "rectangle") && n >= 2) {
+        snprintf(out, out_size, "Rectangle perimeter = 2(L+W) = %.12g", 2.0 * (v[0] + v[1]));
+        return true;
+    }
+
+    if(strstr(text, "area") && strstr(text, "triangle") && n >= 2) {
+        snprintf(out, out_size, "Triangle area = 1/2*b*h = %.12g", 0.5 * v[0] * v[1]);
+        return true;
+    }
+
+    if(strstr(text, "distance between") && n >= 4) {
+        double dx = v[2] - v[0];
+        double dy = v[3] - v[1];
+        snprintf(out, out_size, "Distance = sqrt((x2-x1)^2+(y2-y1)^2) = %.12g",
+                 sqrt(dx*dx + dy*dy));
+        return true;
+    }
+
+    if(strstr(text, "fahrenheit") && strstr(text, "celsius") && n >= 1) {
+        result = (v[0] - 32.0) * 5.0 / 9.0;
+        snprintf(out, out_size, "%.12g F = %.12g C", v[0], result);
+        return true;
+    }
+
+    if(strstr(text, "celsius") && strstr(text, "fahrenheit") && n >= 1) {
+        result = v[0] * 9.0 / 5.0 + 32.0;
+        snprintf(out, out_size, "%.12g C = %.12g F", v[0], result);
+        return true;
+    }
+
+    return false;
+}
+
+static char const *infer_subject_local(char const *text)
+{
+    if(strstr(text, "cell") || strstr(text, "dna") || strstr(text, "mitosis") ||
+       strstr(text, "meiosis") || strstr(text, "photosynthesis") ||
+       strstr(text, "ecosystem") || strstr(text, "genetic")) return "biology";
+
+    if(strstr(text, "atom") || strstr(text, "mole") || strstr(text, "bond") ||
+       strstr(text, "acid") || strstr(text, "base") || strstr(text, "stoichi") ||
+       strstr(text, "periodic")) return "chemistry";
+
+    if(strstr(text, "force") || strstr(text, "velocity") || strstr(text, "acceleration") ||
+       strstr(text, "momentum") || strstr(text, "energy") || strstr(text, "voltage") ||
+       strstr(text, "current") || strstr(text, "wave")) return "physics";
+
+    if(strstr(text, "derivative") || strstr(text, "integral") || strstr(text, "limit") ||
+       strstr(text, "calculus")) return "calculus";
+
+    if(strstr(text, "triangle") || strstr(text, "circle") || strstr(text, "angle") ||
+       strstr(text, "area") || strstr(text, "perimeter")) return "geometry";
+
+    if(strstr(text, "equation") || strstr(text, "slope") || strstr(text, "quadratic") ||
+       strstr(text, "polynomial") || strstr(text, "inequality")) return "algebra_1";
+
+    if(strstr(text, "mean") || strstr(text, "median") || strstr(text, "probability") ||
+       strstr(text, "standard deviation") || strstr(text, "correlation")) return "statistics";
+
+    if(strstr(text, "theme") || strstr(text, "metaphor") || strstr(text, "symbol") ||
+       strstr(text, "irony") || strstr(text, "literature")) return "literature";
+
+    if(strstr(text, "essay") || strstr(text, "thesis") || strstr(text, "paragraph") ||
+       strstr(text, "citation") || strstr(text, "rhetoric")) return "composition";
+
+    if(strstr(text, "constitution") || strstr(text, "federalism") ||
+       strstr(text, "amendment") || strstr(text, "congress") ||
+       strstr(text, "government")) return "government";
+
+    if(strstr(text, "war") || strstr(text, "revolution") || strstr(text, "renaissance") ||
+       strstr(text, "history") || strstr(text, "empire")) return "history";
+
+    if(strstr(text, "inflation") || strstr(text, "gdp") || strstr(text, "supply") ||
+       strstr(text, "demand") || strstr(text, "market")) return "economics";
+
+    if(strstr(text, "marketing") || strstr(text, "revenue") || strstr(text, "profit") ||
+       strstr(text, "business") || strstr(text, "branding")) return "business";
+
+    if(strstr(text, "code") || strstr(text, "algorithm") || strstr(text, "array") ||
+       strstr(text, "loop") || strstr(text, "function") || strstr(text, "database") ||
+       strstr(text, "programming")) return "computer_science";
+
+    if(strstr(text, "music") || strstr(text, "chord") || strstr(text, "rhythm") ||
+       strstr(text, "tempo")) return "music";
+
+    if(strstr(text, "photo") || strstr(text, "aperture") || strstr(text, "shutter")) return "photography";
+    if(strstr(text, "nutrition") || strstr(text, "vitamin") || strstr(text, "calorie")) return "nutrition";
+    if(strstr(text, "latitude") || strstr(text, "longitude") || strstr(text, "map")) return "geography";
+
+    return "auto";
+}
+
+static int edit_distance_small(char const *a, char const *b)
+{
+    unsigned char prev[64], curr[64];
+    size_t la = strlen(a), lb = strlen(b);
+    size_t i, j;
+
+    if(la >= sizeof(prev) || lb >= sizeof(prev)) return 99;
+
+    for(j = 0; j <= lb; j++) prev[j] = (unsigned char)j;
+
+    for(i = 1; i <= la; i++) {
+        curr[0] = (unsigned char)i;
+        for(j = 1; j <= lb; j++) {
+            int cost = a[i - 1] == b[j - 1] ? 0 : 1;
+            int del = prev[j] + 1;
+            int ins = curr[j - 1] + 1;
+            int sub = prev[j - 1] + cost;
+            int best = del < ins ? del : ins;
+            if(sub < best) best = sub;
+            curr[j] = (unsigned char)best;
+        }
+        memcpy(prev, curr, lb + 1);
+    }
+
+    return prev[lb];
+}
+
+static char const *suggest_fact(char const *topic)
+{
+    char lower[64];
+    int best = 99;
+    char const *candidate = NULL;
+    unsigned int i;
+    int threshold;
+
+    if(!topic || !*topic || strlen(topic) >= sizeof(lower)) return NULL;
+    lowercase_into(topic, lower, sizeof(lower));
+
+    threshold = strlen(lower) <= 5 ? 1 : 2;
+
+    for(i = 0; i < sizeof(facts)/sizeof(facts[0]); i++) {
+        int d;
+
+        if(strchr(facts[i].needle, ' ') != NULL && strchr(lower, ' ') == NULL) continue;
+        if(abs((int)strlen(facts[i].needle) - (int)strlen(lower)) > threshold) continue;
+
+        d = edit_distance_small(lower, facts[i].needle);
+        if(d < best) {
+            best = d;
+            candidate = facts[i].needle;
+        }
+    }
+
+    return best <= threshold ? candidate : NULL;
+}
+
+static char memory_topic[180];
+static char memory_answer[700];
+static char memory_subject[64];
+static bool memory_valid = false;
+
+static void first_sentence(char const *text, char *out, size_t out_size)
+{
+    size_t i = 0;
+
+    if(out_size == 0) return;
+
+    while(text[i] && i + 1 < out_size) {
+        out[i] = text[i];
+        if(text[i] == '.' || text[i] == '!' || text[i] == '?' || text[i] == '\n') {
+            i++;
+            break;
+        }
+        i++;
+    }
+
+    out[i] = '\0';
+}
+
+static bool handle_followup(char const *prompt, char const *mode, char const *level,
+                            char *out, size_t out_size)
+{
+    char lower[96];
+    char short_answer[260];
+
+    if(!memory_valid) return false;
+    lowercase_into(prompt, lower, sizeof(lower));
+
+    if(exact_or_punct(lower, "repeat") || exact_or_punct(lower, "repeat that") ||
+       exact_or_punct(lower, "say that again") || exact_or_punct(lower, "again")) {
+        snprintf(out, out_size, "%s", memory_answer);
+        return true;
+    }
+
+    if(exact_or_punct(lower, "simpler") || strstr(lower, "make it simpler") ||
+       strstr(lower, "simplify that")) {
+        first_sentence(memory_answer, short_answer, sizeof(short_answer));
+        snprintf(out, out_size,
+            "Simpler version about \"%s\": %s",
+            memory_topic, short_answer);
+        return true;
+    }
+
+    if(exact_or_punct(lower, "more") || strstr(lower, "explain more") ||
+       strstr(lower, "more detail") || strstr(lower, "go deeper")) {
+        snprintf(out, out_size,
+            "Continuing \"%s\": %s\n"
+            "To go deeper in %s, %s.",
+            memory_topic, memory_answer, memory_subject,
+            subject_strategy(memory_subject));
+        return true;
+    }
+
+    if(exact_or_punct(lower, "why") || starts_with(lower, "why is that") ||
+       starts_with(lower, "why does that") || starts_with(lower, "why?")) {
+        snprintf(out, out_size,
+            "About \"%s\": %s\n"
+            "For the WHY layer, focus on cause/mechanism: %s.",
+            memory_topic, memory_answer, subject_strategy(memory_subject));
+        return true;
+    }
+
+    if(exact_or_punct(lower, "how") || starts_with(lower, "how?") ||
+       starts_with(lower, "how does that") || starts_with(lower, "how is that")) {
+        snprintf(out, out_size,
+            "About \"%s\": %s\n"
+            "For the HOW layer, work through the process in order: %s.",
+            memory_topic, memory_answer, subject_strategy(memory_subject));
+        return true;
+    }
+
+    if(strstr(lower, "what do you mean")) {
+        first_sentence(memory_answer, short_answer, sizeof(short_answer));
+        snprintf(out, out_size,
+            "I mean this about \"%s\": %s",
+            memory_topic, short_answer);
+        return true;
+    }
+
+    if(strstr(lower, "give me an example") || exact_or_punct(lower, "example")) {
+        if(strstr(memory_subject, "math") || strstr(memory_subject, "algebra") ||
+           strstr(memory_subject, "geometry") || strstr(memory_subject, "calculus")) {
+            snprintf(out, out_size,
+                "Example for \"%s\": choose a simple numerical case, apply the rule one step at a time, then substitute the result back to check it.",
+                memory_topic);
+        }
+        else if(strstr(memory_subject, "computer")) {
+            snprintf(out, out_size,
+                "Example for \"%s\": use one small input, trace each step/state change, and compare the actual output with the expected output.",
+                memory_topic);
+        }
+        else if(strstr(memory_subject, "literature") || strstr(memory_subject, "composition")) {
+            snprintf(out, out_size,
+                "Example for \"%s\": make one specific claim, point to one concrete detail, then explain how that detail supports the claim.",
+                memory_topic);
+        }
+        else {
+            snprintf(out, out_size,
+                "Example for \"%s\": pick one simple real case, identify the cause/input, show the process, then state the result and why it fits the concept.",
+                memory_topic);
+        }
+        return true;
+    }
+
+    (void)mode;
+    (void)level;
+    return false;
+}
+
 static bool write_conversation(char const *subject, char const *prompt,
                                char *out, size_t out_size)
 {
@@ -822,7 +1192,15 @@ static void write_contextual_fallback(char const *subject, char const *mode,
     }
 
     if(words == 1) {
-        if(looks_like_unknown_token(lowerbuf)) {
+        char const *suggestion = suggest_fact(topic);
+
+        if(suggestion) {
+            snprintf(out, out_size,
+                "I don't have an exact match for \"%s\". Did you mean \"%s\"? "
+                "If yes, type 'define %s'. If not, keep \"%s\" as the topic and add a little context.",
+                topic, suggestion, suggestion, topic);
+        }
+        else if(looks_like_unknown_token(lowerbuf)) {
             snprintf(out, out_size,
                 "I don't recognize \"%s\" as a stored word or concept. It may be a name, abbreviation, invented term, or typo. "
                 "In %s mode, add a little context and I'll treat that exact term as the topic instead of replacing it with a generic answer.",
@@ -846,7 +1224,7 @@ static void write_contextual_fallback(char const *subject, char const *mode,
         topic, subject_name, mode, level, strategy, subject_name, ref);
 }
 
-bool qb_offline_answer(
+static bool qb_offline_answer_core(
     char const *subject,
     char const *mode,
     char const *level,
@@ -870,6 +1248,10 @@ bool qb_offline_answer(
     lowercase(prompt);
 
     if(write_conversation(subject, prompt, out, out_size)) {
+        return true;
+    }
+
+    if(try_natural_math(lowerbuf, out, out_size)) {
         return true;
     }
 
@@ -1017,4 +1399,54 @@ bool qb_offline_answer(
 
     write_contextual_fallback(subject, mode, level, prompt, out, out_size);
     return true;
+}
+
+
+bool qb_offline_answer(
+    char const *subject,
+    char const *mode,
+    char const *level,
+    char const *prompt,
+    char *out,
+    size_t out_size
+)
+{
+    char lower[700];
+    char topic[180];
+    char const *effective_subject = subject;
+    bool ok;
+
+    if(!out || out_size == 0 || !prompt || !*prompt) return false;
+
+    lowercase_into(prompt, lower, sizeof(lower));
+
+    if((!effective_subject || strcmp(effective_subject, "auto") == 0)) {
+        char const *inferred = infer_subject_local(lower);
+        if(strcmp(inferred, "auto") != 0) effective_subject = inferred;
+    }
+
+    if(!effective_subject) effective_subject = "auto";
+
+    if(handle_followup(prompt, mode, level, out, out_size)) {
+        return true;
+    }
+
+    ok = qb_offline_answer_core(
+        effective_subject,
+        mode,
+        level,
+        prompt,
+        out,
+        out_size
+    );
+
+    if(ok && out[0]) {
+        copy_topic(prompt, topic, sizeof(topic));
+        snprintf(memory_topic, sizeof(memory_topic), "%s", topic);
+        snprintf(memory_answer, sizeof(memory_answer), "%.699s", out);
+        snprintf(memory_subject, sizeof(memory_subject), "%s", effective_subject);
+        memory_valid = true;
+    }
+
+    return ok;
 }
