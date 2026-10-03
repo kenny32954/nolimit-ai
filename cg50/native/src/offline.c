@@ -236,6 +236,31 @@ static fact_t const facts[] = {
     {"sleep", "Sleep supports learning, memory, mood, physical recovery, and health. Regular schedules and adequate duration are important, especially during adolescence."}
 };
 
+typedef struct {
+    char const *a;
+    char const *b;
+    char const *answer;
+} compare_t;
+
+static compare_t const comparisons[] = {
+    {"mitosis", "meiosis", "Mitosis makes two genetically similar cells and usually supports growth/repair; meiosis makes haploid cells for sexual reproduction, uses two divisions, and increases genetic variation."},
+    {"ionic bond", "covalent bond", "Ionic bonding involves attraction between oppositely charged ions, commonly after electron transfer; covalent bonding involves atoms sharing electron pairs."},
+    {"genotype", "phenotype", "Genotype is genetic information; phenotype is an observable characteristic produced by genotype interacting with environment."},
+    {"weather", "climate", "Weather is short-term atmospheric conditions; climate is the long-term statistical pattern of weather in a region."},
+    {"speed", "velocity", "Speed is a scalar rate of distance traveled; velocity is a vector rate of displacement and includes direction."},
+    {"mass", "weight", "Mass measures amount/inertia and is measured in kilograms; weight is the gravitational force on that mass, W=mg, measured in newtons."},
+    {"democracy", "republic", "Democracy describes political authority deriving from the people; a republic is a system without hereditary monarchy in which public power is exercised through institutions and representatives under law. A country can be both."},
+    {"supply", "demand", "Supply describes seller willingness/ability at different prices; demand describes buyer willingness/ability. Their interaction helps determine market equilibrium."},
+    {"debit", "credit", "Debit and credit are opposite accounting entry directions. Assets normally increase with debits, while liabilities and equity normally increase with credits."},
+    {"hardware", "software", "Hardware is the physical computer equipment; software is the instructions and data executed or used by that hardware."},
+    {"ram", "storage", "RAM is fast working memory used while programs run and is usually volatile; storage keeps files/programs longer-term and is nonvolatile."},
+    {"primary source", "secondary source", "A primary source comes directly from the period, event, participant, or original data; a secondary source analyzes, interprets, or synthesizes primary and other sources."},
+    {"mean", "median", "Mean is the arithmetic average; median is the middle ordered value. Mean is more affected by extreme values."},
+    {"acid", "base", "In the Bronsted-Lowry model, acids donate H+ and bases accept H+. Their behavior depends on the chemical system and equilibrium."},
+    {"series circuit", "parallel circuit", "A series circuit has one main current path; a parallel circuit has multiple branches sharing the same two nodes. Current/voltage relationships differ accordingly."},
+    {"prokaryote", "eukaryote", "Prokaryotic cells lack a membrane-bound nucleus; eukaryotic cells have a nucleus and other membrane-bound organelles."}
+};
+
 static char lowerbuf[700];
 
 static void lowercase_into(char const *src, char *dst, size_t dst_size)
@@ -769,8 +794,13 @@ static bool try_linear_equation(char const *text, char *out, size_t out_size)
     double a1, b1, a2, b2;
     double denom, rhs, x;
 
-    if(!starts_with(text, "solve ")) return false;
-    snprintf(equation, sizeof(equation), "%s", text + 6);
+    if(starts_with(text, "solve ")) {
+        snprintf(equation, sizeof(equation), "%s", text + 6);
+    }
+    else {
+        if(!strchr(text, '=') || (!strchr(text, 'x') && !strchr(text, 'X'))) return false;
+        snprintf(equation, sizeof(equation), "%s", text);
+    }
 
     eq = strchr(equation, '=');
     if(!eq || strchr(eq + 1, '=')) return false;
@@ -887,6 +917,105 @@ static bool contains_alnum(char const *text)
         if(isalnum((unsigned char)*text)) return true;
         text++;
     }
+    return false;
+}
+
+
+static void trim_text(char *text)
+{
+    char *start = text;
+    size_t len;
+
+    while(*start && isspace((unsigned char)*start)) start++;
+    if(start != text) memmove(text, start, strlen(start) + 1);
+
+    len = strlen(text);
+    while(len > 0 && (isspace((unsigned char)text[len - 1]) ||
+          text[len - 1] == '?' || text[len - 1] == '!' ||
+          text[len - 1] == '.' || text[len - 1] == ',')) {
+        text[--len] = '\0';
+    }
+}
+
+static bool same_topic(char const *x, char const *y)
+{
+    return strcmp(x, y) == 0;
+}
+
+static bool try_known_comparison(char const *text, char *out, size_t out_size)
+{
+    char topic[180];
+    char left[90];
+    char right[90];
+    char *sep = NULL;
+    size_t sep_len = 0;
+    unsigned int i;
+
+    snprintf(topic, sizeof(topic), "%s", text);
+    trim_text(topic);
+
+    if(starts_with(topic, "compare ")) memmove(topic, topic + 8, strlen(topic + 8) + 1);
+    else if(starts_with(topic, "difference between ")) memmove(topic, topic + 19, strlen(topic + 19) + 1);
+
+    sep = strstr(topic, " versus ");
+    if(sep) sep_len = 8;
+    if(!sep) {
+        sep = strstr(topic, " vs ");
+        if(sep) sep_len = 4;
+    }
+    if(!sep) {
+        sep = strstr(topic, " and ");
+        if(sep) sep_len = 5;
+    }
+
+    if(!sep) return false;
+
+    *sep = '\0';
+    snprintf(left, sizeof(left), "%s", topic);
+    snprintf(right, sizeof(right), "%s", sep + sep_len);
+    trim_text(left);
+    trim_text(right);
+
+    if(!left[0] || !right[0]) return false;
+
+    for(i = 0; i < sizeof(comparisons)/sizeof(comparisons[0]); i++) {
+        if((same_topic(left, comparisons[i].a) && same_topic(right, comparisons[i].b)) ||
+           (same_topic(left, comparisons[i].b) && same_topic(right, comparisons[i].a))) {
+            snprintf(out, out_size, "%s", comparisons[i].answer);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool try_prefixed_expression(char const *text, char *out, size_t out_size)
+{
+    char expr[180];
+    char const *p = NULL;
+    size_t len;
+    double value;
+
+    if(starts_with(text, "calculate ")) p = text + 10;
+    else if(starts_with(text, "evaluate ")) p = text + 9;
+    else if(starts_with(text, "compute ")) p = text + 8;
+    else if(starts_with(text, "what is ")) p = text + 8;
+    else if(starts_with(text, "what's ")) p = text + 7;
+    else if(starts_with(text, "whats ")) p = text + 6;
+
+    if(!p) return false;
+
+    snprintf(expr, sizeof(expr), "%s", p);
+    trim_text(expr);
+    len = strlen(expr);
+
+    if(len == 0 || !looks_like_expression(expr)) return false;
+
+    if(eval_expression(expr, &value)) {
+        snprintf(out, out_size, "%s = %.12g", expr, value);
+        return true;
+    }
+
     return false;
 }
 
@@ -1494,6 +1623,14 @@ static bool qb_offline_answer_core(
     lowercase(prompt);
 
     if(write_conversation(subject, prompt, out, out_size)) {
+        return true;
+    }
+
+    if(try_known_comparison(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_prefixed_expression(lowerbuf, out, out_size)) {
         return true;
     }
 
