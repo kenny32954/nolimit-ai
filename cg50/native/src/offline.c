@@ -1577,6 +1577,31 @@ static bool handle_followup(char const *prompt, char const *mode, char const *le
         return true;
     }
 
+    if(exact_or_punct(lower, "yes") || exact_or_punct(lower, "yeah") ||
+       exact_or_punct(lower, "yep") || exact_or_punct(lower, "sure")) {
+        snprintf(out, out_size,
+            "Got it. We're still on \"%s\". Ask why, how, for steps, an example, or switch to a new topic.",
+            memory_topic);
+        return true;
+    }
+
+    if(exact_or_punct(lower, "no") || exact_or_punct(lower, "nope") ||
+       exact_or_punct(lower, "nah")) {
+        snprintf(out, out_size,
+            "Okay. Then let's not assume the previous explanation solved it. "
+            "For \"%s\", tell me which part seems wrong or confusing and I'll reframe it.",
+            memory_topic);
+        return true;
+    }
+
+    if(exact_or_punct(lower, "maybe") || exact_or_punct(lower, "hmm") ||
+       exact_or_punct(lower, "idk")) {
+        snprintf(out, out_size,
+            "Uncertain is fine. For \"%s\", we can test one claim at a time instead of guessing.",
+            memory_topic);
+        return true;
+    }
+
     if(strstr(lower, "give me an example") || exact_or_punct(lower, "example")) {
         if(strstr(memory_subject, "math") || strstr(memory_subject, "algebra") ||
            strstr(memory_subject, "geometry") || strstr(memory_subject, "calculus")) {
@@ -1920,6 +1945,21 @@ static void write_contextual_fallback(char const *subject, char const *mode,
                 "In %s mode, I can still use it as the topic; try 'define %s', 'explain %s', or 'why %s'.",
                 topic, subject_name, topic, topic, topic);
         }
+        return;
+    }
+
+    if(!strchr(prompt, '?') &&
+       !word_prefix(lowerbuf, "what") && !word_prefix(lowerbuf, "why") &&
+       !word_prefix(lowerbuf, "how") && !word_prefix(lowerbuf, "who") &&
+       !word_prefix(lowerbuf, "when") && !word_prefix(lowerbuf, "where") &&
+       !word_prefix(lowerbuf, "is") && !word_prefix(lowerbuf, "are") &&
+       !word_prefix(lowerbuf, "can") && !word_prefix(lowerbuf, "could") &&
+       !word_prefix(lowerbuf, "should")) {
+        snprintf(out, out_size,
+            "You entered a statement rather than a direct question: \"%s\". "
+            "In %s, I can treat it as a claim to explain, check, compare, or support. "
+            "A good next move is to %s.",
+            topic, subject_name, strategy);
         return;
     }
 
