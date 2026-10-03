@@ -120,7 +120,8 @@ int main(void)
     qb_offline_answer("history", "explain", "school", "random unmatched question about purple clocks", out, sizeof(out));
     expect_contains("unmatched exact", out, "random unmatched question about purple clocks");
     expect_contains("unmatched subject", out, "History");
-    expect_contains("unmatched ref", out, "History reference");
+    expect_contains("unmatched statement", out, "statement rather than a direct question");
+    expect_contains("unmatched strategy", out, "causes, effects, evidence");
     expect_not_contains("no old canned prefix", out, "STANDALONE CORE\nQuick method");
 
 
