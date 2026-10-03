@@ -285,6 +285,10 @@ static bool starts_with(char const *text, char const *prefix)
     return strncmp(text, prefix, strlen(prefix)) == 0;
 }
 
+static void friendly_subject(char const *subject, char *out, size_t out_size);
+static void copy_topic(char const *prompt, char *topic, size_t topic_size);
+static int alpha_word_count(char const *text);
+
 static bool phrase_match(char const *text, char const *phrase)
 {
     size_t n = strlen(phrase);
