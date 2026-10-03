@@ -123,6 +123,42 @@ int main(void)
     expect_contains("unmatched ref", out, "History reference");
     expect_not_contains("no old canned prefix", out, "STANDALONE CORE\nQuick method");
 
+
+    qb_offline_answer("auto", "answer", "school", "what is 18 plus 7", out, sizeof(out));
+    expect_contains("natural plus", out, "25");
+
+    qb_offline_answer("auto", "answer", "school", "square root of 81", out, sizeof(out));
+    expect_contains("natural sqrt", out, "9");
+
+    qb_offline_answer("auto", "answer", "school", "20 percent of 50", out, sizeof(out));
+    expect_contains("natural percent", out, "10");
+
+    qb_offline_answer("auto", "answer", "school", "area of a circle radius 3", out, sizeof(out));
+    expect_contains("circle area", out, "28.274");
+
+    qb_offline_answer("auto", "explain", "school", "what is photosythesis", out, sizeof(out));
+    expect_contains("typo suggestion", out, "photosynthesis");
+
+    qb_offline_answer("auto", "explain", "school", "what is mitosis", out, sizeof(out));
+    expect_contains("auto subject fact", out, "daughter cells");
+
+    qb_offline_answer("auto", "explain", "school", "why?", out, sizeof(out));
+    expect_contains("followup why topic", out, "mitosis");
+    expect_contains("followup why layer", out, "WHY layer");
+
+    qb_offline_answer("auto", "explain", "school", "simpler", out, sizeof(out));
+    expect_contains("followup simpler", out, "Simpler version");
+    expect_contains("followup simpler topic", out, "mitosis");
+
+    qb_offline_answer("auto", "explain", "school", "repeat that", out, sizeof(out));
+    expect_contains("followup repeat", out, "Simpler version");
+
+    qb_offline_answer("auto", "explain", "school", "what is voltage", out, sizeof(out));
+    expect_contains("auto physics", out, "potential difference");
+
+    qb_offline_answer("auto", "explain", "school", "give me an example", out, sizeof(out));
+    expect_contains("followup example", out, "Example for");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
