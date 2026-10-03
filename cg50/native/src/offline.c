@@ -285,15 +285,346 @@ static int parse_list(char const *text, double *values, int cap)
     return count;
 }
 
-static void write_reference(char const *subject, char *out, size_t out_size)
+static bool word_prefix(char const *text, char const *word)
 {
-    char const *ref = qb_reference_text(subject);
-    snprintf(
-        out,
-        out_size,
-        "STANDALONE CORE\n%s\n\nTip: for calculations use commands like calc, slope, quad, mean, force, ohm, moles, molarity, percent, pyth, or compound.",
-        ref
-    );
+    size_t n = strlen(word);
+    unsigned char next;
+
+    if(strncmp(text, word, n) != 0) return false;
+    next = (unsigned char)text[n];
+    return next == '\0' || isspace(next) || next == '?' || next == '!' ||
+           next == ',' || next == '.' || next == ':';
+}
+
+static bool exact_or_punct(char const *text, char const *word)
+{
+    size_t n = strlen(word);
+    if(strncmp(text, word, n) != 0) return false;
+
+    while(text[n] && isspace((unsigned char)text[n])) n++;
+    if(text[n] == '?' || text[n] == '!' || text[n] == '.') n++;
+    while(text[n] && isspace((unsigned char)text[n])) n++;
+    return text[n] == '\0';
+}
+
+static void friendly_subject(char const *subject, char *out, size_t out_size)
+{
+    size_t i = 0;
+    bool cap = true;
+
+    if(!subject || !*subject || strcmp(subject, "auto") == 0) {
+        snprintf(out, out_size, "General");
+        return;
+    }
+
+    while(*subject && i + 1 < out_size) {
+        char c = *subject++;
+
+        if(c == '_') {
+            out[i++] = ' ';
+            cap = true;
+            continue;
+        }
+
+        if(cap && c >= 'a' && c <= 'z') c = (char)(c - 'a' + 'A');
+        out[i++] = c;
+        cap = false;
+    }
+
+    out[i] = '\0';
+}
+
+static char const *subject_strategy(char const *subject)
+{
+    if(!subject) return "identify the important terms, what is known, and exactly what the question is asking";
+
+    if(strstr(subject, "algebra") || strstr(subject, "math") ||
+       strstr(subject, "geometry") || strstr(subject, "calculus") ||
+       strstr(subject, "statistics") || strstr(subject, "trigonometry") ||
+       strstr(subject, "precalculus") || strstr(subject, "differential") ||
+       strstr(subject, "number_theory") || strstr(subject, "linear_algebra")) {
+        return "identify the givens and unknowns, choose the matching rule/equation, solve symbolically when possible, then check the result";
+    }
+
+    if(strstr(subject, "physics") || strstr(subject, "chemistry") ||
+       strstr(subject, "biology") || strstr(subject, "science") ||
+       strstr(subject, "astronomy") || strstr(subject, "environment") ||
+       strstr(subject, "anatomy") || strstr(subject, "genetics") ||
+       strstr(subject, "microbiology")) {
+        return "identify the system, variables, mechanism, evidence, and any units or conservation laws involved";
+    }
+
+    if(strstr(subject, "literature") || strstr(subject, "writing") ||
+       strstr(subject, "ela") || strstr(subject, "composition") ||
+       strstr(subject, "journalism") || strstr(subject, "speech")) {
+        return "identify the claim or meaning, then connect specific words/evidence to an explanation";
+    }
+
+    if(strstr(subject, "history") || strstr(subject, "government") ||
+       strstr(subject, "civics") || strstr(subject, "social") ||
+       strstr(subject, "geography") || strstr(subject, "economics") ||
+       strstr(subject, "political") || strstr(subject, "sociology") ||
+       strstr(subject, "psychology") || strstr(subject, "anthropology")) {
+        return "separate factual claims from interpretation, establish context, and trace causes, effects, evidence, or competing explanations";
+    }
+
+    if(strstr(subject, "computer") || strstr(subject, "algorithm") ||
+       strstr(subject, "database") || strstr(subject, "web_") ||
+       strstr(subject, "cyber") || strstr(subject, "engineering") ||
+       strstr(subject, "robotics") || strstr(subject, "electronics")) {
+        return "define the input, desired output, constraints, and failure cases, then work through the logic step by step";
+    }
+
+    if(strstr(subject, "spanish") || strstr(subject, "french") ||
+       strstr(subject, "german") || strstr(subject, "latin") ||
+       strstr(subject, "language") || strstr(subject, "asl")) {
+        return "identify vocabulary, grammar, word order, and context, then translate or explain the meaning rather than matching words blindly";
+    }
+
+    if(strstr(subject, "art") || strstr(subject, "music") ||
+       strstr(subject, "media") || strstr(subject, "film") ||
+       strstr(subject, "photography") || strstr(subject, "theater")) {
+        return "identify the technique, formal elements, purpose, context, and evidence visible or audible in the work";
+    }
+
+    return "identify the important terms, the relationship between them, and the evidence or rule needed to answer";
+}
+
+static void copy_topic(char const *prompt, char *topic, size_t topic_size)
+{
+    char const *p = prompt;
+    size_t len;
+
+    while(*p && isspace((unsigned char)*p)) p++;
+
+    if(starts_with(lowerbuf, "what is ")) p = prompt + 8;
+    else if(starts_with(lowerbuf, "what are ")) p = prompt + 9;
+    else if(starts_with(lowerbuf, "define ")) p = prompt + 7;
+    else if(starts_with(lowerbuf, "explain ")) p = prompt + 8;
+    else if(starts_with(lowerbuf, "why ")) p = prompt + 4;
+    else if(starts_with(lowerbuf, "how ")) p = prompt + 4;
+    else if(starts_with(lowerbuf, "who ")) p = prompt + 4;
+    else if(starts_with(lowerbuf, "when ")) p = prompt + 5;
+    else if(starts_with(lowerbuf, "where ")) p = prompt + 6;
+    else if(starts_with(lowerbuf, "compare ")) p = prompt + 8;
+
+    while(*p && isspace((unsigned char)*p)) p++;
+    snprintf(topic, topic_size, "%s", p);
+
+    len = strlen(topic);
+    while(len > 0 && (isspace((unsigned char)topic[len - 1]) ||
+          topic[len - 1] == '?' || topic[len - 1] == '!' ||
+          topic[len - 1] == '.')) {
+        topic[--len] = '\0';
+    }
+
+    if(topic[0] == '\0') snprintf(topic, topic_size, "%s", prompt);
+}
+
+static int alpha_word_count(char const *text)
+{
+    int words = 0;
+    bool in_word = false;
+
+    while(*text) {
+        bool alpha = isalpha((unsigned char)*text) != 0;
+
+        if(alpha && !in_word) words++;
+        in_word = alpha;
+        text++;
+    }
+
+    return words;
+}
+
+static bool looks_like_unknown_token(char const *text)
+{
+    int letters = 0;
+    int vowels = 0;
+    int spaces = 0;
+
+    while(*text) {
+        char c = (char)tolower((unsigned char)*text);
+        if(isalpha((unsigned char)c)) {
+            letters++;
+            if(c == 'a' || c == 'e' || c == 'i' || c == 'o' ||
+               c == 'u' || c == 'y') vowels++;
+        }
+        else if(isspace((unsigned char)c)) spaces++;
+        text++;
+    }
+
+    return spaces == 0 && letters >= 7 && vowels == 0;
+}
+
+static bool write_conversation(char const *subject, char const *prompt,
+                               char *out, size_t out_size)
+{
+    char subject_name[64];
+
+    friendly_subject(subject, subject_name, sizeof(subject_name));
+
+    if(exact_or_punct(lowerbuf, "hi") || exact_or_punct(lowerbuf, "hello") ||
+       exact_or_punct(lowerbuf, "hey") || exact_or_punct(lowerbuf, "yo") ||
+       exact_or_punct(lowerbuf, "sup") || exact_or_punct(lowerbuf, "wassup")) {
+        snprintf(out, out_size,
+            "Hey! QBAI Standalone is running entirely on your calculator. "
+            "You're currently in %s. Ask me a question, type a calculation, "
+            "or switch subjects with F1.", subject_name);
+        return true;
+    }
+
+    if(strstr(lowerbuf, "who are you") || strstr(lowerbuf, "what are you")) {
+        snprintf(out, out_size,
+            "I'm Quantum Breaks AI Standalone, the calculator-only academic engine. "
+            "I work with no internet or other device. In %s mode I can answer stored concepts, "
+            "solve supported calculations, and reason about the exact question you type.",
+            subject_name);
+        return true;
+    }
+
+    if(strstr(lowerbuf, "what can you do") || exact_or_punct(lowerbuf, "help") ||
+       strstr(lowerbuf, "how do i use you")) {
+        snprintf(out, out_size,
+            "In %s I can explain stored concepts, answer subject questions, do local math, "
+            "and interpret unknown questions instead of returning a canned error. "
+            "Try: 'what is slope', 'why does mitosis happen', 'quad 1 -5 6', "
+            "'compare mitosis and meiosis', or any sentence you want.",
+            subject_name);
+        return true;
+    }
+
+    if(word_prefix(lowerbuf, "thanks") || word_prefix(lowerbuf, "thank you") ||
+       exact_or_punct(lowerbuf, "thx")) {
+        snprintf(out, out_size,
+            "You're welcome. I'm still in %s Standalone mode, so you can keep asking without connecting anything.",
+            subject_name);
+        return true;
+    }
+
+    if(exact_or_punct(lowerbuf, "bye") || word_prefix(lowerbuf, "goodbye") ||
+       word_prefix(lowerbuf, "see you")) {
+        snprintf(out, out_size,
+            "See you. QBAI Standalone will be here on the calculator whenever you open it again.");
+        return true;
+    }
+
+    (void)prompt;
+    return false;
+}
+
+static void write_contextual_fallback(char const *subject, char const *mode,
+                                      char const *level, char const *prompt,
+                                      char *out, size_t out_size)
+{
+    char topic[180];
+    char subject_name[64];
+    char const *strategy;
+    char const *ref;
+    int words;
+
+    copy_topic(prompt, topic, sizeof(topic));
+    friendly_subject(subject, subject_name, sizeof(subject_name));
+    strategy = subject_strategy(subject);
+    ref = qb_reference_text(subject);
+    words = alpha_word_count(prompt);
+
+    if(starts_with(lowerbuf, "what is ") || starts_with(lowerbuf, "what are ") ||
+       starts_with(lowerbuf, "define ") || starts_with(lowerbuf, "explain ")) {
+        snprintf(out, out_size,
+            "You're asking for an explanation of \"%s\". I don't have a stored definition for that exact term yet. "
+            "In %s mode, I'd analyze it by trying to %s. "
+            "Related %s reference: %.180s",
+            topic, subject_name, strategy, subject_name, ref);
+        return;
+    }
+
+    if(starts_with(lowerbuf, "why ")) {
+        snprintf(out, out_size,
+            "You're asking WHY about \"%s\". I don't have a direct stored explanation for that exact wording, "
+            "so in %s mode I'd answer by looking for the cause or mechanism: %s.",
+            topic, subject_name, strategy);
+        return;
+    }
+
+    if(starts_with(lowerbuf, "how ")) {
+        snprintf(out, out_size,
+            "You're asking HOW \"%s\" works or is done. In %s mode, I don't have a memorized exact answer for that phrase, "
+            "but I can still structure it: %s.",
+            topic, subject_name, strategy);
+        return;
+    }
+
+    if(starts_with(lowerbuf, "compare ") || strstr(lowerbuf, " vs ") ||
+       strstr(lowerbuf, " versus ")) {
+        snprintf(out, out_size,
+            "You want a comparison involving \"%s\". For %s, compare them across the same dimensions, "
+            "then state one similarity, one difference, and why that difference matters. "
+            "Use this subject rule: %s.",
+            topic, subject_name, strategy);
+        return;
+    }
+
+    if(starts_with(lowerbuf, "who ")) {
+        snprintf(out, out_size,
+            "You're asking WHO \"%s\" refers to. I don't have a verified stored biography for that exact name, "
+            "so I won't invent one. In %s, give me one extra clue (time period, work, class topic, etc.) "
+            "and I can narrow down how to analyze it.",
+            topic, subject_name);
+        return;
+    }
+
+    if(starts_with(lowerbuf, "when ")) {
+        snprintf(out, out_size,
+            "You're asking WHEN about \"%s\". I don't have a stored date tied to that exact phrase, "
+            "so I won't guess. In %s, the useful next step is to place it on a timeline and connect the date "
+            "to what happened immediately before and after.",
+            topic, subject_name);
+        return;
+    }
+
+    if(starts_with(lowerbuf, "where ")) {
+        snprintf(out, out_size,
+            "You're asking WHERE \"%s\" is or occurred. I don't have a stored location for that exact phrase, "
+            "so I won't make one up. In %s, identify the place, region, and why location matters to the question.",
+            topic, subject_name);
+        return;
+    }
+
+    if(word_prefix(lowerbuf, "is") || word_prefix(lowerbuf, "are") ||
+       word_prefix(lowerbuf, "do") || word_prefix(lowerbuf, "does") ||
+       word_prefix(lowerbuf, "did") || word_prefix(lowerbuf, "can") ||
+       word_prefix(lowerbuf, "could") || word_prefix(lowerbuf, "should")) {
+        snprintf(out, out_size,
+            "I read \"%s\" as a yes/no or evaluation question in %s. I don't have enough stored facts to honestly choose yes or no, "
+            "so I'd test the claim by trying to %s.",
+            topic, subject_name, strategy);
+        return;
+    }
+
+    if(words == 1) {
+        if(looks_like_unknown_token(lowerbuf)) {
+            snprintf(out, out_size,
+                "I don't recognize \"%s\" as a stored word or concept. It may be a name, abbreviation, invented term, or typo. "
+                "In %s mode, add a little context and I'll treat that exact term as the topic instead of replacing it with a generic answer.",
+                topic, subject_name);
+        }
+        else {
+            snprintf(out, out_size,
+                "You entered the single term \"%s\". I don't have a stored definition for it yet. "
+                "In %s mode, I can still use it as the topic; try 'define %s', 'explain %s', or 'why %s'.",
+                topic, subject_name, topic, topic, topic);
+        }
+        return;
+    }
+
+    snprintf(out, out_size,
+        "I read your exact question as: \"%s\"\n"
+        "Selected subject: %s | mode: %s | level: %s.\n"
+        "I don't have a memorized answer for that exact wording, so I won't fake one. "
+        "My standalone approach for this question is to %s. "
+        "Relevant %s reference: %.150s",
+        topic, subject_name, mode, level, strategy, subject_name, ref);
 }
 
 bool qb_offline_answer(
@@ -315,6 +646,10 @@ bool qb_offline_answer(
     if(!out || out_size == 0 || !prompt || !*prompt) return false;
     out[0] = '\0';
     lowercase(prompt);
+
+    if(write_conversation(subject, prompt, out, out_size)) {
+        return true;
+    }
 
     if(starts_with(lowerbuf, "calc ")) {
         if(eval_expression(prompt + 5, &result)) {
@@ -436,6 +771,6 @@ bool qb_offline_answer(
         }
     }
 
-    write_reference(subject, out, out_size);
+    write_contextual_fallback(subject, mode, level, prompt, out, out_size);
     return true;
 }
