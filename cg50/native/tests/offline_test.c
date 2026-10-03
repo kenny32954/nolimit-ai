@@ -243,6 +243,28 @@ int main(void)
     qb_offline_answer("auto", "explain", "school", "what do you think about homework", out, sizeof(out));
     expect_contains("opinion intent", out, "don't have personal opinions");
 
+
+    qb_offline_answer("biology", "explain", "school", "what is photosynthesis", out, sizeof(out));
+    expect_contains("follow base", out, "chemical energy");
+
+    qb_offline_answer("biology", "explain", "school", "what does that mean?", out, sizeof(out));
+    expect_contains("follow meaning", out, "We were talking about");
+    expect_contains("follow meaning topic", out, "photosynthesis");
+
+    qb_offline_answer("biology", "explain", "school", "show me steps", out, sizeof(out));
+    expect_contains("follow steps", out, "Steps for");
+    expect_contains("follow steps topic", out, "photosynthesis");
+
+    qb_offline_answer("biology", "explain", "school", "what about meiosis?", out, sizeof(out));
+    expect_contains("what about new topic", out, "haploid");
+
+    qb_offline_answer("biology", "explain", "school", "what about that?", out, sizeof(out));
+    expect_contains("what about that", out, "meiosis");
+
+    qb_offline_answer("algebra_1", "steps", "school", "solve x**2 = 9", out, sizeof(out));
+    expect_contains("malformed equation", out, "couldn't parse");
+    expect_contains("malformed exact", out, "x**2");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
