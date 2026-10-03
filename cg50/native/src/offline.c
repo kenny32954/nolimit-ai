@@ -238,13 +238,21 @@ static fact_t const facts[] = {
 
 static char lowerbuf[700];
 
-static void lowercase(char const *src)
+static void lowercase_into(char const *src, char *dst, size_t dst_size)
 {
     size_t i;
-    for(i = 0; i + 1 < sizeof(lowerbuf) && src[i]; i++) {
-        lowerbuf[i] = (char)tolower((unsigned char)src[i]);
+
+    if(dst_size == 0) return;
+
+    for(i = 0; i + 1 < dst_size && src[i]; i++) {
+        dst[i] = (char)tolower((unsigned char)src[i]);
     }
-    lowerbuf[i] = '\0';
+    dst[i] = '\0';
+}
+
+static void lowercase(char const *src)
+{
+    lowercase_into(src, lowerbuf, sizeof(lowerbuf));
 }
 
 static bool starts_with(char const *text, char const *prefix)
@@ -851,6 +859,9 @@ bool qb_offline_answer(
     double result;
     int n;
     unsigned int i;
+    char fact_topic[180];
+    char fact_topic_lower[180];
+    char const *fact_source;
     (void)mode;
     (void)level;
 
@@ -975,8 +986,30 @@ bool qb_offline_answer(
         return true;
     }
 
+    /*
+     * Search stored knowledge against the semantic topic of natural-language
+     * questions instead of every word in the sentence. This prevents intent
+     * words such as "mean" from hijacking "what does X mean?".
+     */
+    copy_topic(prompt, fact_topic, sizeof(fact_topic));
+    lowercase_into(fact_topic, fact_topic_lower, sizeof(fact_topic_lower));
+
+    if(starts_with(lowerbuf, "what is ") || starts_with(lowerbuf, "what are ") ||
+       starts_with(lowerbuf, "what's ") || starts_with(lowerbuf, "whats ") ||
+       starts_with(lowerbuf, "what does ") || starts_with(lowerbuf, "define ") ||
+       starts_with(lowerbuf, "explain ") || starts_with(lowerbuf, "tell me about ") ||
+       starts_with(lowerbuf, "why ") || starts_with(lowerbuf, "how ") ||
+       starts_with(lowerbuf, "who ") || starts_with(lowerbuf, "when ") ||
+       starts_with(lowerbuf, "where ") || starts_with(lowerbuf, "compare ") ||
+       starts_with(lowerbuf, "difference between ")) {
+        fact_source = fact_topic_lower;
+    }
+    else {
+        fact_source = lowerbuf;
+    }
+
     for(i = 0; i < sizeof(facts)/sizeof(facts[0]); i++) {
-        if(phrase_match(lowerbuf, facts[i].needle)) {
+        if(phrase_match(fact_source, facts[i].needle)) {
             snprintf(out, out_size, "%s", facts[i].answer);
             return true;
         }
