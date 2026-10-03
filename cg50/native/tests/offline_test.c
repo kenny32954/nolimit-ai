@@ -265,6 +265,21 @@ int main(void)
     expect_contains("malformed equation", out, "couldn't parse");
     expect_contains("malformed exact", out, "x**2");
 
+
+    qb_offline_answer("biology", "explain", "school", "what is mitosis", out, sizeof(out));
+    expect_contains("continuation base", out, "daughter cells");
+
+    qb_offline_answer("biology", "explain", "school", "yes", out, sizeof(out));
+    expect_contains("yes continuation", out, "still on");
+    expect_contains("yes continuation topic", out, "mitosis");
+
+    qb_offline_answer("biology", "explain", "school", "no", out, sizeof(out));
+    expect_contains("no continuation", out, "which part seems wrong");
+
+    qb_offline_answer("history", "explain", "school", "The empire expanded quickly", out, sizeof(out));
+    expect_contains("statement classification", out, "statement rather than a direct question");
+    expect_contains("statement exact", out, "empire expanded quickly");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
