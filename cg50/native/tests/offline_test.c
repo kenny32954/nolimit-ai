@@ -56,6 +56,12 @@ int main(void)
     expect_contains("greeting", out, "Hey!");
     expect_contains("greeting mode", out, "Standalone");
 
+    qb_offline_answer("auto", "explain", "school", "hey bro", out, sizeof(out));
+    expect_contains("casual greeting", out, "Hey!");
+
+    qb_offline_answer("physics", "explain", "school", "how are you", out, sizeof(out));
+    expect_contains("how are you", out, "running fine");
+
     qb_offline_answer("auto", "explain", "school", "who are you", out, sizeof(out));
     expect_contains("identity", out, "Quantum Breaks AI Standalone");
 
@@ -68,6 +74,12 @@ int main(void)
     qb_offline_answer("history", "explain", "school", "define thermopylae", out, sizeof(out));
     expect_contains("unknown definition topic", out, "thermopylae");
     expect_contains("unknown definition subject", out, "History");
+
+    qb_offline_answer("history", "explain", "school", "what's thermopylae", out, sizeof(out));
+    expect_contains("whats topic", out, "thermopylae");
+
+    qb_offline_answer("history", "explain", "school", "tell me about thermopylae", out, sizeof(out));
+    expect_contains("tell me topic", out, "thermopylae");
 
     qb_offline_answer("biology", "explain", "school", "why florpules reproduce", out, sizeof(out));
     expect_contains("why topic", out, "florpules reproduce");
