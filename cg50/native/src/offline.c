@@ -693,6 +693,203 @@ static int extract_numbers(char const *text, double *values, int cap)
     return count;
 }
 
+
+static bool parse_linear_side(char const *text, double *xcoef, double *constant)
+{
+    double a = 0.0;
+    double b = 0.0;
+    double sign = 1.0;
+    bool got_term = false;
+
+    while(*text) {
+        char *end;
+        double value;
+
+        while(*text && isspace((unsigned char)*text)) text++;
+        if(!*text) break;
+
+        if(*text == '+') {
+            sign = 1.0;
+            text++;
+            continue;
+        }
+        if(*text == '-') {
+            sign = -1.0;
+            text++;
+            continue;
+        }
+
+        while(*text && isspace((unsigned char)*text)) text++;
+
+        if(*text == 'x' || *text == 'X') {
+            a += sign;
+            text++;
+            sign = 1.0;
+            got_term = true;
+            continue;
+        }
+
+        value = strtod(text, &end);
+        if(end == text) return false;
+        text = end;
+
+        while(*text && isspace((unsigned char)*text)) text++;
+        if(*text == '*') {
+            text++;
+            while(*text && isspace((unsigned char)*text)) text++;
+        }
+
+        if(*text == 'x' || *text == 'X') {
+            a += sign * value;
+            text++;
+        }
+        else {
+            b += sign * value;
+        }
+
+        sign = 1.0;
+        got_term = true;
+
+        while(*text && isspace((unsigned char)*text)) text++;
+        if(*text && *text != '+' && *text != '-') return false;
+    }
+
+    if(!got_term) return false;
+    *xcoef = a;
+    *constant = b;
+    return true;
+}
+
+static bool try_linear_equation(char const *text, char *out, size_t out_size)
+{
+    char equation[180];
+    char *eq;
+    char *left;
+    char *right;
+    double a1, b1, a2, b2;
+    double denom, rhs, x;
+
+    if(!starts_with(text, "solve ")) return false;
+    snprintf(equation, sizeof(equation), "%s", text + 6);
+
+    eq = strchr(equation, '=');
+    if(!eq || strchr(eq + 1, '=')) return false;
+
+    *eq = '\0';
+    left = equation;
+    right = eq + 1;
+
+    if(!strchr(left, 'x') && !strchr(left, 'X') &&
+       !strchr(right, 'x') && !strchr(right, 'X')) return false;
+
+    if(!parse_linear_side(left, &a1, &b1) ||
+       !parse_linear_side(right, &a2, &b2)) return false;
+
+    denom = a1 - a2;
+    rhs = b2 - b1;
+
+    if(fabs(denom) < 1e-12) {
+        if(fabs(rhs) < 1e-12) {
+            snprintf(out, out_size,
+                "Both sides simplify to the same expression, so there are infinitely many solutions.");
+        }
+        else {
+            snprintf(out, out_size,
+                "The x-terms cancel but the constants disagree, so there is no solution.");
+        }
+        return true;
+    }
+
+    x = rhs / denom;
+    snprintf(out, out_size,
+        "Linear equation: (%.12g)x + %.12g = (%.12g)x + %.12g\n"
+        "(%.12g)x = %.12g\nx = %.12g",
+        a1, b1, a2, b2, denom, rhs, x);
+    return true;
+}
+
+static bool try_unit_conversion(char const *text, char *out, size_t out_size)
+{
+    double v[4];
+    int n = extract_numbers(text, v, 4);
+    double x;
+
+    if(n < 1) return false;
+    x = v[0];
+
+    if((strstr(text, "cm to m") || strstr(text, "centimeters to meters") ||
+        strstr(text, "centimetres to metres"))) {
+        snprintf(out, out_size, "%.12g cm = %.12g m", x, x / 100.0);
+        return true;
+    }
+    if((strstr(text, "m to cm") || strstr(text, "meters to centimeters") ||
+        strstr(text, "metres to centimetres"))) {
+        snprintf(out, out_size, "%.12g m = %.12g cm", x, x * 100.0);
+        return true;
+    }
+    if(strstr(text, "km to m") || strstr(text, "kilometers to meters")) {
+        snprintf(out, out_size, "%.12g km = %.12g m", x, x * 1000.0);
+        return true;
+    }
+    if(strstr(text, "m to km") || strstr(text, "meters to kilometers")) {
+        snprintf(out, out_size, "%.12g m = %.12g km", x, x / 1000.0);
+        return true;
+    }
+    if(strstr(text, "inches to feet") || strstr(text, "inch to feet") ||
+       strstr(text, "in to ft")) {
+        snprintf(out, out_size, "%.12g in = %.12g ft", x, x / 12.0);
+        return true;
+    }
+    if(strstr(text, "feet to inches") || strstr(text, "foot to inches") ||
+       strstr(text, "ft to in")) {
+        snprintf(out, out_size, "%.12g ft = %.12g in", x, x * 12.0);
+        return true;
+    }
+    if(strstr(text, "feet to miles") || strstr(text, "ft to mi")) {
+        snprintf(out, out_size, "%.12g ft = %.12g mi", x, x / 5280.0);
+        return true;
+    }
+    if(strstr(text, "miles to feet") || strstr(text, "mi to ft")) {
+        snprintf(out, out_size, "%.12g mi = %.12g ft", x, x * 5280.0);
+        return true;
+    }
+    if(strstr(text, "ounces to pounds") || strstr(text, "oz to lb")) {
+        snprintf(out, out_size, "%.12g oz = %.12g lb", x, x / 16.0);
+        return true;
+    }
+    if(strstr(text, "pounds to ounces") || strstr(text, "lb to oz")) {
+        snprintf(out, out_size, "%.12g lb = %.12g oz", x, x * 16.0);
+        return true;
+    }
+    if(strstr(text, "seconds to minutes") || strstr(text, "sec to min")) {
+        snprintf(out, out_size, "%.12g s = %.12g min", x, x / 60.0);
+        return true;
+    }
+    if(strstr(text, "minutes to seconds") || strstr(text, "min to sec")) {
+        snprintf(out, out_size, "%.12g min = %.12g s", x, x * 60.0);
+        return true;
+    }
+    if(strstr(text, "minutes to hours") || strstr(text, "min to hr")) {
+        snprintf(out, out_size, "%.12g min = %.12g hr", x, x / 60.0);
+        return true;
+    }
+    if(strstr(text, "hours to minutes") || strstr(text, "hr to min")) {
+        snprintf(out, out_size, "%.12g hr = %.12g min", x, x * 60.0);
+        return true;
+    }
+
+    return false;
+}
+
+static bool contains_alnum(char const *text)
+{
+    while(*text) {
+        if(isalnum((unsigned char)*text)) return true;
+        text++;
+    }
+    return false;
+}
+
 static bool try_natural_math(char const *text, char *out, size_t out_size)
 {
     double v[16];
@@ -1095,6 +1292,44 @@ static bool write_conversation(char const *subject, char const *prompt,
         return true;
     }
 
+    if(exact_or_punct(lowerbuf, "lol") || exact_or_punct(lowerbuf, "lmao") ||
+       exact_or_punct(lowerbuf, "bruh") || exact_or_punct(lowerbuf, "bro")) {
+        snprintf(out, out_size,
+            "Fair enough. I'm still here in %s Standalone mode—send literally whatever you want next.",
+            subject_name);
+        return true;
+    }
+
+    if(exact_or_punct(lowerbuf, "ok") || exact_or_punct(lowerbuf, "okay") ||
+       exact_or_punct(lowerbuf, "cool") || exact_or_punct(lowerbuf, "nice") ||
+       exact_or_punct(lowerbuf, "bet")) {
+        snprintf(out, out_size,
+            "Got it. Keep going—I'm staying in %s Standalone mode.", subject_name);
+        return true;
+    }
+
+    if(exact_or_punct(lowerbuf, "idk") || strstr(lowerbuf, "i don't know") ||
+       strstr(lowerbuf, "i dont know")) {
+        snprintf(out, out_size,
+            "That's fine. In %s, send the part you do know—even one word, number, formula, or clue—and I'll build from that.",
+            subject_name);
+        return true;
+    }
+
+    if(strstr(lowerbuf, "what's up") || strstr(lowerbuf, "whats up") ||
+       strstr(lowerbuf, "how's it going") || strstr(lowerbuf, "hows it going")) {
+        snprintf(out, out_size,
+            "QBAI Standalone is up and running. Current subject: %s. Throw me anything.", subject_name);
+        return true;
+    }
+
+    if(strstr(lowerbuf, "i'm bored") || strstr(lowerbuf, "im bored")) {
+        snprintf(out, out_size,
+            "Challenge: give me a random %s term, equation, question, or claim and try to make the standalone engine fail.",
+            subject_name);
+        return true;
+    }
+
     (void)prompt;
     return false;
 }
@@ -1249,6 +1484,14 @@ static bool qb_offline_answer_core(
     lowercase(prompt);
 
     if(write_conversation(subject, prompt, out, out_size)) {
+        return true;
+    }
+
+    if(try_linear_equation(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_unit_conversion(lowerbuf, out, out_size)) {
         return true;
     }
 
@@ -1427,6 +1670,14 @@ bool qb_offline_answer(
     }
 
     if(!effective_subject) effective_subject = "auto";
+
+    if(!contains_alnum(prompt)) {
+        snprintf(out, out_size,
+            "I received only spaces/punctuation/symbols: \"%.120s\". "
+            "That still counts as input. Add any letter or number and I'll treat it as a topic, question, or calculation.",
+            prompt);
+        return true;
+    }
 
     if(handle_followup(prompt, mode, level, out, out_size)) {
         if(out[0]) {
