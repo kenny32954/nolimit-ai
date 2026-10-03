@@ -306,6 +306,198 @@ static bool phrase_match(char const *text, char const *phrase)
 }
 
 
+static fact_t const *find_fact_match(char const *text)
+{
+    unsigned int i;
+
+    for(i = 0; i < sizeof(facts)/sizeof(facts[0]); i++) {
+        if(phrase_match(text, facts[i].needle)) return &facts[i];
+    }
+
+    return NULL;
+}
+
+static bool is_all_upper_word(char const *text)
+{
+    int letters = 0;
+
+    while(*text) {
+        if(isalpha((unsigned char)*text)) {
+            letters++;
+            if(islower((unsigned char)*text)) return false;
+        }
+        else if(!isspace((unsigned char)*text) && *text != '?' &&
+                *text != '!' && *text != '.') {
+            return false;
+        }
+        text++;
+    }
+
+    return letters >= 2 && letters <= 12;
+}
+
+static bool looks_like_url(char const *text)
+{
+    return starts_with(text, "http://") || starts_with(text, "https://") ||
+           starts_with(text, "www.") || strstr(text, ".com/") ||
+           strstr(text, ".org/") || strstr(text, ".edu/");
+}
+
+static bool looks_like_code(char const *text)
+{
+    return strstr(text, "print(") || strstr(text, "console.log") ||
+           strstr(text, "def ") || strstr(text, "function ") ||
+           strstr(text, "if(") || strstr(text, "if (") ||
+           strstr(text, "for(") || strstr(text, "for (") ||
+           strstr(text, "while(") || strstr(text, "while (") ||
+           strstr(text, "#include") || strstr(text, "<html") ||
+           strstr(text, "public static void") || strstr(text, "=>");
+}
+
+static bool has_suffix(char const *word, char const *suffix)
+{
+    size_t lw = strlen(word), ls = strlen(suffix);
+    if(ls > lw) return false;
+    return strcmp(word + lw - ls, suffix) == 0;
+}
+
+static bool write_input_shape_response(char const *subject, char const *prompt,
+                                       char *out, size_t out_size)
+{
+    char lower[220];
+    char subject_name[64];
+
+    lowercase_into(prompt, lower, sizeof(lower));
+    friendly_subject(subject, subject_name, sizeof(subject_name));
+
+    if(looks_like_url(lower)) {
+        snprintf(out, out_size,
+            "That looks like a URL: \"%.150s\". Standalone QBAI has no internet connection, "
+            "so I can't open it, but I can still reason about any text, domain name, path, or clue you type from it.",
+            prompt);
+        return true;
+    }
+
+    if(looks_like_code(lower)) {
+        snprintf(out, out_size,
+            "That looks like source code or a code fragment. In %s mode, I can inspect it locally for structure, "
+            "variables, control flow, likely syntax, and obvious logic patterns. Exact input: \"%.170s\".",
+            subject_name, prompt);
+        return true;
+    }
+
+    if(is_all_upper_word(prompt)) {
+        snprintf(out, out_size,
+            "\"%.40s\" looks like an acronym or initialism. I don't have a verified expansion stored for that exact token, "
+            "so I won't invent one. Add the class/topic or expand one letter and I'll narrow it down.",
+            prompt);
+        return true;
+    }
+
+    if(alpha_word_count(prompt) == 1) {
+        if(has_suffix(lower, "ology")) {
+            snprintf(out, out_size,
+                "\"%s\" looks like a field-of-study word because it ends in -ology. "
+                "I don't have its exact stored definition, so add context and I'll analyze the roots/topic.",
+                lower);
+            return true;
+        }
+        if(has_suffix(lower, "ism")) {
+            snprintf(out, out_size,
+                "\"%s\" ends in -ism, a suffix often used for systems, doctrines, practices, or conditions. "
+                "I don't have enough stored context to assign the exact meaning safely.",
+                lower);
+            return true;
+        }
+        if(has_suffix(lower, "tion") || has_suffix(lower, "ment")) {
+            snprintf(out, out_size,
+                "\"%s\" has a noun-like ending. I don't have an exact dictionary entry stored, "
+                "but I can use the word as the subject of a definition, cause/effect, or comparison question.",
+                lower);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static char quiz_answer[700];
+static char quiz_topic[120];
+static bool quiz_pending = false;
+
+static bool try_study_request(char const *subject, char const *prompt,
+                              char *out, size_t out_size)
+{
+    char topic[180];
+    char topic_lower[180];
+    fact_t const *fact;
+    char const *ref;
+
+    copy_topic(prompt, topic, sizeof(topic));
+    lowercase_into(topic, topic_lower, sizeof(topic_lower));
+    fact = find_fact_match(topic_lower);
+    ref = qb_reference_text(subject);
+
+    if(starts_with(lowerbuf, "summarize ") || starts_with(lowerbuf, "summary of ")) {
+        if(fact) {
+            snprintf(out, out_size, "Summary - %s: %s", fact->needle, fact->answer);
+        }
+        else {
+            snprintf(out, out_size,
+                "Summary target: \"%s\". I don't have an exact stored entry, so here is the closest subject-level reference: %.300s",
+                topic, ref);
+        }
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "flashcards on ") || starts_with(lowerbuf, "flashcards about ")) {
+        if(fact) {
+            snprintf(out, out_size,
+                "FLASHCARD\nQ: What is %s?\nA: %s\n\nQ: What key idea should you remember?\nA: Connect the definition to one example or application.",
+                fact->needle, fact->answer);
+        }
+        else {
+            snprintf(out, out_size,
+                "FLASHCARD\nQ: Explain %s.\nA: Use the %s reference and identify definition, key mechanism/rule, and one example.\nReference: %.220s",
+                topic, subject, ref);
+        }
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "quiz me on ") || starts_with(lowerbuf, "quiz me about ")) {
+        snprintf(quiz_topic, sizeof(quiz_topic), "%.119s", topic);
+        if(fact) snprintf(quiz_answer, sizeof(quiz_answer), "%.699s", fact->answer);
+        else snprintf(quiz_answer, sizeof(quiz_answer), "%.699s", ref);
+        quiz_pending = true;
+
+        snprintf(out, out_size,
+            "QUIZ: Without looking anything up, explain \"%s\" in your own words and give one important detail. "
+            "When you're ready, type 'show answer'.",
+            topic);
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "give me an example of ")) {
+        if(fact) {
+            snprintf(out, out_size,
+                "Concept: %s\n%s\nExample strategy: choose one concrete case where the definition/rule clearly applies, "
+                "identify the input/cause, then show the result.",
+                fact->needle, fact->answer);
+        }
+        else {
+            snprintf(out, out_size,
+                "For \"%s\", I don't have a stored specific example. In %s, build one by choosing a simple concrete case, "
+                "applying the subject rule, and checking that the example actually satisfies the definition.",
+                topic, subject);
+        }
+        return true;
+    }
+
+    return false;
+}
+
+
+
 static void skip_spaces(char const **p)
 {
     while(**p && isspace((unsigned char)**p)) (*p)++;
@@ -619,6 +811,13 @@ static void copy_topic(char const *prompt, char *topic, size_t topic_size)
     else if(starts_with(lowerbuf, "define ")) p = prompt + 7;
     else if(starts_with(lowerbuf, "explain ")) p = prompt + 8;
     else if(starts_with(lowerbuf, "tell me about ")) p = prompt + 14;
+    else if(starts_with(lowerbuf, "summarize ")) p = prompt + 10;
+    else if(starts_with(lowerbuf, "summary of ")) p = prompt + 11;
+    else if(starts_with(lowerbuf, "quiz me on ")) p = prompt + 11;
+    else if(starts_with(lowerbuf, "quiz me about ")) p = prompt + 14;
+    else if(starts_with(lowerbuf, "flashcards on ")) p = prompt + 14;
+    else if(starts_with(lowerbuf, "flashcards about ")) p = prompt + 17;
+    else if(starts_with(lowerbuf, "give me an example of ")) p = prompt + 22;
     else if(starts_with(lowerbuf, "why ")) p = prompt + 4;
     else if(starts_with(lowerbuf, "how ")) p = prompt + 4;
     else if(starts_with(lowerbuf, "who ")) p = prompt + 4;
@@ -1626,6 +1825,10 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(try_study_request(subject, prompt, out, out_size)) {
+        return true;
+    }
+
     if(try_known_comparison(lowerbuf, out, out_size)) {
         return true;
     }
@@ -1788,6 +1991,10 @@ static bool qb_offline_answer_core(
         }
     }
 
+    if(write_input_shape_response(subject, prompt, out, out_size)) {
+        return true;
+    }
+
     write_contextual_fallback(subject, mode, level, prompt, out, out_size);
     return true;
 }
@@ -1817,6 +2024,17 @@ bool qb_offline_answer(
     }
 
     if(!effective_subject) effective_subject = "auto";
+
+    if(quiz_pending && (exact_or_punct(lower, "show answer") ||
+       exact_or_punct(lower, "answer") || exact_or_punct(lower, "reveal answer"))) {
+        snprintf(out, out_size, "ANSWER - %s: %s", quiz_topic, quiz_answer);
+        quiz_pending = false;
+        snprintf(memory_topic, sizeof(memory_topic), "%s", quiz_topic);
+        snprintf(memory_answer, sizeof(memory_answer), "%.699s", out);
+        snprintf(memory_subject, sizeof(memory_subject), "%s", effective_subject);
+        memory_valid = true;
+        return true;
+    }
 
     if(!contains_alnum(prompt)) {
         snprintf(out, out_size,
