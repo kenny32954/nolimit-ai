@@ -592,6 +592,7 @@ static void copy_topic(char const *prompt, char *topic, size_t topic_size)
     else if(starts_with(lowerbuf, "when ")) p = prompt + 5;
     else if(starts_with(lowerbuf, "where ")) p = prompt + 6;
     else if(starts_with(lowerbuf, "compare ")) p = prompt + 8;
+    else if(starts_with(lowerbuf, "difference between ")) p = prompt + 19;
 
     while(*p && isspace((unsigned char)*p)) p++;
     snprintf(topic, topic_size, "%s", p);
@@ -601,6 +602,19 @@ static void copy_topic(char const *prompt, char *topic, size_t topic_size)
           topic[len - 1] == '?' || topic[len - 1] == '!' ||
           topic[len - 1] == '.')) {
         topic[--len] = '\0';
+    }
+
+    if(len >= 5) {
+        char tail[6];
+        size_t j;
+        for(j = 0; j < 5; j++) {
+            tail[j] = (char)tolower((unsigned char)topic[len - 5 + j]);
+        }
+        tail[5] = '\0';
+        if(strcmp(tail, " mean") == 0) {
+            topic[len - 5] = '\0';
+            len -= 5;
+        }
     }
 
     if(topic[0] == '\0') snprintf(topic, topic_size, "%s", prompt);
