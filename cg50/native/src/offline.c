@@ -971,8 +971,8 @@ static bool try_known_comparison(char const *text, char *out, size_t out_size)
     if(!sep) return false;
 
     *sep = '\0';
-    snprintf(left, sizeof(left), "%s", topic);
-    snprintf(right, sizeof(right), "%s", sep + sep_len);
+    snprintf(left, sizeof(left), "%.89s", topic);
+    snprintf(right, sizeof(right), "%.89s", sep + sep_len);
     trim_text(left);
     trim_text(right);
 
