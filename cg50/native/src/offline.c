@@ -1533,6 +1533,50 @@ static bool handle_followup(char const *prompt, char const *mode, char const *le
         return true;
     }
 
+    if(strstr(lower, "what does that mean") || strstr(lower, "explain that") ||
+       strstr(lower, "explain it") || strstr(lower, "tell me more about that") ||
+       strstr(lower, "tell me more about it")) {
+        first_sentence(memory_answer, short_answer, sizeof(short_answer));
+        snprintf(out, out_size,
+            "We were talking about \"%s\". In simpler terms: %s "
+            "If you want, ask why, how, for an example, or for steps.",
+            memory_topic, short_answer);
+        return true;
+    }
+
+    if(exact_or_punct(lower, "shorter") || strstr(lower, "short answer") ||
+       strstr(lower, "make it shorter")) {
+        first_sentence(memory_answer, short_answer, sizeof(short_answer));
+        snprintf(out, out_size, "%s", short_answer);
+        return true;
+    }
+
+    if(exact_or_punct(lower, "longer") || strstr(lower, "more explanation") ||
+       strstr(lower, "more detail please")) {
+        snprintf(out, out_size,
+            "More detail on \"%s\": %s\n"
+            "Next layer: %s.",
+            memory_topic, memory_answer, subject_strategy(memory_subject));
+        return true;
+    }
+
+    if(strstr(lower, "show me steps") || strstr(lower, "show the steps") ||
+       exact_or_punct(lower, "steps")) {
+        snprintf(out, out_size,
+            "Steps for \"%s\": 1) identify what is known, 2) identify what must be found, "
+            "3) choose the governing rule/evidence, 4) apply it one step at a time, "
+            "5) check the result against the original question. Subject strategy: %s.",
+            memory_topic, subject_strategy(memory_subject));
+        return true;
+    }
+
+    if(exact_or_punct(lower, "what about that") || exact_or_punct(lower, "what about it")) {
+        snprintf(out, out_size,
+            "You're still on \"%s\". The previous answer was: %s",
+            memory_topic, memory_answer);
+        return true;
+    }
+
     if(strstr(lower, "give me an example") || exact_or_punct(lower, "example")) {
         if(strstr(memory_subject, "math") || strstr(memory_subject, "algebra") ||
            strstr(memory_subject, "geometry") || strstr(memory_subject, "calculus")) {
@@ -1931,6 +1975,15 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(strchr(lowerbuf, '=') && strchr(lowerbuf, 'x')) {
+        snprintf(out, out_size,
+            "I can see an x-equation, but I couldn't parse its exact form. "
+            "Standalone linear solving supports forms like 3x+7=25 or 2x-4=x+9. "
+            "Your exact input was: \"%.180s\".",
+            prompt);
+        return true;
+    }
+
     if(try_unit_conversion(lowerbuf, out, out_size)) {
         return true;
     }
@@ -2136,6 +2189,29 @@ bool qb_offline_answer(
             "That still counts as input. Add any letter or number and I'll treat it as a topic, question, or calculation.",
             prompt);
         return true;
+    }
+
+    if(memory_valid && starts_with(lower, "what about ") &&
+       !exact_or_punct(lower, "what about that") &&
+       !exact_or_punct(lower, "what about it")) {
+        char synthetic[220];
+        snprintf(synthetic, sizeof(synthetic), "explain %.190s", prompt + 11);
+        ok = qb_offline_answer_core(
+            effective_subject,
+            mode,
+            level,
+            synthetic,
+            out,
+            out_size
+        );
+        if(ok && out[0]) {
+            copy_topic(synthetic, topic, sizeof(topic));
+            snprintf(memory_topic, sizeof(memory_topic), "%s", topic);
+            snprintf(memory_answer, sizeof(memory_answer), "%.699s", out);
+            snprintf(memory_subject, sizeof(memory_subject), "%s", effective_subject);
+            memory_valid = true;
+        }
+        return ok;
     }
 
     if(handle_followup(prompt, mode, level, out, out_size)) {
