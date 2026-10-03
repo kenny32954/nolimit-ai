@@ -252,6 +252,27 @@ static bool starts_with(char const *text, char const *prefix)
     return strncmp(text, prefix, strlen(prefix)) == 0;
 }
 
+static bool phrase_match(char const *text, char const *phrase)
+{
+    size_t n = strlen(phrase);
+    char const *p = text;
+
+    while((p = strstr(p, phrase)) != NULL) {
+        unsigned char before = (p == text) ? 0 : (unsigned char)p[-1];
+        unsigned char after = (unsigned char)p[n];
+
+        if((p == text || !isalnum(before)) &&
+           (after == '\0' || !isalnum(after))) {
+            return true;
+        }
+
+        p++;
+    }
+
+    return false;
+}
+
+
 static void skip_spaces(char const **p)
 {
     while(**p && isspace((unsigned char)**p)) (*p)++;
@@ -941,7 +962,7 @@ bool qb_offline_answer(
     }
 
     for(i = 0; i < sizeof(facts)/sizeof(facts[0]); i++) {
-        if(strstr(lowerbuf, facts[i].needle)) {
+        if(phrase_match(lowerbuf, facts[i].needle)) {
             snprintf(out, out_size, "%s", facts[i].answer);
             return true;
         }
