@@ -180,7 +180,8 @@ int main(void)
     expect_contains("casual lol", out, "Fair enough");
 
     qb_offline_answer("auto", "explain", "school", "idk", out, sizeof(out));
-    expect_contains("casual idk", out, "part you do know");
+    expect_contains("casual idk", out, "Uncertain is fine");
+    expect_contains("casual idk context", out, "lol");
 
     qb_offline_answer("auto", "explain", "school", "???", out, sizeof(out));
     expect_contains("punctuation input", out, "only spaces/punctuation/symbols");
