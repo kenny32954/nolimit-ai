@@ -559,8 +559,12 @@ static void copy_topic(char const *prompt, char *topic, size_t topic_size)
 
     if(starts_with(lowerbuf, "what is ")) p = prompt + 8;
     else if(starts_with(lowerbuf, "what are ")) p = prompt + 9;
+    else if(starts_with(lowerbuf, "what's ")) p = prompt + 7;
+    else if(starts_with(lowerbuf, "whats ")) p = prompt + 6;
+    else if(starts_with(lowerbuf, "what does ") && strstr(lowerbuf, " mean")) p = prompt + 10;
     else if(starts_with(lowerbuf, "define ")) p = prompt + 7;
     else if(starts_with(lowerbuf, "explain ")) p = prompt + 8;
+    else if(starts_with(lowerbuf, "tell me about ")) p = prompt + 14;
     else if(starts_with(lowerbuf, "why ")) p = prompt + 4;
     else if(starts_with(lowerbuf, "how ")) p = prompt + 4;
     else if(starts_with(lowerbuf, "who ")) p = prompt + 4;
@@ -624,13 +628,22 @@ static bool write_conversation(char const *subject, char const *prompt,
 
     friendly_subject(subject, subject_name, sizeof(subject_name));
 
-    if(exact_or_punct(lowerbuf, "hi") || exact_or_punct(lowerbuf, "hello") ||
-       exact_or_punct(lowerbuf, "hey") || exact_or_punct(lowerbuf, "yo") ||
-       exact_or_punct(lowerbuf, "sup") || exact_or_punct(lowerbuf, "wassup")) {
+    if(word_prefix(lowerbuf, "hi") || word_prefix(lowerbuf, "hello") ||
+       word_prefix(lowerbuf, "hey") || word_prefix(lowerbuf, "yo") ||
+       word_prefix(lowerbuf, "sup") || word_prefix(lowerbuf, "wassup") ||
+       word_prefix(lowerbuf, "good morning") || word_prefix(lowerbuf, "good afternoon") ||
+       word_prefix(lowerbuf, "good evening")) {
         snprintf(out, out_size,
             "Hey! QBAI Standalone is running entirely on your calculator. "
             "You're currently in %s. Ask me a question, type a calculation, "
             "or switch subjects with F1.", subject_name);
+        return true;
+    }
+
+    if(strstr(lowerbuf, "how are you")) {
+        snprintf(out, out_size,
+            "I'm running fine in Standalone mode. No network needed. "
+            "You're in %s right now—throw me a question.", subject_name);
         return true;
     }
 
@@ -690,7 +703,10 @@ static void write_contextual_fallback(char const *subject, char const *mode,
     words = alpha_word_count(prompt);
 
     if(starts_with(lowerbuf, "what is ") || starts_with(lowerbuf, "what are ") ||
-       starts_with(lowerbuf, "define ") || starts_with(lowerbuf, "explain ")) {
+       starts_with(lowerbuf, "what's ") || starts_with(lowerbuf, "whats ") ||
+       (starts_with(lowerbuf, "what does ") && strstr(lowerbuf, " mean")) ||
+       starts_with(lowerbuf, "define ") || starts_with(lowerbuf, "explain ") ||
+       starts_with(lowerbuf, "tell me about ")) {
         snprintf(out, out_size,
             "You're asking for an explanation of \"%s\". I don't have a stored definition for that exact term yet. "
             "In %s mode, I'd analyze it by trying to %s. "
@@ -715,8 +731,8 @@ static void write_contextual_fallback(char const *subject, char const *mode,
         return;
     }
 
-    if(starts_with(lowerbuf, "compare ") || strstr(lowerbuf, " vs ") ||
-       strstr(lowerbuf, " versus ")) {
+    if(starts_with(lowerbuf, "compare ") || starts_with(lowerbuf, "difference between ") ||
+       strstr(lowerbuf, " vs ") || strstr(lowerbuf, " versus ")) {
         snprintf(out, out_size,
             "You want a comparison involving \"%s\". For %s, compare them across the same dimensions, "
             "then state one similarity, one difference, and why that difference matters. "
