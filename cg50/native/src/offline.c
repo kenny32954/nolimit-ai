@@ -1963,6 +1963,10 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(write_intent_response(subject, mode, prompt, out, out_size)) {
+        return true;
+    }
+
     if(try_known_comparison(lowerbuf, out, out_size)) {
         return true;
     }
@@ -2135,10 +2139,6 @@ static bool qb_offline_answer_core(
     }
 
     if(write_input_shape_response(subject, prompt, out, out_size)) {
-        return true;
-    }
-
-    if(write_intent_response(subject, mode, prompt, out, out_size)) {
         return true;
     }
 
