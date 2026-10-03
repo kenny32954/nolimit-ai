@@ -1666,6 +1666,92 @@ static bool write_conversation(char const *subject, char const *prompt,
     return false;
 }
 
+static bool write_intent_response(char const *subject, char const *mode,
+                                  char const *prompt, char *out, size_t out_size)
+{
+    char subject_name[64];
+    char topic[180];
+
+    friendly_subject(subject, subject_name, sizeof(subject_name));
+    copy_topic(prompt, topic, sizeof(topic));
+
+    if(starts_with(lowerbuf, "what do you think about ") ||
+       starts_with(lowerbuf, "what do you think of ") ||
+       starts_with(lowerbuf, "do you like ") ||
+       starts_with(lowerbuf, "which is better ")) {
+        snprintf(out, out_size,
+            "I don't have personal opinions, but I can evaluate \"%s\" using explicit criteria. "
+            "In %s, useful criteria are accuracy/evidence, purpose, tradeoffs, and how well it fits the question.",
+            topic, subject_name);
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "i think ") || starts_with(lowerbuf, "i believe ") ||
+       starts_with(lowerbuf, "my claim is ") || starts_with(lowerbuf, "my answer is ")) {
+        snprintf(out, out_size,
+            "You gave a claim/answer: \"%.180s\". In %s, I would check it by identifying the key claim, "
+            "matching it against the relevant rule/evidence, and looking for a counterexample or missing condition.",
+            prompt, subject_name);
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "check this ") || starts_with(lowerbuf, "check my ") ||
+       starts_with(lowerbuf, "is this right") || starts_with(lowerbuf, "is this correct")) {
+        snprintf(out, out_size,
+            "CHECK mode for \"%.180s\": I can inspect the logic locally, but I need the actual work/claim in the text. "
+            "For %s, I check the first step that conflicts with the governing rule or evidence.",
+            prompt, subject_name);
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "write about ") || starts_with(lowerbuf, "write an essay about ") ||
+       starts_with(lowerbuf, "write a paragraph about ") ||
+       starts_with(lowerbuf, "make an essay about ")) {
+        snprintf(out, out_size,
+            "Writing plan for \"%s\": 1) make a specific thesis, 2) choose 2-3 supporting points, "
+            "3) attach evidence/examples to each point, 4) explain the connection, 5) conclude by returning to the thesis. "
+            "Standalone mode can build the structure even when it cannot generate unlimited freeform prose.",
+            topic);
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "list ") || starts_with(lowerbuf, "give me a list of ")) {
+        snprintf(out, out_size,
+            "You want a list about \"%s\". In %s, organize the list by category or importance, "
+            "keep each item parallel, and include a short reason/example when the assignment needs explanation.",
+            topic, subject_name);
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "give me reasons ") || starts_with(lowerbuf, "reasons why ") ||
+       starts_with(lowerbuf, "causes of ") || starts_with(lowerbuf, "effects of ")) {
+        snprintf(out, out_size,
+            "For \"%s\", separate causes from effects and rank them by directness/evidence. "
+            "In %s, a strong answer names the factor, explains the mechanism, and connects it to the outcome.",
+            topic, subject_name);
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "prove ") || strcmp(mode, "proof") == 0) {
+        snprintf(out, out_size,
+            "Proof setup for \"%s\": state the hypotheses and exact conclusion first, then choose a valid strategy "
+            "(direct, contrapositive, contradiction, induction, construction, or theorem application). "
+            "Every step must follow from a definition, hypothesis, or previously established result.",
+            topic);
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "derive ") || strcmp(mode, "derive") == 0) {
+        snprintf(out, out_size,
+            "Derivation setup for \"%s\": start from definitions/governing equations, state assumptions, "
+            "substitute one relationship at a time, preserve units, and verify the final form with a limiting or dimensional check.",
+            topic);
+        return true;
+    }
+
+    return false;
+}
+
 static void write_contextual_fallback(char const *subject, char const *mode,
                                       char const *level, char const *prompt,
                                       char *out, size_t out_size)
@@ -1996,6 +2082,10 @@ static bool qb_offline_answer_core(
     }
 
     if(write_input_shape_response(subject, prompt, out, out_size)) {
+        return true;
+    }
+
+    if(write_intent_response(subject, mode, prompt, out, out_size)) {
         return true;
     }
 
