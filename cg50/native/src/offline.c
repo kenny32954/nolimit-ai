@@ -5547,6 +5547,47 @@ static bool try_known_comparison(char const *text, char *out, size_t out_size)
 }
 
 
+
+static bool try_multi_fact_response(char const *text, char *out, size_t out_size)
+{
+    fact_t const *matches[3]={NULL,NULL,NULL};
+    int count=0;
+    unsigned int i;
+    bool multi_intent =
+        starts_with(text,"explain ") ||
+        starts_with(text,"tell me about ") ||
+        starts_with(text,"what are ") ||
+        starts_with(text,"summarize ") ||
+        starts_with(text,"summary of ");
+
+    if(!multi_intent || !strstr(text," and ")) return false;
+
+    for(i=0;i<sizeof(facts)/sizeof(facts[0]) && count<3;i++) {
+        if(phrase_match(text,facts[i].needle)) {
+            int j;
+            bool duplicate=false;
+            for(j=0;j<count;j++) {
+                if(strcmp(matches[j]->needle,facts[i].needle)==0) duplicate=true;
+            }
+            if(!duplicate) matches[count++]=&facts[i];
+        }
+    }
+
+    if(count<2) return false;
+
+    out[0]='\0';
+    for(i=0;i<(unsigned int)count;i++) {
+        size_t used=strlen(out);
+        snprintf(out+used,out_size-used,
+            "%s%s: %.260s",
+            i?"\n":"",
+            matches[i]->needle,
+            matches[i]->answer);
+        if(strlen(out)+40>=out_size) break;
+    }
+    return true;
+}
+
 static bool try_generic_fact_relation(char const *text, char *out, size_t out_size)
 {
     fact_t const *first=NULL;
@@ -6888,6 +6929,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_study_request(subject, prompt, out, out_size)) {
+        return true;
+    }
+
+    if(try_multi_fact_response(lowerbuf, out, out_size)) {
         return true;
     }
 
