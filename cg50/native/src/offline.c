@@ -2064,14 +2064,14 @@ static bool try_fraction_percent_tools(char const *text, char *out, size_t out_s
         return true;
     }
 
-    if(n>=2 && strstr(text,"increase") && strstr(text,"percent")) {
+    if(n>=2 && starts_with(text,"increase ") && strstr(text," by ") && strstr(text,"percent")) {
         double base=v[0], pct=v[1];
         snprintf(out,out_size,
             "Increase %.12g by %.12g%% = %.12g.",base,pct,base*(1.0+pct/100.0));
         return true;
     }
 
-    if(n>=2 && strstr(text,"decrease") && strstr(text,"percent")) {
+    if(n>=2 && starts_with(text,"decrease ") && strstr(text," by ") && strstr(text,"percent")) {
         double base=v[0], pct=v[1];
         snprintf(out,out_size,
             "Decrease %.12g by %.12g%% = %.12g.",base,pct,base*(1.0-pct/100.0));
