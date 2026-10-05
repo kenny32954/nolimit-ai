@@ -928,6 +928,29 @@ int main(void)
     qb_offline_answer("business", "answer", "school", "roi profit 100 investment 500", out, sizeof(out));
     expect_contains("roi tool", out, "20%");
 
+
+    qb_offline_answer("finance", "answer", "college", "loan payment 10000 6 5", out, sizeof(out));
+    expect_contains("loan monthly payment", out, "193.328");
+    expect_contains("loan payment count", out, "60 payments");
+
+    qb_offline_answer("finance", "answer", "school", "loan payment 1200 0 1", out, sizeof(out));
+    expect_contains("zero interest loan", out, "100");
+
+    qb_offline_answer("finance", "answer", "college", "savings annuity 100 6 12 10", out, sizeof(out));
+    expect_contains("savings annuity", out, "16387");
+
+    qb_offline_answer("algebra_2", "answer", "school", "exponential growth 100 5 10", out, sizeof(out));
+    expect_contains("exponential growth", out, "162.889");
+
+    qb_offline_answer("algebra_2", "answer", "school", "exponential decay 100 10 3", out, sizeof(out));
+    expect_contains("exponential decay", out, "72.9");
+
+    qb_offline_answer("science", "answer", "school", "half life 100 5 10", out, sizeof(out));
+    expect_contains("half life amount", out, "25");
+
+    qb_offline_answer("algebra_2", "answer", "school", "doubling time 7", out, sizeof(out));
+    expect_contains("doubling time", out, "10.244");
+
     qb_offline_answer("consumer_math", "steps", "school", "3 notebooks cost 12 dollars how much do 5 notebooks cost", out, sizeof(out));
     expect_contains("unit rate cost", out, "20");
 
