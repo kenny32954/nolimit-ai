@@ -3989,6 +3989,153 @@ static bool try_relationship_word_problem(char const *text, char *out, size_t ou
     return false;
 }
 
+
+static int unique_sorted_values(double *v, int n)
+{
+    int i,w=0;
+    if(n<=0) return 0;
+    qsort(v,(size_t)n,sizeof(double),compare_double_asc);
+    for(i=0;i<n;i++) {
+        if(w==0 || !approx_equal(v[i],v[w-1])) v[w++]=v[i];
+    }
+    return w;
+}
+
+static void format_numeric_set(double const *v, int n, char *out, size_t out_size)
+{
+    int i;
+    size_t used=0;
+    if(out_size==0) return;
+    out[0]='\0';
+    used+=(size_t)snprintf(out+used,out_size-used,"{");
+    for(i=0;i<n && used+8<out_size;i++) {
+        used+=(size_t)snprintf(out+used,out_size-used,"%s%.12g",i?", ":"",v[i]);
+    }
+    if(used+2<out_size) snprintf(out+used,out_size-used,"}");
+}
+
+static bool value_in_sorted(double const *v, int n, double x)
+{
+    int i;
+    for(i=0;i<n;i++) if(approx_equal(v[i],x)) return true;
+    return false;
+}
+
+static bool try_set_tools(char const *text, char *out, size_t out_size)
+{
+    double a[32],b[32],result[64];
+    int na=0,nb=0,nr=0,i;
+    char formatted[500];
+
+    if(!(starts_with(text,"union ") || starts_with(text,"intersection ") ||
+         starts_with(text,"set difference ") || starts_with(text,"difference set ") ||
+         starts_with(text,"subset ") || starts_with(text,"symmetric difference "))) return false;
+
+    if(!split_numeric_sides(text,a,&na,b,&nb,32)) {
+        snprintf(out,out_size,"Use two numeric sets separated by ';'. Example: union 1 2 3 ; 3 4 5");
+        return true;
+    }
+
+    na=unique_sorted_values(a,na);
+    nb=unique_sorted_values(b,nb);
+
+    if(starts_with(text,"union ")) {
+        for(i=0;i<na;i++) result[nr++]=a[i];
+        for(i=0;i<nb;i++) if(!value_in_sorted(result,nr,b[i])) result[nr++]=b[i];
+        nr=unique_sorted_values(result,nr);
+        format_numeric_set(result,nr,formatted,sizeof(formatted));
+        snprintf(out,out_size,"Union = %s",formatted);
+        return true;
+    }
+
+    if(starts_with(text,"intersection ")) {
+        for(i=0;i<na;i++) if(value_in_sorted(b,nb,a[i])) result[nr++]=a[i];
+        format_numeric_set(result,nr,formatted,sizeof(formatted));
+        snprintf(out,out_size,"Intersection = %s",formatted);
+        return true;
+    }
+
+    if(starts_with(text,"set difference ") || starts_with(text,"difference set ")) {
+        for(i=0;i<na;i++) if(!value_in_sorted(b,nb,a[i])) result[nr++]=a[i];
+        format_numeric_set(result,nr,formatted,sizeof(formatted));
+        snprintf(out,out_size,"A minus B = %s",formatted);
+        return true;
+    }
+
+    if(starts_with(text,"symmetric difference ")) {
+        for(i=0;i<na;i++) if(!value_in_sorted(b,nb,a[i])) result[nr++]=a[i];
+        for(i=0;i<nb;i++) if(!value_in_sorted(a,na,b[i])) result[nr++]=b[i];
+        nr=unique_sorted_values(result,nr);
+        format_numeric_set(result,nr,formatted,sizeof(formatted));
+        snprintf(out,out_size,"Symmetric difference = %s",formatted);
+        return true;
+    }
+
+    if(starts_with(text,"subset ")) {
+        bool subset=true;
+        for(i=0;i<na;i++) if(!value_in_sorted(b,nb,a[i])) subset=false;
+        snprintf(out,out_size,"First set %s a subset of the second.",subset?"is":"is not");
+        return true;
+    }
+
+    return false;
+}
+
+static bool parse_bool_token(char const *token, bool *value)
+{
+    if(strcmp(token,"1")==0 || strcmp(token,"true")==0 || strcmp(token,"t")==0) {
+        *value=true; return true;
+    }
+    if(strcmp(token,"0")==0 || strcmp(token,"false")==0 || strcmp(token,"f")==0) {
+        *value=false; return true;
+    }
+    return false;
+}
+
+static bool try_logic_tools(char const *text, char *out, size_t out_size)
+{
+    char op[32],a[32],b[32];
+    bool x,y,result;
+
+    if(starts_with(text,"truth table ")) {
+        char const *kind=text+12;
+        if(strcmp(kind,"and")==0) {
+            snprintf(out,out_size,"A B | A AND B\n0 0 | 0\n0 1 | 0\n1 0 | 0\n1 1 | 1");
+            return true;
+        }
+        if(strcmp(kind,"or")==0) {
+            snprintf(out,out_size,"A B | A OR B\n0 0 | 0\n0 1 | 1\n1 0 | 1\n1 1 | 1");
+            return true;
+        }
+        if(strcmp(kind,"xor")==0) {
+            snprintf(out,out_size,"A B | A XOR B\n0 0 | 0\n0 1 | 1\n1 0 | 1\n1 1 | 0");
+            return true;
+        }
+        if(strcmp(kind,"implies")==0 || strcmp(kind,"implication")==0) {
+            snprintf(out,out_size,"A B | A->B\n0 0 | 1\n0 1 | 1\n1 0 | 0\n1 1 | 1");
+            return true;
+        }
+    }
+
+    if(sscanf(text,"logic %31s %31s %31s",op,a,b)==3) {
+        if(!parse_bool_token(a,&x) || !parse_bool_token(b,&y)) return false;
+        if(strcmp(op,"and")==0) result=x&&y;
+        else if(strcmp(op,"or")==0) result=x||y;
+        else if(strcmp(op,"xor")==0) result=(x!=y);
+        else if(strcmp(op,"implies")==0) result=(!x)||y;
+        else return false;
+        snprintf(out,out_size,"%s",result?"TRUE":"FALSE");
+        return true;
+    }
+
+    if(sscanf(text,"logic not %31s",a)==1 && parse_bool_token(a,&x)) {
+        snprintf(out,out_size,"%s",(!x)?"TRUE":"FALSE");
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_science_formula(char const *text, char *out, size_t out_size)
 {
     double v[8];
@@ -5808,6 +5955,14 @@ static bool qb_offline_answer_core(
     }
 
     if(try_linear_algebra_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_set_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_logic_tools(lowerbuf, out, out_size)) {
         return true;
     }
 
