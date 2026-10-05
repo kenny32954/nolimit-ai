@@ -288,6 +288,7 @@ static bool starts_with(char const *text, char const *prefix)
 static void friendly_subject(char const *subject, char *out, size_t out_size);
 static void copy_topic(char const *prompt, char *topic, size_t topic_size);
 static int alpha_word_count(char const *text);
+static bool eval_expression(char const *text, double *value);
 
 static bool phrase_match(char const *text, char const *phrase)
 {
