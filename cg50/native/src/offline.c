@@ -2788,7 +2788,7 @@ static bool try_calculus_analysis(char const *text, char *out, size_t out_size)
         m=eval_poly_derivative(c,x);
         snprintf(out,out_size,
             "At x=%.12g: point (%.12g, %.12g), slope %.12g. Tangent: y = %.12gx %+.12g",
-            x,x,y,m,y-m*x);
+            x,x,y,m,m,y-m*x);
         return true;
     }
 
