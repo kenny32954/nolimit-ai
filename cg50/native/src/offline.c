@@ -416,6 +416,8 @@ static bool try_acronym_response(char const *prompt, char *out, size_t out_size)
 
     lowercase_into(prompt, lower, sizeof(lower));
 
+    if(looks_like_url(lower) || looks_like_code(lower)) return false;
+
     if(strstr(lower, "stand for") || starts_with(lower, "expand ") ||
        starts_with(lower, "meaning of ")) {
         asks_expand = true;
