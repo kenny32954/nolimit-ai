@@ -3558,6 +3558,94 @@ static bool try_finance_tools(char const *text, char *out, size_t out_size)
         return true;
     }
 
+    if(n>=3 && (starts_with(text,"loan payment ") || starts_with(text,"monthly payment "))) {
+        double principal=v[0], annual_rate=v[1], years=v[2];
+        double monthly=(fabs(annual_rate)>1.0 ? annual_rate/100.0 : annual_rate)/12.0;
+        long payments=(long)llround(years*12.0);
+        if(principal<0.0 || years<=0.0 || payments<=0) {
+            snprintf(out,out_size,"Principal must be nonnegative and loan term must be positive.");
+        } else if(fabs(monthly)<1e-15) {
+            snprintf(out,out_size,"Monthly payment = %.12g over %ld payments.",principal/payments,payments);
+        } else {
+            double factor=pow(1.0+monthly,(double)payments);
+            double payment=principal*monthly*factor/(factor-1.0);
+            snprintf(out,out_size,
+                "Monthly payment = %.12g over %ld payments; total paid = %.12g.",
+                payment,payments,payment*payments);
+        }
+        return true;
+    }
+
+    if(n>=4 && (starts_with(text,"savings annuity ") || starts_with(text,"future value deposits "))) {
+        double deposit=v[0], annual_rate=v[1], periods_year=v[2], years=v[3];
+        double rate=(fabs(annual_rate)>1.0 ? annual_rate/100.0 : annual_rate);
+        double periodic;
+        long total_periods;
+        if(deposit<0.0 || periods_year<=0.0 || years<0.0) {
+            snprintf(out,out_size,"Deposit must be nonnegative; periods/year positive; years nonnegative.");
+            return true;
+        }
+        periodic=rate/periods_year;
+        total_periods=(long)llround(periods_year*years);
+        if(total_periods<=0) {
+            snprintf(out,out_size,"Future value = 0 because there are no deposit periods.");
+        } else if(fabs(periodic)<1e-15) {
+            snprintf(out,out_size,"Future value of deposits = %.12g",deposit*total_periods);
+        } else {
+            snprintf(out,out_size,
+                "Ordinary-annuity future value = %.12g",
+                deposit*(pow(1.0+periodic,(double)total_periods)-1.0)/periodic);
+        }
+        return true;
+    }
+
+    if(n>=3 && (starts_with(text,"exponential growth ") || starts_with(text,"growth amount "))) {
+        double initial=v[0], rate=v[1], time=v[2];
+        double r=fabs(rate)>1.0 ? rate/100.0 : rate;
+        snprintf(out,out_size,
+            "Exponential growth A=A0(1+r)^t = %.12g",
+            initial*pow(1.0+r,time));
+        return true;
+    }
+
+    if(n>=3 && (starts_with(text,"exponential decay ") || starts_with(text,"decay amount "))) {
+        double initial=v[0], rate=v[1], time=v[2];
+        double r=fabs(rate)>1.0 ? rate/100.0 : rate;
+        if(r<0.0 || r>1.0) {
+            snprintf(out,out_size,"Decay rate must be between 0 and 1, or 0%% and 100%%.");
+        } else {
+            snprintf(out,out_size,
+                "Exponential decay A=A0(1-r)^t = %.12g",
+                initial*pow(1.0-r,time));
+        }
+        return true;
+    }
+
+    if(n>=3 && starts_with(text,"half life ")) {
+        double initial=v[0], half_life=v[1], elapsed=v[2];
+        if(half_life<=0.0) {
+            snprintf(out,out_size,"Half-life must be positive.");
+        } else {
+            snprintf(out,out_size,
+                "Remaining amount = A0*(1/2)^(t/T_half) = %.12g",
+                initial*pow(0.5,elapsed/half_life));
+        }
+        return true;
+    }
+
+    if(n>=1 && starts_with(text,"doubling time ")) {
+        double rate=v[0];
+        double r=fabs(rate)>1.0 ? rate/100.0 : rate;
+        if(r<=0.0) {
+            snprintf(out,out_size,"Growth rate must be positive.");
+        } else {
+            snprintf(out,out_size,
+                "Exact doubling time = ln(2)/ln(1+r) = %.12g periods.",
+                log(2.0)/log(1.0+r));
+        }
+        return true;
+    }
+
     return false;
 }
 
