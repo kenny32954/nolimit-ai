@@ -217,6 +217,16 @@ int main(void)
     qb_offline_answer("biology", "summary", "school", "summarize photosynthesis", out, sizeof(out));
     expect_contains("summary request", out, "Summary - photosynthesis");
 
+
+    qb_offline_answer("biology", "explain", "school", "explain photosynthesis and cellular respiration", out, sizeof(out));
+    expect_contains("multi fact photosynthesis", out, "photosynthesis:");
+    expect_contains("multi fact respiration", out, "cellular respiration:");
+    expect_contains("multi fact respiration ATP", out, "ATP");
+
+    qb_offline_answer("government", "explain", "school", "explain federalism and separation of powers", out, sizeof(out));
+    expect_contains("multi fact federalism", out, "federalism:");
+    expect_contains("multi fact separation powers", out, "separation of powers:");
+
     qb_offline_answer("algebra_1", "flashcards", "school", "flashcards on slope", out, sizeof(out));
     expect_contains("flashcard request", out, "FLASHCARD");
     expect_contains("flashcard topic", out, "slope");
