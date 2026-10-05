@@ -1155,6 +1155,202 @@ static bool try_misc_text_math(char const *prompt, char *out, size_t out_size)
     return false;
 }
 
+
+static bool leap_year_int(int year)
+{
+    return (year%4==0 && year%100!=0) || (year%400==0);
+}
+
+static int days_in_month_int(int year, int month)
+{
+    static int const d[]={31,28,31,30,31,30,31,31,30,31,30,31};
+    if(month<1 || month>12) return 0;
+    if(month==2 && leap_year_int(year)) return 29;
+    return d[month-1];
+}
+
+static bool valid_date_int(int y,int m,int d)
+{
+    int maxd=days_in_month_int(y,m);
+    return y>=1 && m>=1 && m<=12 && d>=1 && d<=maxd;
+}
+
+static long days_from_civil_int(int y, unsigned m, unsigned d)
+{
+    int era;
+    unsigned yoe,doy,doe;
+    y -= m <= 2;
+    era = (y >= 0 ? y : y-399) / 400;
+    yoe = (unsigned)(y - era*400);
+    doy = (153*(m + (m > 2 ? (unsigned)-3 : 9)) + 2)/5 + d-1;
+    doe = yoe*365 + yoe/4 - yoe/100 + doy;
+    return (long)era*146097L + (long)doe - 719468L;
+}
+
+static int weekday_index_int(int y,int m,int d)
+{
+    long z=days_from_civil_int(y,(unsigned)m,(unsigned)d);
+    int idx=(int)((z+4)%7);
+    if(idx<0) idx+=7;
+    return idx;
+}
+
+static bool try_date_tools(char const *prompt, char *out, size_t out_size)
+{
+    char lower[300];
+    int y,m,d,y2,m2,d2;
+    static char const *wd[]={"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"};
+
+    lowercase_into(prompt,lower,sizeof(lower));
+
+    if(sscanf(lower,"leap year %d",&y)==1 || sscanf(lower,"is %d a leap year",&y)==1) {
+        snprintf(out,out_size,"%d %s a leap year.",y,leap_year_int(y)?"is":"is not");
+        return true;
+    }
+
+    if(sscanf(lower,"day of week %d-%d-%d",&y,&m,&d)==3 ||
+       sscanf(lower,"weekday %d-%d-%d",&y,&m,&d)==3) {
+        if(!valid_date_int(y,m,d)) snprintf(out,out_size,"That is not a valid calendar date.");
+        else snprintf(out,out_size,"%04d-%02d-%02d is %s.",y,m,d,wd[weekday_index_int(y,m,d)]);
+        return true;
+    }
+
+    if(sscanf(lower,"days in february %d",&y)==1) {
+        snprintf(out,out_size,"February %d has %d days.",y,leap_year_int(y)?29:28);
+        return true;
+    }
+
+    if(sscanf(lower,"days between %d-%d-%d and %d-%d-%d",&y,&m,&d,&y2,&m2,&d2)==6) {
+        long a,b,diff;
+        if(!valid_date_int(y,m,d) || !valid_date_int(y2,m2,d2)) {
+            snprintf(out,out_size,"One of those dates is invalid.");
+            return true;
+        }
+        a=days_from_civil_int(y,(unsigned)m,(unsigned)d);
+        b=days_from_civil_int(y2,(unsigned)m2,(unsigned)d2);
+        diff=b-a;
+        if(diff<0) diff=-diff;
+        snprintf(out,out_size,"Days between the dates = %ld.",diff);
+        return true;
+    }
+
+    return false;
+}
+
+typedef struct {
+    char ch;
+    char const *code;
+    char const *nato;
+} letter_code_t;
+
+static letter_code_t const letter_codes[] = {
+    {'A',".-","Alpha"},{'B',"-...","Bravo"},{'C',"-.-.","Charlie"},{'D',"-..","Delta"},
+    {'E',".","Echo"},{'F',"..-.","Foxtrot"},{'G',"--.","Golf"},{'H',"....","Hotel"},
+    {'I',"..","India"},{'J',".---","Juliett"},{'K',"-.-","Kilo"},{'L',".-..","Lima"},
+    {'M',"--","Mike"},{'N',"-.","November"},{'O',"---","Oscar"},{'P',".--.","Papa"},
+    {'Q',"--.-","Quebec"},{'R',".-.","Romeo"},{'S',"...","Sierra"},{'T',"-","Tango"},
+    {'U',"..-","Uniform"},{'V',"...-","Victor"},{'W',".--","Whiskey"},{'X',"-..-","X-ray"},
+    {'Y',"-.--","Yankee"},{'Z',"--..","Zulu"},
+    {'0',"-----","Zero"},{'1',".----","One"},{'2',"..---","Two"},{'3',"...--","Three"},
+    {'4',"....-","Four"},{'5',".....","Five"},{'6',"-....","Six"},{'7',"--...","Seven"},
+    {'8',"---..","Eight"},{'9',"----.","Nine"}
+};
+
+static letter_code_t const *code_for_char(char c)
+{
+    unsigned int i;
+    c=(char)toupper((unsigned char)c);
+    for(i=0;i<sizeof(letter_codes)/sizeof(letter_codes[0]);i++)
+        if(letter_codes[i].ch==c) return &letter_codes[i];
+    return NULL;
+}
+
+static char char_for_morse(char const *code)
+{
+    unsigned int i;
+    for(i=0;i<sizeof(letter_codes)/sizeof(letter_codes[0]);i++)
+        if(strcmp(letter_codes[i].code,code)==0) return letter_codes[i].ch;
+    return '?';
+}
+
+static bool try_encoding_tools(char const *prompt, char *out, size_t out_size)
+{
+    char lower[500];
+
+    lowercase_into(prompt,lower,sizeof(lower));
+
+    if(starts_with(lower,"morse ")) {
+        char const *p=prompt+6;
+        bool first=true;
+        out[0]='\0';
+        while(*p) {
+            size_t used=strlen(out);
+            if(*p==' ') {
+                snprintf(out+used,out_size-used," / ");
+                first=true;
+                p++;
+                continue;
+            }
+            {
+                letter_code_t const *e=code_for_char(*p++);
+                if(e) {
+                    used=strlen(out);
+                    snprintf(out+used,out_size-used,"%s%s",first?"":" ",e->code);
+                    first=false;
+                }
+            }
+            if(strlen(out)+8>=out_size) break;
+        }
+        if(out[0]) return true;
+    }
+
+    if(starts_with(lower,"decode morse ")) {
+        char work[500];
+        char *tok;
+        snprintf(work,sizeof(work),"%.499s",prompt+13);
+        out[0]='\0';
+        tok=strtok(work," ");
+        while(tok) {
+            size_t used=strlen(out);
+            if(strcmp(tok,"/")==0) snprintf(out+used,out_size-used," ");
+            else {
+                char c=char_for_morse(tok);
+                snprintf(out+used,out_size-used,"%c",c);
+            }
+            tok=strtok(NULL," ");
+            if(strlen(out)+2>=out_size) break;
+        }
+        return true;
+    }
+
+    if(starts_with(lower,"nato ")) {
+        char const *p=prompt+5;
+        bool first=true;
+        out[0]='\0';
+        while(*p) {
+            if(*p==' ') {
+                size_t used=strlen(out);
+                snprintf(out+used,out_size-used," / ");
+                first=true;
+                p++;
+                continue;
+            }
+            {
+                letter_code_t const *e=code_for_char(*p++);
+                if(e) {
+                    size_t used=strlen(out);
+                    snprintf(out+used,out_size-used,"%s%s",first?"":" ",e->nato);
+                    first=false;
+                }
+            }
+            if(strlen(out)+16>=out_size) break;
+        }
+        if(out[0]) return true;
+    }
+
+    return false;
+}
+
 static bool write_input_shape_response(char const *subject, char const *prompt,
                                        char *out, size_t out_size)
 {
@@ -4645,6 +4841,14 @@ static bool qb_offline_answer_core(
     }
 
     if(try_misc_text_math(prompt, out, out_size)) {
+        return true;
+    }
+
+    if(try_date_tools(prompt, out, out_size)) {
+        return true;
+    }
+
+    if(try_encoding_tools(prompt, out, out_size)) {
         return true;
     }
 
