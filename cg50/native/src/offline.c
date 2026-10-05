@@ -3358,36 +3358,75 @@ static bool atomic_mass_lookup(char const *symbol, double *mass)
     return false;
 }
 
-static bool simple_formula_mass(char const *formula, double *mass_out)
+static bool parse_formula_group(char const **pp, double *mass_out, int depth)
 {
-    char const *p=formula;
+    char const *p=*pp;
     double total=0.0;
     bool any=false;
 
-    while(*p) {
-        char symbol[3]={0,0,0};
-        char *end;
+    if(depth>6) return false;
+
+    while(*p && *p!=')') {
         long count=1;
-        double mass;
+        char *end;
 
-        if(!isupper((unsigned char)*p)) return false;
-        symbol[0]=*p++;
-        if(islower((unsigned char)*p)) symbol[1]=*p++;
+        if(*p=='(') {
+            double group_mass;
+            p++;
+            if(!parse_formula_group(&p,&group_mass,depth+1)) return false;
+            if(*p!=')') return false;
+            p++;
 
-        if(!atomic_mass_lookup(symbol,&mass)) return false;
+            if(isdigit((unsigned char)*p)) {
+                count=strtol(p,&end,10);
+                if(end==p || count<=0) return false;
+                p=end;
+            }
 
-        if(isdigit((unsigned char)*p)) {
-            count=strtol(p,&end,10);
-            if(end==p || count<=0) return false;
-            p=end;
+            total += group_mass*(double)count;
+            any=true;
+            continue;
         }
 
-        total += mass*(double)count;
-        any=true;
+        if(isupper((unsigned char)*p)) {
+            char symbol[3]={0,0,0};
+            double atomic_mass;
+
+            symbol[0]=*p++;
+            if(islower((unsigned char)*p)) symbol[1]=*p++;
+
+            if(!atomic_mass_lookup(symbol,&atomic_mass)) return false;
+
+            if(isdigit((unsigned char)*p)) {
+                count=strtol(p,&end,10);
+                if(end==p || count<=0) return false;
+                p=end;
+            }
+
+            total += atomic_mass*(double)count;
+            any=true;
+            continue;
+        }
+
+        return false;
     }
 
     if(!any) return false;
+    *pp=p;
     *mass_out=total;
+    return true;
+}
+
+static bool simple_formula_mass(char const *formula, double *mass_out)
+{
+    char const *p=formula;
+    double mass;
+
+    if(!formula || !*formula) return false;
+    if(!parse_formula_group(&p,&mass,0)) return false;
+    if(*p!='\0') return false;
+
+    *mass_out=mass;
     return true;
 }
 
@@ -3421,7 +3460,7 @@ static bool try_chemistry_formula_tools(char const *prompt, char *out, size_t ou
             snprintf(out,out_size,"Molar mass of %s = %.6g g/mol.",formula,mass);
         } else {
             snprintf(out,out_size,
-                "I couldn't parse that simple formula. This standalone molar-mass tool supports common element symbols and numeric subscripts without parentheses.");
+                "I couldn't parse that formula. This standalone molar-mass tool supports common element symbols, numeric subscripts, and parenthesis groups.");
         }
         return true;
     }
