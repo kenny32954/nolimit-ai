@@ -3792,6 +3792,10 @@ static char memory_answer[700];
 static char memory_subject[64];
 static bool memory_valid = false;
 
+/* Small RAM-only conversational memory; never persisted to storage. */
+static char session_name[48];
+static char session_note[180];
+
 static void first_sentence(char const *text, char *out, size_t out_size)
 {
     size_t i = 0;
@@ -3976,6 +3980,81 @@ static bool write_conversation(char const *subject, char const *prompt,
     char subject_name[64];
 
     friendly_subject(subject, subject_name, sizeof(subject_name));
+
+    if(starts_with(lowerbuf, "my name is ") || starts_with(lowerbuf, "call me ")) {
+        char name[64];
+        char const *p = starts_with(lowerbuf, "my name is ") ? prompt + 11 : prompt + 8;
+        snprintf(name, sizeof(name), "%.63s", p);
+        trim_text(name);
+        if(name[0]) {
+            snprintf(session_name, sizeof(session_name), "%.47s", name);
+            snprintf(out, out_size,
+                "Got it. I'll remember your name as %s for this calculator session.",
+                session_name);
+            return true;
+        }
+    }
+
+    if(strstr(lowerbuf, "what is my name") || strstr(lowerbuf, "what's my name") ||
+       strstr(lowerbuf, "whats my name") || exact_or_punct(lowerbuf, "who am i")) {
+        if(session_name[0]) snprintf(out, out_size, "You told me your name is %s.", session_name);
+        else snprintf(out, out_size, "You haven't told me your name in this calculator session yet.");
+        return true;
+    }
+
+    if(starts_with(lowerbuf, "remember that ") || starts_with(lowerbuf, "remember ")) {
+        char note[220];
+        char const *p = starts_with(lowerbuf, "remember that ") ? prompt + 14 : prompt + 9;
+        snprintf(note, sizeof(note), "%.219s", p);
+        trim_text(note);
+        if(note[0]) {
+            snprintf(session_note, sizeof(session_note), "%.179s", note);
+            snprintf(out, out_size,
+                "Remembered for this calculator session: %s", session_note);
+            return true;
+        }
+    }
+
+    if(strstr(lowerbuf, "what do you remember") ||
+       strstr(lowerbuf, "what did i tell you") ||
+       strstr(lowerbuf, "what have i told you")) {
+        if(session_name[0] && session_note[0]) {
+            snprintf(out, out_size,
+                "This session: your name is %s, and you asked me to remember: %s",
+                session_name, session_note);
+        }
+        else if(session_name[0]) {
+            snprintf(out, out_size, "This session, you told me your name is %s.", session_name);
+        }
+        else if(session_note[0]) {
+            snprintf(out, out_size, "This session, you asked me to remember: %s", session_note);
+        }
+        else {
+            snprintf(out, out_size, "I don't have any user-supplied session memory yet.");
+        }
+        return true;
+    }
+
+    if(exact_or_punct(lowerbuf, "forget my name")) {
+        session_name[0] = '\0';
+        snprintf(out, out_size, "Cleared your name from this calculator session.");
+        return true;
+    }
+
+    if(exact_or_punct(lowerbuf, "forget that") ||
+       exact_or_punct(lowerbuf, "forget what i said")) {
+        session_note[0] = '\0';
+        snprintf(out, out_size, "Cleared the remembered note from this calculator session.");
+        return true;
+    }
+
+    if(exact_or_punct(lowerbuf, "forget everything") ||
+       exact_or_punct(lowerbuf, "clear memory")) {
+        session_name[0] = '\0';
+        session_note[0] = '\0';
+        snprintf(out, out_size, "Cleared the user-supplied RAM memory for this calculator session.");
+        return true;
+    }
 
     if(word_prefix(lowerbuf, "hi") || word_prefix(lowerbuf, "hello") ||
        word_prefix(lowerbuf, "hey") || word_prefix(lowerbuf, "yo") ||
