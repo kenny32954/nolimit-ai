@@ -3873,6 +3873,75 @@ static bool try_triangle_trig(char const *text, char *out, size_t out_size)
     return false;
 }
 
+
+static bool try_geography_tools(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+    const double pi=3.14159265358979323846;
+
+    if(n>=4 && (starts_with(text,"great circle ") ||
+       starts_with(text,"great circle distance ") ||
+       starts_with(text,"latlon distance "))) {
+        double lat1=v[0]*pi/180.0;
+        double lon1=v[1]*pi/180.0;
+        double lat2=v[2]*pi/180.0;
+        double lon2=v[3]*pi/180.0;
+        double dlat=lat2-lat1;
+        double dlon=lon2-lon1;
+        double a=sin(dlat/2.0)*sin(dlat/2.0)+
+                 cos(lat1)*cos(lat2)*sin(dlon/2.0)*sin(dlon/2.0);
+        double c=2.0*atan2(sqrt(a),sqrt(fmax(0.0,1.0-a)));
+        double km=6371.0088*c;
+        snprintf(out,out_size,"Great-circle distance = %.12g km (%.12g miles)",km,km*0.621371192237334);
+        return true;
+    }
+
+    if(n>=4 && starts_with(text,"bearing ")) {
+        double lat1=v[0]*pi/180.0;
+        double lon1=v[1]*pi/180.0;
+        double lat2=v[2]*pi/180.0;
+        double lon2=v[3]*pi/180.0;
+        double y=sin(lon2-lon1)*cos(lat2);
+        double x=cos(lat1)*sin(lat2)-sin(lat1)*cos(lat2)*cos(lon2-lon1);
+        double deg=atan2(y,x)*180.0/pi;
+        while(deg<0.0) deg+=360.0;
+        while(deg>=360.0) deg-=360.0;
+        snprintf(out,out_size,"Initial bearing = %.12g degrees from true north",deg);
+        return true;
+    }
+
+    if(n>=2 && starts_with(text,"population density ")) {
+        if(v[1]<=0.0) snprintf(out,out_size,"Area must be positive.");
+        else snprintf(out,out_size,"Population density = population/area = %.12g per square unit",v[0]/v[1]);
+        return true;
+    }
+
+    if(n>=2 && starts_with(text,"map scale ")) {
+        double map_cm=v[0];
+        double denominator=v[1];
+        if(denominator<=0.0) {
+            snprintf(out,out_size,"Scale denominator must be positive.");
+        } else {
+            double real_cm=map_cm*denominator;
+            double km=real_cm/100000.0;
+            snprintf(out,out_size,
+                "%.12g cm at 1:%.12g represents %.12g km in reality.",
+                map_cm,denominator,km);
+        }
+        return true;
+    }
+
+    if(n>=1 && starts_with(text,"latitude distance ")) {
+        snprintf(out,out_size,
+            "%.12g degrees of latitude is approximately %.12g km.",
+            v[0],fabs(v[0])*111.195);
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_extra_science(char const *text, char *out, size_t out_size)
 {
     double v[8];
@@ -7110,6 +7179,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_geometry_extra(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_geography_tools(lowerbuf, out, out_size)) {
         return true;
     }
 
