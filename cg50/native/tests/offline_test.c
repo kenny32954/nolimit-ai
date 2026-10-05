@@ -445,6 +445,23 @@ int main(void)
     qb_offline_answer("calculus", "derive", "college", "integrate 6x+4", out, sizeof(out));
     expect_contains("polynomial integral", out, "3x^2 + 4x + C");
 
+
+    qb_offline_answer("chemistry", "explain", "school", "Fe", out, sizeof(out));
+    expect_contains("element symbol lookup", out, "iron");
+    expect_contains("element atomic number", out, "26");
+
+    qb_offline_answer("chemistry", "explain", "school", "atomic number 8", out, sizeof(out));
+    expect_contains("atomic number lookup", out, "oxygen");
+    expect_contains("atomic number symbol", out, "(O)");
+
+    qb_offline_answer("chemistry", "explain", "school", "symbol for sodium", out, sizeof(out));
+    expect_contains("element symbol by name", out, "Na");
+
+    qb_offline_answer("biology", "explain", "school", "thermobiology", out, sizeof(out));
+    expect_contains("word root thermo", out, "thermo = heat");
+    expect_contains("word root bio", out, "bio = life");
+    expect_contains("word root caution", out, "not a guaranteed definition");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
