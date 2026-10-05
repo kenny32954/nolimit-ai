@@ -233,7 +233,51 @@ static fact_t const facts[] = {
     {"calorie", "A food Calorie is a kilocalorie, a unit of energy. Nutrition quality depends on more than calorie count alone."},
     {"aerobic exercise", "Aerobic activity relies mainly on oxygen-supported energy pathways during sustained activity. Examples include walking, cycling, and swimming at appropriate intensity."},
     {"anaerobic exercise", "Anaerobic activity relies more heavily on short-duration energy systems for brief higher-intensity efforts. Training should be age-appropriate and safely supervised."},
-    {"sleep", "Sleep supports learning, memory, mood, physical recovery, and health. Regular schedules and adequate duration are important, especially during adolescence."}
+    {"sleep", "Sleep supports learning, memory, mood, physical recovery, and health. Regular schedules and adequate duration are important, especially during adolescence."},
+
+    {"osmosis", "Osmosis is the net movement of water across a selectively permeable membrane toward the side with lower free-water concentration, often described as toward higher solute concentration."},
+    {"diffusion", "Diffusion is net movement of particles from regions of higher concentration toward lower concentration because of random molecular motion."},
+    {"chromosome", "A chromosome is a DNA-protein structure carrying genetic information. Human body cells normally contain homologous chromosome pairs, while gametes contain one set."},
+    {"gene expression", "Gene expression is the process by which information in DNA is used to produce functional RNA or protein, regulated at multiple stages."},
+    {"ecological succession", "Ecological succession is change in community composition over time. Primary succession begins without established soil; secondary succession follows disturbance where soil remains."},
+    {"trophic level", "A trophic level describes an organism's feeding position in an energy-transfer system, such as producer, primary consumer, or higher-level consumer."},
+
+    {"isotope", "Isotopes are atoms of the same element with the same proton count but different neutron counts, giving different mass numbers."},
+    {"valence electron", "Valence electrons occupy an atom's outer occupied energy levels and strongly influence bonding and chemical reactivity."},
+    {"molar mass", "Molar mass is the mass of one mole of a substance, usually expressed in grams per mole. It connects particle-scale formulas to measurable mass."},
+    {"endothermic", "An endothermic process absorbs energy from the surroundings; in thermochemical equations its enthalpy change is positive under the usual sign convention."},
+    {"exothermic", "An exothermic process releases energy to the surroundings; its enthalpy change is negative under the usual sign convention."},
+
+    {"projectile motion", "Projectile motion can be analyzed by treating horizontal and vertical motion separately when air resistance is neglected: horizontal velocity is constant while vertical acceleration is approximately -9.8 m/s^2 near Earth."},
+    {"centripetal force", "Centripetal force is the net inward force required for circular motion. Its magnitude is F=mv^2/r; it is not a separate new type of force."},
+    {"gravitational potential energy", "Near Earth's surface, gravitational potential energy can be approximated as U=mgh relative to a chosen zero height."},
+
+    {"absolute value", "Absolute value gives distance from zero on the number line. |x|=a with a>0 has solutions x=a and x=-a; |x| cannot be negative."},
+    {"exponential function", "An exponential function has the variable in the exponent, commonly y=a*b^x. Growth has b>1; decay has 0<b<1."},
+    {"rational function", "A rational function is a ratio of polynomials. Domain restrictions occur where the denominator equals zero, and those values can create holes or vertical asymptotes."},
+    {"asymptote", "An asymptote is a line or curve that a graph approaches according to a limiting relationship. Common types include vertical, horizontal, and oblique asymptotes."},
+    {"inverse function", "An inverse function reverses a one-to-one function: f^-1(f(x))=x on the appropriate domain. Graphs of inverse functions reflect across y=x."},
+
+    {"judicial review", "Judicial review is the power of courts to evaluate whether laws or government actions conflict with a constitution. In the U.S. federal system it became firmly established through Supreme Court practice."},
+    {"checks and balances", "Checks and balances are constitutional mechanisms that let branches of government limit or influence one another so power is not concentrated in a single branch."},
+    {"rule of law", "Rule of law means public power is exercised through established laws that apply to officials and citizens, with procedures for interpretation and enforcement."},
+
+    {"industrial revolution", "The Industrial Revolution was a long transformation toward mechanized production, factories, new energy sources, urbanization, and major economic and social change beginning in the late eighteenth century."},
+    {"enlightenment", "The Enlightenment emphasized reason, inquiry, natural rights, and debate about government and society, influencing political thought and reform movements."},
+    {"cold war", "The Cold War was a prolonged geopolitical rivalry centered on the United States and Soviet Union after World War II, involving alliances, nuclear competition, proxy conflicts, ideology, and diplomacy."},
+    {"great depression", "The Great Depression was a severe worldwide economic downturn beginning in 1929, marked by major declines in output, banking failures, unemployment, and social hardship."},
+
+    {"scarcity", "Scarcity means resources are limited relative to wants, so individuals and societies must make choices and face opportunity costs."},
+    {"comparative advantage", "Comparative advantage exists when a producer has a lower opportunity cost for producing a good or service. It explains potential gains from specialization and trade."},
+    {"gross domestic product", "Gross domestic product measures the market value of final goods and services produced within a country's borders during a specified period."},
+
+    {"rhetorical situation", "A rhetorical situation includes the communicator, audience, purpose, message, context, and constraints shaping a piece of communication."},
+    {"counterclaim", "A counterclaim is a competing or opposing claim. Strong argument writing represents it fairly and then responds with reasoning and evidence."},
+    {"context clue", "A context clue is information around an unfamiliar word or idea that helps infer meaning, such as definitions, examples, contrasts, or cause-effect relationships."},
+
+    {"operating system", "An operating system manages hardware resources and provides services such as process scheduling, memory management, files, device access, security, and user interfaces."},
+    {"compiler", "A compiler translates source code into another representation, often machine code or intermediate code, while checking syntax and performing transformations or optimizations."},
+    {"boolean", "A Boolean value represents one of two logical states, commonly true or false, and is fundamental to conditions, comparisons, and digital logic."}
 };
 
 typedef struct {
