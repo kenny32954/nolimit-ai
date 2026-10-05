@@ -1,0 +1,70 @@
+name: CG50 checks
+
+on:
+  push:
+    branches: [cg50-integration]
+    paths:
+      - "bridge/**"
+      - "cg50/**"
+      - ".github/workflows/cg50-checks.yml"
+  pull_request:
+    paths:
+      - "bridge/**"
+      - "cg50/**"
+      - ".github/workflows/cg50-checks.yml"
+
+jobs:
+  bridge-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install bridge dependencies
+        run: python -m pip install -r bridge/requirements.txt
+
+      - name: Check Python syntax
+        run: python -m py_compile bridge/*.py cg50/native/tools/make_icon.py
+
+      - name: Run bridge protocol tests
+        env:
+          PYTHONPATH: bridge
+        run: python -m unittest discover -s bridge/tests -v
+
+      - name: Smoke-test icon generation
+        run: |
+          python cg50/native/tools/make_icon.py /tmp/qb-uns.png
+          python cg50/native/tools/make_icon.py /tmp/qb-sel.png --selected
+          test -s /tmp/qb-uns.png
+          test -s /tmp/qb-sel.png
+
+      - name: Run standalone offline core tests
+        run: |
+          gcc -std=c11 -Wall -Wextra -Werror             cg50/native/tests/offline_test.c             cg50/native/src/offline.c             -Icg50/native/src -lm             -o /tmp/qb_offline_test
+          /tmp/qb_offline_test
+
+      - name: Run standalone type-anything fuzz corpus
+        run: |
+          gcc -std=c11 -Wall -Wextra -Werror \
+            cg50/native/tests/offline_fuzz_test.c \
+            cg50/native/src/offline.c \
+            -Icg50/native/src -lm \
+            -o /tmp/qb_offline_fuzz_test
+          /tmp/qb_offline_fuzz_test
+
+      - name: Check native C syntax
+        run: |
+          gcc -std=c11 -Wall -Wextra -Werror -fsyntax-only \
+            -Icg50/native/tests/include \
+            -Icg50/native/src \
+            cg50/native/src/main.c \
+            cg50/native/src/diagnostics.c \
+            cg50/native/src/editor.c \
+            cg50/native/src/picker.c \
+            cg50/native/src/reference.c \
+            cg50/native/src/offline.c \
+            cg50/native/src/base64.c \
+            cg50/native/src/transport.c

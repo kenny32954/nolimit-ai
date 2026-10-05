@@ -1,0 +1,40 @@
+name: Package QBAI Live Bridge
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [cg50-integration]
+    paths:
+      - "bridge/**"
+      - ".github/workflows/package-live-bridge.yml"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: cg50-integration
+
+      - name: Package bridge
+        run: |
+          set -e
+          mkdir -p /tmp/QBAI-LIVE/bridge
+          cp bridge/qb_bridge.py /tmp/QBAI-LIVE/bridge/
+          cp bridge/qb_launch.py /tmp/QBAI-LIVE/bridge/
+          cp bridge/subject_router.py /tmp/QBAI-LIVE/bridge/
+          cp bridge/requirements.txt /tmp/QBAI-LIVE/bridge/
+          cp bridge/INSTALL_WINDOWS.bat /tmp/QBAI-LIVE/bridge/
+          cp bridge/START_QBAI_WINDOWS.bat /tmp/QBAI-LIVE/bridge/
+          cp bridge/start_qbai.sh /tmp/QBAI-LIVE/bridge/
+          cp bridge/LIVE_TEST_README.txt /tmp/QBAI-LIVE/
+          cd /tmp
+          zip -9 -r QBAI-LIVE-BRIDGE.zip QBAI-LIVE
+
+      - name: Upload bridge package
+        uses: actions/upload-artifact@v4
+        with:
+          name: QBAI-LIVE-BRIDGE
+          path: /tmp/QBAI-LIVE-BRIDGE.zip
+          if-no-files-found: error
