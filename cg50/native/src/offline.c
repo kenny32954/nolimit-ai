@@ -3909,6 +3909,50 @@ static bool try_extra_science(char const *text, char *out, size_t out_size)
         return true;
     }
 
+    if(n>=1 && (starts_with(text,"series resistance ") || starts_with(text,"resistors series "))) {
+        double total=0.0;
+        int i;
+        for(i=0;i<n;i++) total+=v[i];
+        snprintf(out,out_size,"Series equivalent resistance = %.12g ohms",total);
+        return true;
+    }
+
+    if(n>=2 && (starts_with(text,"parallel resistance ") || starts_with(text,"resistors parallel "))) {
+        double inv=0.0;
+        int i;
+        for(i=0;i<n;i++) {
+            if(v[i]<=0.0) {
+                snprintf(out,out_size,"Parallel-resistance values must be positive.");
+                return true;
+            }
+            inv+=1.0/v[i];
+        }
+        snprintf(out,out_size,"Parallel equivalent resistance = %.12g ohms",1.0/inv);
+        return true;
+    }
+
+    if(n>=3 && starts_with(text,"coulomb force ")) {
+        const double k=8.9875517923e9;
+        double q1=v[0],q2=v[1],r=v[2];
+        if(r<=0.0) snprintf(out,out_size,"Charge separation r must be positive.");
+        else snprintf(out,out_size,"Coulomb-force magnitude k*|q1*q2|/r^2 = %.12g N",k*fabs(q1*q2)/(r*r));
+        return true;
+    }
+
+    if(n>=3 && starts_with(text,"gravitational force ")) {
+        const double G=6.67430e-11;
+        double m1=v[0],m2=v[1],r=v[2];
+        if(r<=0.0) snprintf(out,out_size,"Separation r must be positive.");
+        else snprintf(out,out_size,"Gravitational-force magnitude G*m1*m2/r^2 = %.12g N",G*fabs(m1*m2)/(r*r));
+        return true;
+    }
+
+    if(n>=1 && starts_with(text,"photon energy frequency ")) {
+        const double h=6.62607015e-34;
+        snprintf(out,out_size,"Photon energy E=h*f = %.12g J",h*v[0]);
+        return true;
+    }
+
     return false;
 }
 
