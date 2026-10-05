@@ -4272,6 +4272,55 @@ static bool try_science_formula(char const *text, char *out, size_t out_size)
         return true;
     }
 
+    if(n>=2 && (strstr(text,"gravitational potential energy") || strstr(text,"potential energy")) &&
+       strstr(text,"mass") && strstr(text,"height")) {
+        snprintf(out,out_size,"U=mgh with g=9.8 m/s^2 -> %.12g J",v[0]*9.8*v[1]);
+        return true;
+    }
+
+    if(n>=3 && strstr(text,"centripetal force")) {
+        if(v[2]==0.0) snprintf(out,out_size,"Radius cannot be zero.");
+        else snprintf(out,out_size,"Fc=m*v^2/r = %.12g N",v[0]*v[1]*v[1]/v[2]);
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"pressure") && strstr(text,"force") && strstr(text,"area")) {
+        if(v[1]==0.0) snprintf(out,out_size,"Area cannot be zero.");
+        else snprintf(out,out_size,"Pressure P=F/A = %.12g Pa",v[0]/v[1]);
+        return true;
+    }
+
+    if(n>=1 && strstr(text,"frequency") && strstr(text,"period") && !strstr(text,"wavelength")) {
+        if(v[0]==0.0) snprintf(out,out_size,"Period cannot be zero.");
+        else snprintf(out,out_size,"Frequency f=1/T = %.12g Hz",1.0/v[0]);
+        return true;
+    }
+
+    if(n>=1 && strstr(text,"period") && strstr(text,"frequency") && starts_with(text,"period")) {
+        if(v[0]==0.0) snprintf(out,out_size,"Frequency cannot be zero.");
+        else snprintf(out,out_size,"Period T=1/f = %.12g s",1.0/v[0]);
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"wavelength") && strstr(text,"wave speed") && strstr(text,"frequency")) {
+        if(v[1]==0.0) snprintf(out,out_size,"Frequency cannot be zero.");
+        else snprintf(out,out_size,"Wavelength lambda=v/f = %.12g",v[0]/v[1]);
+        return true;
+    }
+
+    if(n>=1 && (strstr(text,"ph from h") || strstr(text,"ph from hydrogen") ||
+       strstr(text,"ph hydrogen concentration"))) {
+        if(v[0]<=0.0) snprintf(out,out_size,"Hydrogen-ion concentration must be positive.");
+        else snprintf(out,out_size,"pH=-log10([H+]) = %.12g",-log10(v[0]));
+        return true;
+    }
+
+    if(n>=3 && strstr(text,"dilution") && (strstr(text,"m1v1") || strstr(text,"m2"))) {
+        if(v[2]==0.0) snprintf(out,out_size,"Target concentration M2 cannot be zero.");
+        else snprintf(out,out_size,"Using M1V1=M2V2: V2 = %.12g",v[0]*v[1]/v[2]);
+        return true;
+    }
+
     return false;
 }
 
@@ -6108,6 +6157,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_unit_conversion(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_date_tools(lowerbuf, out, out_size)) {
         return true;
     }
 
