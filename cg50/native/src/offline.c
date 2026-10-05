@@ -2042,7 +2042,7 @@ static bool try_fraction_percent_tools(char const *text, char *out, size_t out_s
 
     if((starts_with(text,"simplify fraction ") || starts_with(text,"reduce fraction ") ||
         starts_with(text,"fraction ")) &&
-       sscanf(strchr(text,' ') ? strchr(text,' ')+1 : text,"%ld/%ld",&a,&b)==2) {
+       sscanf(text,"%*[^-0-9]%ld/%ld",&a,&b)==2) {
         long g;
         if(b==0) {
             snprintf(out,out_size,"A fraction with denominator 0 is undefined.");
