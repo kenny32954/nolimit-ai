@@ -462,6 +462,55 @@ int main(void)
     expect_contains("word root bio", out, "bio = life");
     expect_contains("word root caution", out, "not a guaranteed definition");
 
+
+    qb_offline_answer("auto", "answer", "school", "5 kg to lb", out, sizeof(out));
+    expect_contains("kg to lb", out, "11.023");
+
+    qb_offline_answer("auto", "answer", "school", "10 miles to kilometers", out, sizeof(out));
+    expect_contains("mi to km", out, "16.09344");
+
+    qb_offline_answer("auto", "answer", "school", "next in sequence 2 5 8 11", out, sizeof(out));
+    expect_contains("arithmetic sequence", out, "14");
+
+    qb_offline_answer("auto", "answer", "school", "sequence 3 6 12 24", out, sizeof(out));
+    expect_contains("geometric sequence", out, "48");
+
+    qb_offline_answer("auto", "answer", "school", "sequence 1 1 2 3 5", out, sizeof(out));
+    expect_contains("fibonacci sequence", out, "8");
+
+    qb_offline_answer("consumer_math", "answer", "school", "20 percent discount on 50", out, sizeof(out));
+    expect_contains("discount tool", out, "40");
+
+    qb_offline_answer("consumer_math", "answer", "school", "7 percent sales tax on 100", out, sizeof(out));
+    expect_contains("tax tool", out, "107");
+
+    qb_offline_answer("consumer_math", "answer", "school", "18 percent tip on 25", out, sizeof(out));
+    expect_contains("tip tool", out, "29.5");
+
+    qb_offline_answer("auto", "answer", "school", "uppercase hello world", out, sizeof(out));
+    expect_contains("uppercase tool", out, "HELLO WORLD");
+
+    qb_offline_answer("auto", "answer", "school", "title case the quick brown fox", out, sizeof(out));
+    expect_contains("title case tool", out, "The Quick Brown Fox");
+
+    qb_offline_answer("auto", "answer", "school", "count vowels in education", out, sizeof(out));
+    expect_contains("vowel count tool", out, "5");
+
+    qb_offline_answer("auto", "answer", "school", "initials of central processing unit", out, sizeof(out));
+    expect_contains("initials tool", out, "CPU");
+
+    qb_offline_answer("auto", "answer", "school", "alphabetize pear apple banana", out, sizeof(out));
+    expect_contains("alphabetize tool", out, "apple, banana, pear");
+
+    qb_offline_answer("biology", "explain", "school", "what is mitosis", out, sizeof(out));
+    expect_contains("and followup base", out, "daughter cells");
+
+    qb_offline_answer("biology", "explain", "school", "and meiosis?", out, sizeof(out));
+    expect_contains("and followup new topic", out, "haploid");
+
+    qb_offline_answer("biology", "explain", "school", "same for photosynthesis", out, sizeof(out));
+    expect_contains("same for followup", out, "chemical energy");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
