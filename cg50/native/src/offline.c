@@ -2737,6 +2737,196 @@ static bool try_genetics_cross(char const *prompt, char *out, size_t out_size)
     return true;
 }
 
+
+static bool split_numeric_sides(char const *text,
+                                double *left, int *nl,
+                                double *right, int *nr, int cap)
+{
+    char work[500];
+    char *sep;
+
+    snprintf(work,sizeof(work),"%.499s",text);
+    sep=strchr(work,';');
+    if(!sep) return false;
+    *sep='\0';
+
+    *nl=extract_flexible_numbers(work,left,cap);
+    *nr=extract_flexible_numbers(sep+1,right,cap);
+    return *nl>0 && *nr>0;
+}
+
+static bool try_linear_algebra_tools(char const *text, char *out, size_t out_size)
+{
+    double v[16];
+    double a[8],b[8];
+    int n=extract_flexible_numbers(text,v,16);
+    int na=0,nb=0;
+
+    if((starts_with(text,"det ") || starts_with(text,"determinant ")) && n>=4) {
+        double det=v[0]*v[3]-v[1]*v[2];
+        snprintf(out,out_size,
+            "det([[%.12g,%.12g],[%.12g,%.12g]]) = %.12g",
+            v[0],v[1],v[2],v[3],det);
+        return true;
+    }
+
+    if((starts_with(text,"inverse ") || starts_with(text,"matrix inverse ")) && n>=4) {
+        double det=v[0]*v[3]-v[1]*v[2];
+        if(fabs(det)<1e-12) {
+            snprintf(out,out_size,"That 2x2 matrix is singular because its determinant is 0.");
+        } else {
+            snprintf(out,out_size,
+                "2x2 inverse = [[%.12g, %.12g], [%.12g, %.12g]]",
+                v[3]/det,-v[1]/det,-v[2]/det,v[0]/det);
+        }
+        return true;
+    }
+
+    if((starts_with(text,"vector magnitude ") || starts_with(text,"magnitude ")) && n>=2) {
+        double ss=0.0;
+        int i;
+        for(i=0;i<n;i++) ss+=v[i]*v[i];
+        snprintf(out,out_size,"Vector magnitude = sqrt(sum(component^2)) = %.12g",sqrt(ss));
+        return true;
+    }
+
+    if(starts_with(text,"dot ") && split_numeric_sides(text,a,&na,b,&nb,8)) {
+        double dot=0.0;
+        int i;
+        if(na!=nb) {
+            snprintf(out,out_size,"Dot product needs vectors with the same number of components.");
+            return true;
+        }
+        for(i=0;i<na;i++) dot+=a[i]*b[i];
+        snprintf(out,out_size,"Dot product = %.12g",dot);
+        return true;
+    }
+
+    if(starts_with(text,"cross ") && split_numeric_sides(text,a,&na,b,&nb,8)) {
+        if(na!=3 || nb!=3) {
+            snprintf(out,out_size,"Cross product here expects two 3D vectors.");
+            return true;
+        }
+        snprintf(out,out_size,
+            "Cross product = <%.12g, %.12g, %.12g>",
+            a[1]*b[2]-a[2]*b[1],
+            a[2]*b[0]-a[0]*b[2],
+            a[0]*b[1]-a[1]*b[0]);
+        return true;
+    }
+
+    if((starts_with(text,"matmul ") || starts_with(text,"matrix multiply ")) &&
+       split_numeric_sides(text,a,&na,b,&nb,8)) {
+        if(na!=4 || nb!=4) {
+            snprintf(out,out_size,"2x2 matrix multiplication expects four entries on each side of ';'.");
+            return true;
+        }
+        snprintf(out,out_size,
+            "Product = [[%.12g, %.12g], [%.12g, %.12g]]",
+            a[0]*b[0]+a[1]*b[2],
+            a[0]*b[1]+a[1]*b[3],
+            a[2]*b[0]+a[3]*b[2],
+            a[2]*b[1]+a[3]*b[3]);
+        return true;
+    }
+
+    return false;
+}
+
+static double choose_double(int n, int k)
+{
+    double result=1.0;
+    int i;
+    if(k<0 || k>n) return 0.0;
+    if(k>n-k) k=n-k;
+    for(i=1;i<=k;i++) result=result*(double)(n-k+i)/(double)i;
+    return result;
+}
+
+static bool try_probability_tools(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+
+    if(n>=2 && strstr(text,"probability") && strstr(text,"out of")) {
+        if(v[1]<=0.0) snprintf(out,out_size,"Total outcomes must be positive.");
+        else {
+            double p=v[0]/v[1];
+            snprintf(out,out_size,"Probability = %.12g = %.12g%%",p,100.0*p);
+        }
+        return true;
+    }
+
+    if(n>=1 && starts_with(text,"complement ")) {
+        double p=v[0];
+        if(p>1.0 && p<=100.0) p/=100.0;
+        if(p<0.0 || p>1.0) snprintf(out,out_size,"Probability must be between 0 and 1, or 0%% and 100%%.");
+        else snprintf(out,out_size,"Complement = 1-p = %.12g = %.12g%%",1.0-p,100.0*(1.0-p));
+        return true;
+    }
+
+    if(n>=3 && starts_with(text,"binomial ")) {
+        int trials=(int)v[0];
+        double p=v[1];
+        int k=(int)v[2];
+        double prob;
+        if(p>1.0 && p<=100.0) p/=100.0;
+        if(trials<0 || k<0 || k>trials || p<0.0 || p>1.0) {
+            snprintf(out,out_size,"Use binomial n p k with n>=0, 0<=k<=n, and probability p from 0 to 1 (or percent).");
+            return true;
+        }
+        prob=choose_double(trials,k)*pow(p,k)*pow(1.0-p,trials-k);
+        snprintf(out,out_size,
+            "P(X=%d) = C(%d,%d)*p^k*(1-p)^(n-k) = %.12g = %.12g%%",
+            k,trials,k,prob,100.0*prob);
+        return true;
+    }
+
+    return false;
+}
+
+static bool try_log_root_tools(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+
+    if(n>=2 && strstr(text,"log base ") && strstr(text," of ")) {
+        double base=v[0], x=v[1];
+        if(base<=0.0 || approx_equal(base,1.0) || x<=0.0)
+            snprintf(out,out_size,"For real logarithms: base > 0, base != 1, and argument > 0.");
+        else snprintf(out,out_size,"log base %.12g of %.12g = %.12g",base,x,log(x)/log(base));
+        return true;
+    }
+
+    if(n>=1 && (starts_with(text,"log ") || starts_with(text,"log10 "))) {
+        if(v[0]<=0.0) snprintf(out,out_size,"Real log10 requires a positive argument.");
+        else snprintf(out,out_size,"log10(%.12g) = %.12g",v[0],log10(v[0]));
+        return true;
+    }
+
+    if(n>=1 && starts_with(text,"ln ")) {
+        if(v[0]<=0.0) snprintf(out,out_size,"Real natural log requires a positive argument.");
+        else snprintf(out,out_size,"ln(%.12g) = %.12g",v[0],log(v[0]));
+        return true;
+    }
+
+    if(n>=2 && (strstr(text,"nth root") || strstr(text,"root of"))) {
+        double degree=v[0], x=v[1];
+        if(fabs(degree)<1e-12) snprintf(out,out_size,"Root degree cannot be zero.");
+        else if(x<0.0 && fmod(fabs(degree),2.0)<1e-12 && ((long)fabs(degree))%2==0)
+            snprintf(out,out_size,"An even root of a negative number is not real.");
+        else {
+            double value;
+            if(x<0.0) value=-pow(-x,1.0/degree);
+            else value=pow(x,1.0/degree);
+            snprintf(out,out_size,"%.12g-th root of %.12g = %.12g",degree,x,value);
+        }
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_science_formula(char const *text, char *out, size_t out_size)
 {
     double v[8];
@@ -4528,6 +4718,18 @@ static bool qb_offline_answer_core(
     }
 
     if(try_statistics_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_linear_algebra_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_probability_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_log_root_tools(lowerbuf, out, out_size)) {
         return true;
     }
 
