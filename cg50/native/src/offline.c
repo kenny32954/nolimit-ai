@@ -688,6 +688,106 @@ static bool try_text_tools(char const *prompt, char *out, size_t out_size)
         return true;
     }
 
+    if(starts_with(lower, "uppercase ")) {
+        p = prompt + 10;
+        snprintf(text, sizeof(text), "%.299s", p);
+        for(i = 0; text[i]; i++) text[i] = (char)toupper((unsigned char)text[i]);
+        snprintf(out, out_size, "%s", text);
+        return true;
+    }
+
+    if(starts_with(lower, "lowercase ")) {
+        p = prompt + 10;
+        snprintf(text, sizeof(text), "%.299s", p);
+        for(i = 0; text[i]; i++) text[i] = (char)tolower((unsigned char)text[i]);
+        snprintf(out, out_size, "%s", text);
+        return true;
+    }
+
+    if(starts_with(lower, "title case ")) {
+        bool new_word = true;
+        p = prompt + 11;
+        snprintf(text, sizeof(text), "%.299s", p);
+        for(i = 0; text[i]; i++) {
+            if(isalpha((unsigned char)text[i])) {
+                text[i] = new_word
+                    ? (char)toupper((unsigned char)text[i])
+                    : (char)tolower((unsigned char)text[i]);
+                new_word = false;
+            } else {
+                new_word = isspace((unsigned char)text[i]) || text[i]=='-' || text[i]=='_';
+            }
+        }
+        snprintf(out, out_size, "%s", text);
+        return true;
+    }
+
+    if(starts_with(lower, "sentence stats ") || starts_with(lower, "text stats ")) {
+        int chars = 0, alpha = 0, digits = 0, vowels = 0, spaces = 0, sentences = 0;
+        bool word = false;
+        int word_count = 0;
+        p = starts_with(lower, "sentence stats ") ? prompt + 15 : prompt + 11;
+
+        while(*p) {
+            unsigned char c = (unsigned char)*p;
+            chars++;
+            if(isalpha(c)) {
+                char lc=(char)tolower(c);
+                alpha++;
+                if(strchr("aeiou", lc)) vowels++;
+            }
+            if(isdigit(c)) digits++;
+            if(isspace(c)) spaces++;
+            if(c=='.' || c=='!' || c=='?') sentences++;
+            if(isalnum(c)) {
+                if(!word) word_count++;
+                word = true;
+            } else {
+                word = false;
+            }
+            p++;
+        }
+        if(sentences==0 && chars>0) sentences=1;
+        snprintf(out, out_size,
+            "Text stats: words=%d chars=%d letters=%d vowels=%d digits=%d spaces=%d sentences=%d.",
+            word_count, chars, alpha, vowels, digits, spaces, sentences);
+        return true;
+    }
+
+    if(starts_with(lower, "clean sentence ") || starts_with(lower, "fix punctuation ")) {
+        bool need_space=false;
+        bool first_alpha=true;
+        size_t w=0;
+        p = starts_with(lower, "clean sentence ") ? prompt + 15 : prompt + 16;
+
+        while(*p && w+3<sizeof(text)) {
+            unsigned char c=(unsigned char)*p++;
+            if(isspace(c)) {
+                if(w>0) need_space=true;
+                continue;
+            }
+            if(need_space && w>0 && text[w-1]!=' ' &&
+               c!=',' && c!='.' && c!='!' && c!='?' && c!=';' && c!=':') {
+                text[w++]=' ';
+            }
+            need_space=false;
+
+            if(first_alpha && isalpha(c)) {
+                c=(unsigned char)toupper(c);
+                first_alpha=false;
+            }
+            text[w++]=(char)c;
+            if(c=='.' || c=='!' || c=='?') first_alpha=true;
+        }
+        while(w>0 && text[w-1]==' ') w--;
+        if(w>0 && text[w-1]!='.' && text[w-1]!='!' && text[w-1]!='?' && w+1<sizeof(text)) {
+            text[w++]='.';
+        }
+        text[w]='\0';
+        snprintf(out, out_size, "%s", text);
+        return true;
+    }
+
     return false;
 }
 
@@ -4491,6 +4591,70 @@ static bool try_unit_conversion(char const *text, char *out, size_t out_size)
     }
     if(strstr(text, "radians to degrees") || strstr(text, "rad to deg")) {
         snprintf(out,out_size,"%.12g radians = %.12g degrees",x,x*180.0/3.14159265358979323846);
+        return true;
+    }
+    if(strstr(text, "yards to feet") || strstr(text, "yd to ft")) {
+        snprintf(out,out_size,"%.12g yd = %.12g ft",x,x*3.0);
+        return true;
+    }
+    if(strstr(text, "feet to yards") || strstr(text, "ft to yd")) {
+        snprintf(out,out_size,"%.12g ft = %.12g yd",x,x/3.0);
+        return true;
+    }
+    if(strstr(text, "gallons to liters") || strstr(text, "gallons to litres") || strstr(text, "gal to l")) {
+        snprintf(out,out_size,"%.12g US gal = %.12g L",x,x*3.785411784);
+        return true;
+    }
+    if(strstr(text, "liters to gallons") || strstr(text, "litres to gallons") || strstr(text, "l to gal")) {
+        snprintf(out,out_size,"%.12g L = %.12g US gal",x,x/3.785411784);
+        return true;
+    }
+    if(strstr(text, "cups to milliliters") || strstr(text, "cups to ml")) {
+        snprintf(out,out_size,"%.12g US cups = %.12g mL",x,x*236.5882365);
+        return true;
+    }
+    if(strstr(text, "milliliters to cups") || strstr(text, "ml to cups")) {
+        snprintf(out,out_size,"%.12g mL = %.12g US cups",x,x/236.5882365);
+        return true;
+    }
+    if(strstr(text, "tablespoons to teaspoons") || strstr(text, "tbsp to tsp")) {
+        snprintf(out,out_size,"%.12g tbsp = %.12g tsp",x,x*3.0);
+        return true;
+    }
+    if(strstr(text, "teaspoons to tablespoons") || strstr(text, "tsp to tbsp")) {
+        snprintf(out,out_size,"%.12g tsp = %.12g tbsp",x,x/3.0);
+        return true;
+    }
+    if(strstr(text, "celsius to kelvin") || strstr(text, "c to k")) {
+        snprintf(out,out_size,"%.12g C = %.12g K",x,x+273.15);
+        return true;
+    }
+    if(strstr(text, "kelvin to celsius") || strstr(text, "k to c")) {
+        snprintf(out,out_size,"%.12g K = %.12g C",x,x-273.15);
+        return true;
+    }
+    if(strstr(text, "square feet to acres") || strstr(text, "sq ft to acres")) {
+        snprintf(out,out_size,"%.12g sq ft = %.12g acres",x,x/43560.0);
+        return true;
+    }
+    if(strstr(text, "acres to square feet") || strstr(text, "acres to sq ft")) {
+        snprintf(out,out_size,"%.12g acres = %.12g sq ft",x,x*43560.0);
+        return true;
+    }
+    if(strstr(text, "bytes to kilobytes") || strstr(text, "bytes to kb")) {
+        snprintf(out,out_size,"%.12g bytes = %.12g KiB (1024-byte units)",x,x/1024.0);
+        return true;
+    }
+    if(strstr(text, "kilobytes to bytes") || strstr(text, "kb to bytes")) {
+        snprintf(out,out_size,"%.12g KiB = %.12g bytes (1024-byte units)",x,x*1024.0);
+        return true;
+    }
+    if(strstr(text, "megabytes to kilobytes") || strstr(text, "mb to kb")) {
+        snprintf(out,out_size,"%.12g MiB = %.12g KiB (1024-based)",x,x*1024.0);
+        return true;
+    }
+    if(strstr(text, "kilobytes to megabytes") || strstr(text, "kb to mb")) {
+        snprintf(out,out_size,"%.12g KiB = %.12g MiB (1024-based)",x,x/1024.0);
         return true;
     }
 
