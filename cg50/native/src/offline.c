@@ -970,6 +970,147 @@ static bool try_word_parts(char const *subject, char const *prompt, char *out, s
     return false;
 }
 
+
+static bool roman_to_int(char const *text, int *value)
+{
+    int total=0, prev=0;
+    size_t len=strlen(text);
+    int i;
+
+    if(len==0 || len>20) return false;
+
+    for(i=(int)len-1;i>=0;i--) {
+        int v;
+        switch(toupper((unsigned char)text[i])) {
+            case 'I': v=1; break;
+            case 'V': v=5; break;
+            case 'X': v=10; break;
+            case 'L': v=50; break;
+            case 'C': v=100; break;
+            case 'D': v=500; break;
+            case 'M': v=1000; break;
+            default: return false;
+        }
+        if(v<prev) total-=v;
+        else { total+=v; prev=v; }
+    }
+
+    if(total<=0 || total>3999) return false;
+    *value=total;
+    return true;
+}
+
+static bool int_to_roman(int value, char *out, size_t out_size)
+{
+    static int const vals[]={1000,900,500,400,100,90,50,40,10,9,5,4,1};
+    static char const *syms[]={"M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"};
+    size_t used=0;
+    int i;
+
+    if(value<1 || value>3999 || out_size==0) return false;
+    out[0]='\0';
+
+    for(i=0;i<13;i++) {
+        while(value>=vals[i]) {
+            size_t n=strlen(syms[i]);
+            if(used+n+1>=out_size) return false;
+            memcpy(out+used,syms[i],n);
+            used+=n;
+            out[used]='\0';
+            value-=vals[i];
+        }
+    }
+    return true;
+}
+
+static bool try_misc_text_math(char const *prompt, char *out, size_t out_size)
+{
+    char lower[500];
+
+    lowercase_into(prompt,lower,sizeof(lower));
+
+    if(starts_with(lower,"roman ") || starts_with(lower,"roman numeral ")) {
+        char const *p=starts_with(lower,"roman numeral ")?prompt+14:prompt+6;
+        char *end;
+        long n=strtol(p,&end,10);
+        char roman[64];
+        if(end!=p && int_to_roman((int)n,roman,sizeof(roman))) {
+            snprintf(out,out_size,"%ld in Roman numerals = %s.",n,roman);
+            return true;
+        }
+    }
+
+    if(strstr(lower," roman to decimal") || starts_with(lower,"roman to decimal ")) {
+        char token[32];
+        char const *p=starts_with(lower,"roman to decimal ")?prompt+17:prompt;
+        int value;
+        size_t i=0;
+        while(*p && !isalpha((unsigned char)*p)) p++;
+        while(*p && isalpha((unsigned char)*p) && i+1<sizeof(token)) token[i++]=*p++;
+        token[i]='\0';
+        if(roman_to_int(token,&value)) {
+            snprintf(out,out_size,"%s = %d.",token,value);
+            return true;
+        }
+    }
+
+    if(starts_with(lower,"rot13 ")) {
+        char text[420];
+        size_t i;
+        snprintf(text,sizeof(text),"%.419s",prompt+6);
+        for(i=0;text[i];i++) {
+            char c=text[i];
+            if(c>='a'&&c<='z') text[i]=(char)('a'+(c-'a'+13)%26);
+            else if(c>='A'&&c<='Z') text[i]=(char)('A'+(c-'A'+13)%26);
+        }
+        snprintf(out,out_size,"%s",text);
+        return true;
+    }
+
+    if(starts_with(lower,"caesar ")) {
+        char *end;
+        long shift=strtol(prompt+7,&end,10);
+        char text[420];
+        size_t i;
+        int sh=(int)(shift%26);
+        while(*end && isspace((unsigned char)*end)) end++;
+        if(end==prompt+7 || !*end) return false;
+        if(sh<0) sh+=26;
+        snprintf(text,sizeof(text),"%.419s",end);
+        for(i=0;text[i];i++) {
+            char c=text[i];
+            if(c>='a'&&c<='z') text[i]=(char)('a'+(c-'a'+sh)%26);
+            else if(c>='A'&&c<='Z') text[i]=(char)('A'+(c-'A'+sh)%26);
+        }
+        snprintf(out,out_size,"%s",text);
+        return true;
+    }
+
+    if(starts_with(lower,"is ") && strstr(lower," an anagram of ")) {
+        char work[500], *sep, *a, *b;
+        int ca[26]={0}, cb[26]={0};
+        int i;
+        snprintf(work,sizeof(work),"%.499s",lower+3);
+        sep=strstr(work," an anagram of ");
+        if(!sep) return false;
+        *sep='\0';
+        a=work;
+        b=sep+15;
+        trim_text(a);
+        trim_text(b);
+        for(;*a;a++) if(isalpha((unsigned char)*a)) ca[*a-'a']++;
+        for(;*b;b++) if(isalpha((unsigned char)*b)) cb[*b-'a']++;
+        for(i=0;i<26;i++) if(ca[i]!=cb[i]) {
+            snprintf(out,out_size,"No, those are not anagrams when spaces/punctuation are ignored.");
+            return true;
+        }
+        snprintf(out,out_size,"Yes, those are anagrams when spaces/punctuation are ignored.");
+        return true;
+    }
+
+    return false;
+}
+
 static bool write_input_shape_response(char const *subject, char const *prompt,
                                        char *out, size_t out_size)
 {
@@ -1887,6 +2028,54 @@ static bool try_number_theory(char const *text, char *out, size_t out_size)
             snprintf(out,out_size,"%ldP%ld = %llu",nn,rr,result);
             return true;
         }
+    }
+
+    return false;
+}
+
+
+static bool try_fraction_percent_tools(char const *text, char *out, size_t out_size)
+{
+    long a,b;
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+
+    if((starts_with(text,"simplify fraction ") || starts_with(text,"reduce fraction ") ||
+        starts_with(text,"fraction ")) &&
+       sscanf(strchr(text,' ') ? strchr(text,' ')+1 : text,"%ld/%ld",&a,&b)==2) {
+        long g;
+        if(b==0) {
+            snprintf(out,out_size,"A fraction with denominator 0 is undefined.");
+            return true;
+        }
+        if(b<0) { a=-a; b=-b; }
+        g=gcd_long(a,b);
+        if(g==0) g=1;
+        snprintf(out,out_size,"%ld/%ld simplifies to %ld/%ld.",a,b,a/g,b/g);
+        return true;
+    }
+
+    if(n>=2 && (strstr(text,"what percent is") || strstr(text,"what percentage is"))) {
+        if(fabs(v[1])<1e-12) {
+            snprintf(out,out_size,"Percent relative to a zero whole is undefined.");
+        } else {
+            snprintf(out,out_size,"%.12g is %.12g%% of %.12g.",v[0],100.0*v[0]/v[1],v[1]);
+        }
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"increase") && strstr(text,"percent")) {
+        double base=v[0], pct=v[1];
+        snprintf(out,out_size,
+            "Increase %.12g by %.12g%% = %.12g.",base,pct,base*(1.0+pct/100.0));
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"decrease") && strstr(text,"percent")) {
+        double base=v[0], pct=v[1];
+        snprintf(out,out_size,
+            "Decrease %.12g by %.12g%% = %.12g.",base,pct,base*(1.0-pct/100.0));
+        return true;
     }
 
     return false;
@@ -3098,6 +3287,12 @@ static bool try_natural_math(char const *text, char *out, size_t out_size)
         return true;
     }
 
+    if(strstr(text, "midpoint") && n >= 4) {
+        snprintf(out,out_size,"Midpoint = ((x1+x2)/2,(y1+y2)/2) = (%.12g, %.12g)",
+                 (v[0]+v[2])/2.0,(v[1]+v[3])/2.0);
+        return true;
+    }
+
     if(strstr(text, "fahrenheit") && strstr(text, "celsius") && n >= 1) {
         result = (v[0] - 32.0) * 5.0 / 9.0;
         snprintf(out, out_size, "%.12g F = %.12g C", v[0], result);
@@ -3910,6 +4105,10 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(try_misc_text_math(prompt, out, out_size)) {
+        return true;
+    }
+
     if(try_study_request(subject, prompt, out, out_size)) {
         return true;
     }
@@ -3964,6 +4163,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_number_theory(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_fraction_percent_tools(lowerbuf, out, out_size)) {
         return true;
     }
 
