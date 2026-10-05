@@ -1323,6 +1323,302 @@ static int extract_numbers(char const *text, double *values, int cap)
 }
 
 
+
+static bool parse_quadratic_side(char const *text, double *a, double *b, double *c)
+{
+    double qa = 0.0, qb = 0.0, qc = 0.0;
+    double sign = 1.0;
+    bool got = false;
+
+    while(*text) {
+        char *end;
+        double coeff = 1.0;
+        bool explicit_coeff = false;
+
+        while(*text && isspace((unsigned char)*text)) text++;
+        if(!*text) break;
+
+        if(*text == '+') { sign = 1.0; text++; continue; }
+        if(*text == '-') { sign = -1.0; text++; continue; }
+
+        while(*text && isspace((unsigned char)*text)) text++;
+
+        if(isdigit((unsigned char)*text) || *text == '.') {
+            coeff = strtod(text, &end);
+            if(end == text) return false;
+            text = end;
+            explicit_coeff = true;
+            while(*text && isspace((unsigned char)*text)) text++;
+            if(*text == '*') {
+                text++;
+                while(*text && isspace((unsigned char)*text)) text++;
+            }
+        }
+
+        if(*text == 'x' || *text == 'X') {
+            text++;
+            while(*text && isspace((unsigned char)*text)) text++;
+
+            if(*text == '^') {
+                text++;
+                while(*text && isspace((unsigned char)*text)) text++;
+                if(*text != '2') return false;
+                text++;
+                qa += sign * coeff;
+            }
+            else {
+                qb += sign * coeff;
+            }
+        }
+        else {
+            if(!explicit_coeff) return false;
+            qc += sign * coeff;
+        }
+
+        got = true;
+        sign = 1.0;
+
+        while(*text && isspace((unsigned char)*text)) text++;
+        if(*text && *text != '+' && *text != '-') return false;
+    }
+
+    if(!got) return false;
+    *a = qa; *b = qb; *c = qc;
+    return true;
+}
+
+static bool try_quadratic_equation(char const *text, char *out, size_t out_size)
+{
+    char equation[220];
+    char *eq;
+    char *left;
+    char *right;
+    double a1,b1,c1,a2,b2,c2;
+    double a,b,c,d;
+
+    if(!strstr(text, "x^2") && !strstr(text, "X^2")) return false;
+
+    if(starts_with(text, "solve ")) snprintf(equation, sizeof(equation), "%s", text + 6);
+    else snprintf(equation, sizeof(equation), "%s", text);
+
+    eq = strchr(equation, '=');
+    if(!eq || strchr(eq + 1, '=')) return false;
+
+    *eq = '\0';
+    left = equation;
+    right = eq + 1;
+
+    if(!parse_quadratic_side(left, &a1,&b1,&c1) ||
+       !parse_quadratic_side(right, &a2,&b2,&c2)) return false;
+
+    a = a1-a2; b = b1-b2; c = c1-c2;
+    if(fabs(a) < 1e-12) return false;
+
+    d = b*b - 4.0*a*c;
+
+    if(d > 1e-12) {
+        double r1 = (-b + sqrt(d))/(2.0*a);
+        double r2 = (-b - sqrt(d))/(2.0*a);
+        snprintf(out, out_size,
+            "Quadratic: %.12gx^2 + %.12gx + %.12g = 0\n"
+            "Discriminant = %.12g\nx1 = %.12g\nx2 = %.12g",
+            a,b,c,d,r1,r2);
+    }
+    else if(fabs(d) <= 1e-12) {
+        double r = -b/(2.0*a);
+        snprintf(out, out_size,
+            "Quadratic: %.12gx^2 + %.12gx + %.12g = 0\n"
+            "Discriminant = 0\nRepeated root: x = %.12g",
+            a,b,c,r);
+    }
+    else {
+        double real = -b/(2.0*a);
+        double imag = sqrt(-d)/fabs(2.0*a);
+        snprintf(out, out_size,
+            "Quadratic: %.12gx^2 + %.12gx + %.12g = 0\n"
+            "Discriminant = %.12g\nRoots: %.12g +/- %.12gi",
+            a,b,c,d,real,imag);
+    }
+
+    return true;
+}
+
+static bool try_proportion(char const *text, char *out, size_t out_size)
+{
+    char compact[220];
+    size_t i=0, j=0;
+    double a,b,c,d,x;
+
+    while(text[i] && j + 1 < sizeof(compact)) {
+        if(!isspace((unsigned char)text[i]) && text[i] != '?') {
+            compact[j++] = (char)tolower((unsigned char)text[i]);
+        }
+        i++;
+    }
+    compact[j] = '\0';
+
+    if(starts_with(compact, "solve")) memmove(compact, compact+5, strlen(compact+5)+1);
+
+    if(sscanf(compact, "%lf/%lf=x/%lf", &a,&b,&d) == 3 && b != 0.0) {
+        x = a*d/b;
+    }
+    else if(sscanf(compact, "x/%lf=%lf/%lf", &b,&c,&d) == 3 && d != 0.0) {
+        x = b*c/d;
+    }
+    else if(sscanf(compact, "%lf/x=%lf/%lf", &a,&c,&d) == 3 && c != 0.0) {
+        x = a*d/c;
+    }
+    else if(sscanf(compact, "%lf/%lf=%lf/x", &a,&b,&c) == 3 && c != 0.0) {
+        x = b*c/a;
+    }
+    else return false;
+
+    snprintf(out, out_size,
+        "Proportion solved by cross-multiplying. x = %.12g", x);
+    return true;
+}
+
+static bool parse_xy_side(char const *text, double *xcoef, double *ycoef, double *constant)
+{
+    double ax=0.0, ay=0.0, c=0.0;
+    double sign=1.0;
+    bool got=false;
+
+    while(*text) {
+        char *end;
+        double coeff=1.0;
+        bool explicit_coeff=false;
+
+        while(*text && isspace((unsigned char)*text)) text++;
+        if(!*text) break;
+        if(*text=='+') { sign=1.0; text++; continue; }
+        if(*text=='-') { sign=-1.0; text++; continue; }
+
+        while(*text && isspace((unsigned char)*text)) text++;
+
+        if(isdigit((unsigned char)*text) || *text=='.') {
+            coeff=strtod(text,&end);
+            if(end==text) return false;
+            text=end;
+            explicit_coeff=true;
+            while(*text && isspace((unsigned char)*text)) text++;
+            if(*text=='*') { text++; while(*text && isspace((unsigned char)*text)) text++; }
+        }
+
+        if(*text=='x' || *text=='X') { ax += sign*coeff; text++; }
+        else if(*text=='y' || *text=='Y') { ay += sign*coeff; text++; }
+        else {
+            if(!explicit_coeff) return false;
+            c += sign*coeff;
+        }
+
+        got=true;
+        sign=1.0;
+        while(*text && isspace((unsigned char)*text)) text++;
+        if(*text && *text!='+' && *text!='-') return false;
+    }
+
+    if(!got) return false;
+    *xcoef=ax; *ycoef=ay; *constant=c;
+    return true;
+}
+
+static bool parse_xy_equation(char *equation, double *a, double *b, double *c)
+{
+    char *eq = strchr(equation, '=');
+    double al,bl,cl,ar,br,cr;
+
+    if(!eq || strchr(eq+1,'=')) return false;
+    *eq='\0';
+
+    if(!parse_xy_side(equation,&al,&bl,&cl) ||
+       !parse_xy_side(eq+1,&ar,&br,&cr)) return false;
+
+    *a=al-ar;
+    *b=bl-br;
+    *c=cr-cl;
+    return true;
+}
+
+static bool try_system_2x2(char const *text, char *out, size_t out_size)
+{
+    char copy[300];
+    char *p;
+    char *sep;
+    double a1,b1,c1,a2,b2,c2;
+    double det,x,y;
+
+    if(!strstr(text,"system") && !(strchr(text,';') && strchr(text,'x') && strchr(text,'y'))) return false;
+
+    snprintf(copy,sizeof(copy),"%s",text);
+    p=copy;
+    if(starts_with(p,"solve system")) {
+        p += 12;
+        while(*p==':' || isspace((unsigned char)*p)) p++;
+    }
+    else if(starts_with(p,"system")) {
+        p += 6;
+        while(*p==':' || isspace((unsigned char)*p)) p++;
+    }
+
+    sep=strchr(p,';');
+    if(!sep) return false;
+    *sep='\0';
+
+    if(!parse_xy_equation(p,&a1,&b1,&c1) ||
+       !parse_xy_equation(sep+1,&a2,&b2,&c2)) return false;
+
+    det=a1*b2-a2*b1;
+    if(fabs(det)<1e-12) {
+        snprintf(out,out_size,
+            "The 2x2 system has determinant 0, so it does not have one unique solution.");
+        return true;
+    }
+
+    x=(c1*b2-c2*b1)/det;
+    y=(a1*c2-a2*c1)/det;
+
+    snprintf(out,out_size,
+        "2x2 system solution:\nx = %.12g\ny = %.12g\n"
+        "Check both values in both original equations.",
+        x,y);
+    return true;
+}
+
+static bool try_science_formula(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+
+    if(n>=2 && strstr(text,"kinetic energy")) {
+        snprintf(out,out_size,"K=1/2*m*v^2 = %.12g J",0.5*v[0]*v[1]*v[1]);
+        return true;
+    }
+    if(n>=2 && strstr(text,"momentum")) {
+        snprintf(out,out_size,"p=mv = %.12g kg*m/s",v[0]*v[1]);
+        return true;
+    }
+    if(n>=2 && strstr(text,"density") && !strstr(text,"population")) {
+        if(v[1]==0.0) snprintf(out,out_size,"Density is undefined for zero volume.");
+        else snprintf(out,out_size,"density=mass/volume = %.12g",v[0]/v[1]);
+        return true;
+    }
+    if(n>=2 && strstr(text,"power") && strstr(text,"voltage") && strstr(text,"current")) {
+        snprintf(out,out_size,"Electrical power P=VI = %.12g W",v[0]*v[1]);
+        return true;
+    }
+    if(n>=2 && strstr(text,"wave speed")) {
+        snprintf(out,out_size,"Wave speed v=f*lambda = %.12g",v[0]*v[1]);
+        return true;
+    }
+    if(n>=2 && strstr(text,"work") && strstr(text,"force") && strstr(text,"distance")) {
+        snprintf(out,out_size,"For force parallel to motion, W=F*d = %.12g J",v[0]*v[1]);
+        return true;
+    }
+
+    return false;
+}
+
 static bool parse_linear_side(char const *text, double *xcoef, double *constant)
 {
     double a = 0.0;
@@ -1988,6 +2284,29 @@ static bool try_natural_math(char const *text, char *out, size_t out_size)
     if(strstr(text, "celsius") && strstr(text, "fahrenheit") && n >= 1) {
         result = v[0] * 9.0 / 5.0 + 32.0;
         snprintf(out, out_size, "%.12g C = %.12g F", v[0], result);
+        return true;
+    }
+
+    if(strstr(text, "volume") && (strstr(text, "rectangular prism") || strstr(text, "box")) && n >= 3) {
+        snprintf(out,out_size,"Volume of rectangular prism = L*W*H = %.12g",v[0]*v[1]*v[2]);
+        return true;
+    }
+
+    if(strstr(text, "volume") && strstr(text, "cylinder") && n >= 2) {
+        snprintf(out,out_size,"Cylinder volume = pi*r^2*h = %.12g",
+                 3.14159265358979323846*v[0]*v[0]*v[1]);
+        return true;
+    }
+
+    if(strstr(text, "volume") && strstr(text, "sphere") && n >= 1) {
+        snprintf(out,out_size,"Sphere volume = 4/3*pi*r^3 = %.12g",
+                 (4.0/3.0)*3.14159265358979323846*v[0]*v[0]*v[0]);
+        return true;
+    }
+
+    if(strstr(text, "surface area") && strstr(text, "sphere") && n >= 1) {
+        snprintf(out,out_size,"Sphere surface area = 4*pi*r^2 = %.12g",
+                 4.0*3.14159265358979323846*v[0]*v[0]);
         return true;
     }
 
@@ -2708,6 +3027,18 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(try_system_2x2(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_quadratic_equation(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_proportion(lowerbuf, out, out_size)) {
+        return true;
+    }
+
     if(try_linear_equation(lowerbuf, out, out_size)) {
         return true;
     }
@@ -2722,6 +3053,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_unit_conversion(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_science_formula(lowerbuf, out, out_size)) {
         return true;
     }
 
