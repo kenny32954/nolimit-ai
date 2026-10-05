@@ -2533,6 +2533,166 @@ static bool try_language_tools(char const *prompt, char *out, size_t out_size)
     return false;
 }
 
+
+static bool try_triangle_trig(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+    double pi=3.14159265358979323846;
+
+    if(n>=2 && (strstr(text,"hypotenuse") || strstr(text,"right triangle")) &&
+       !strstr(text,"missing leg") && !strstr(text,"find leg")) {
+        double c=sqrt(v[0]*v[0]+v[1]*v[1]);
+        snprintf(out,out_size,"Right triangle hypotenuse = sqrt(a^2+b^2) = %.12g",c);
+        return true;
+    }
+
+    if(n>=2 && (strstr(text,"missing leg") || strstr(text,"find leg"))) {
+        double c=v[0], a=v[1];
+        if(c<a || c<0.0 || a<0.0) {
+            snprintf(out,out_size,"The hypotenuse must be at least as long as the known leg.");
+        } else {
+            snprintf(out,out_size,"Missing leg = sqrt(c^2-a^2) = %.12g",sqrt(c*c-a*a));
+        }
+        return true;
+    }
+
+    if(n>=1 && (starts_with(text,"sin ") || starts_with(text,"sine "))) {
+        snprintf(out,out_size,"sin(%.12g deg) = %.12g",v[0],sin(v[0]*pi/180.0));
+        return true;
+    }
+    if(n>=1 && (starts_with(text,"cos ") || starts_with(text,"cosine "))) {
+        snprintf(out,out_size,"cos(%.12g deg) = %.12g",v[0],cos(v[0]*pi/180.0));
+        return true;
+    }
+    if(n>=1 && (starts_with(text,"tan ") || starts_with(text,"tangent "))) {
+        double c=cos(v[0]*pi/180.0);
+        if(fabs(c)<1e-12) snprintf(out,out_size,"tan(%.12g deg) is undefined.",v[0]);
+        else snprintf(out,out_size,"tan(%.12g deg) = %.12g",v[0],tan(v[0]*pi/180.0));
+        return true;
+    }
+
+    return false;
+}
+
+static bool try_extra_science(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+
+    if(n>=1 && (starts_with(text,"ph ") || strstr(text,"ph from h"))) {
+        double h=v[0];
+        if(h<=0.0) snprintf(out,out_size,"Hydrogen-ion concentration must be positive for pH=-log10[H+].");
+        else snprintf(out,out_size,"pH = -log10[H+] = %.12g",-log10(h));
+        return true;
+    }
+
+    if(n>=1 && (strstr(text,"h+ concentration from ph") || strstr(text,"hydrogen concentration from ph"))) {
+        snprintf(out,out_size,"[H+] = 10^(-pH) = %.12g M",pow(10.0,-v[0]));
+        return true;
+    }
+
+    if(n>=3 && strstr(text,"ideal gas") && strstr(text,"pressure")) {
+        double moles=v[0], temp=v[1], volume=v[2];
+        if(volume<=0.0) snprintf(out,out_size,"Gas volume must be positive.");
+        else snprintf(out,out_size,"Ideal-gas pressure P=nRT/V = %.12g atm",
+                      moles*0.082057366080960*temp/volume);
+        return true;
+    }
+
+    if(n>=2 && (strstr(text,"gravitational potential energy") || strstr(text,"potential energy mass"))) {
+        snprintf(out,out_size,"Gravitational potential energy U=mgh = %.12g J",v[0]*9.80665*v[1]);
+        return true;
+    }
+
+    if(n>=2 && starts_with(text,"speed ") && strstr(text,"distance") && strstr(text,"time")) {
+        if(fabs(v[1])<1e-12) snprintf(out,out_size,"Speed is undefined for zero elapsed time.");
+        else snprintf(out,out_size,"speed = distance/time = %.12g",v[0]/v[1]);
+        return true;
+    }
+
+    return false;
+}
+
+static void canonical_genotype(char a, char b, char out[3])
+{
+    if(isupper((unsigned char)b) && islower((unsigned char)a)) {
+        char t=a; a=b; b=t;
+    }
+    out[0]=a; out[1]=b; out[2]='\0';
+}
+
+static bool valid_simple_genotype(char const *g)
+{
+    return g && strlen(g)==2 && isalpha((unsigned char)g[0]) &&
+           isalpha((unsigned char)g[1]) &&
+           tolower((unsigned char)g[0])==tolower((unsigned char)g[1]);
+}
+
+static bool try_genetics_cross(char const *prompt, char *out, size_t out_size)
+{
+    char lower[220], work[220];
+    char *p,*sep;
+    char g1[3],g2[3];
+    char offspring[4][3];
+    int counts[4]={0,0,0,0};
+    char unique[4][3];
+    int unique_n=0, i,j;
+
+    lowercase_into(prompt,lower,sizeof(lower));
+    if(!(starts_with(lower,"cross ") || starts_with(lower,"punnett ") || starts_with(lower,"punnett square "))) return false;
+
+    snprintf(work,sizeof(work),"%.219s",prompt);
+    p=work;
+    if(starts_with(lower,"punnett square ")) p+=15;
+    else if(starts_with(lower,"punnett ")) p+=8;
+    else p+=6;
+    while(*p && isspace((unsigned char)*p)) p++;
+
+    sep=strstr(p," x ");
+    if(!sep) sep=strstr(p," X ");
+    if(!sep) return false;
+    *sep='\0';
+    snprintf(g1,sizeof(g1),"%.2s",p);
+    snprintf(g2,sizeof(g2),"%.2s",sep+3);
+    trim_text(g1); trim_text(g2);
+
+    if(!valid_simple_genotype(g1) || !valid_simple_genotype(g2) ||
+       tolower((unsigned char)g1[0])!=tolower((unsigned char)g2[0])) return false;
+
+    canonical_genotype(g1[0],g2[0],offspring[0]);
+    canonical_genotype(g1[0],g2[1],offspring[1]);
+    canonical_genotype(g1[1],g2[0],offspring[2]);
+    canonical_genotype(g1[1],g2[1],offspring[3]);
+
+    for(i=0;i<4;i++) {
+        int idx=-1;
+        for(j=0;j<unique_n;j++) if(strcmp(unique[j],offspring[i])==0) idx=j;
+        if(idx<0) {
+            idx=unique_n++;
+            strcpy(unique[idx],offspring[i]);
+        }
+        counts[idx]++;
+    }
+
+    out[0]='\0';
+    snprintf(out,out_size,"Punnett cross %s x %s: ",g1,g2);
+    for(i=0;i<unique_n;i++) {
+        size_t used=strlen(out);
+        snprintf(out+used,out_size-used,"%s%s %d%%",i?", ":"",unique[i],counts[i]*25);
+    }
+    {
+        int dominant=0;
+        for(i=0;i<4;i++) if(isupper((unsigned char)offspring[i][0]) || isupper((unsigned char)offspring[i][1])) dominant++;
+        {
+            size_t used=strlen(out);
+            snprintf(out+used,out_size-used,". Dominant phenotype %d%%; recessive phenotype %d%%.",
+                     dominant*25,(4-dominant)*25);
+        }
+    }
+    return true;
+}
+
 static bool try_science_formula(char const *text, char *out, size_t out_size)
 {
     double v[8];
@@ -2686,6 +2846,64 @@ static bool try_linear_equation(char const *text, char *out, size_t out_size)
     return true;
 }
 
+
+static void flip_inequality(char op[3])
+{
+    if(strcmp(op,"<")==0) strcpy(op,">");
+    else if(strcmp(op,">")==0) strcpy(op,"<");
+    else if(strcmp(op,"<=")==0) strcpy(op,">=");
+    else if(strcmp(op,">=")==0) strcpy(op,"<=");
+}
+
+static bool try_linear_inequality(char const *text, char *out, size_t out_size)
+{
+    char expr[220];
+    char *pos=NULL;
+    char op[3]="";
+    char *right;
+    double a1,b1,a2,b2;
+    double coeff,rhs,value;
+    bool truth=false;
+
+    if(starts_with(text,"solve ")) snprintf(expr,sizeof(expr),"%s",text+6);
+    else snprintf(expr,sizeof(expr),"%s",text);
+
+    pos=strstr(expr,"<=");
+    if(pos) strcpy(op,"<=");
+    if(!pos) { pos=strstr(expr,">="); if(pos) strcpy(op,">="); }
+    if(!pos) { pos=strchr(expr,'<'); if(pos) strcpy(op,"<"); }
+    if(!pos) { pos=strchr(expr,'>'); if(pos) strcpy(op,">"); }
+
+    if(!pos || (!strchr(expr,'x') && !strchr(expr,'X'))) return false;
+
+    right=pos+strlen(op);
+    *pos='\0';
+
+    if(!parse_linear_side(expr,&a1,&b1) || !parse_linear_side(right,&a2,&b2)) return false;
+
+    coeff=a1-a2;
+    rhs=b2-b1;
+
+    if(fabs(coeff)<1e-12) {
+        if(strcmp(op,"<")==0) truth=0.0<rhs;
+        else if(strcmp(op,">")==0) truth=0.0>rhs;
+        else if(strcmp(op,"<=")==0) truth=0.0<=rhs;
+        else if(strcmp(op,">=")==0) truth=0.0>=rhs;
+        snprintf(out,out_size,"%s: the inequality simplifies to %.12g %s %.12g.",
+                 truth?"All real x work":"No real x works",0.0,op,rhs);
+        return true;
+    }
+
+    if(coeff<0.0) flip_inequality(op);
+    value=rhs/coeff;
+
+    snprintf(out,out_size,
+        "Linear inequality: %.12gx %s %.12g\nSolution: x %s %.12g",
+        coeff, coeff<0.0 ? (strcmp(op,"<")==0?">":strcmp(op,">")==0?"<":strcmp(op,"<=")==0?">=":"<=") : op,
+        rhs,op,value);
+    return true;
+}
+
 static bool try_unit_conversion(char const *text, char *out, size_t out_size)
 {
     double v[4];
@@ -2817,6 +3035,14 @@ static bool try_unit_conversion(char const *text, char *out, size_t out_size)
     }
     if(strstr(text, "hours to days") || strstr(text, "hour to days")) {
         snprintf(out, out_size, "%.12g hours = %.12g days", x, x / 24.0);
+        return true;
+    }
+    if(strstr(text, "degrees to radians") || strstr(text, "deg to rad")) {
+        snprintf(out,out_size,"%.12g degrees = %.12g radians",x,x*3.14159265358979323846/180.0);
+        return true;
+    }
+    if(strstr(text, "radians to degrees") || strstr(text, "rad to deg")) {
+        snprintf(out,out_size,"%.12g radians = %.12g degrees",x,x*180.0/3.14159265358979323846);
         return true;
     }
 
@@ -4113,6 +4339,10 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(try_genetics_cross(prompt, out, out_size)) {
+        return true;
+    }
+
     if(try_polynomial_calculus(lowerbuf, out, out_size)) {
         return true;
     }
@@ -4142,6 +4372,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_proportion(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_linear_inequality(lowerbuf, out, out_size)) {
         return true;
     }
 
@@ -4179,6 +4413,14 @@ static bool qb_offline_answer_core(
     }
 
     if(try_finance_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_triangle_trig(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_extra_science(lowerbuf, out, out_size)) {
         return true;
     }
 
