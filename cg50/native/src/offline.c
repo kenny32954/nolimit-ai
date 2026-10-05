@@ -3767,7 +3767,7 @@ static bool try_relationship_word_problem(char const *text, char *out, size_t ou
     }
 
     if(n>=2 && (strstr(text,"unit price") || strstr(text,"cost per") ||
-       strstr(text,"price per")) {
+       strstr(text,"price per"))) {
         if(approx_equal(v[1],0.0)) snprintf(out,out_size,"Item count cannot be zero.");
         else snprintf(out,out_size,
             "Unit price = total cost / quantity = %.12g / %.12g = %.12g.",
