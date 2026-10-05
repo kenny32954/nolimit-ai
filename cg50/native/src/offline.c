@@ -1504,33 +1504,6 @@ static bool looks_like_unknown_token(char const *text)
 }
 
 
-static int extract_numbers(char const *text, double *values, int cap)
-{
-    int count = 0;
-    char *end;
-
-    while(*text && count < cap) {
-        bool candidate = isdigit((unsigned char)*text) || *text == '.';
-
-        if((*text == '+' || *text == '-') &&
-           (isdigit((unsigned char)text[1]) || text[1] == '.')) {
-            candidate = true;
-        }
-
-        if(candidate) {
-            values[count] = strtod(text, &end);
-            if(end != text) {
-                count++;
-                text = end;
-                continue;
-            }
-        }
-
-        text++;
-    }
-
-    return count;
-}
 
 
 
