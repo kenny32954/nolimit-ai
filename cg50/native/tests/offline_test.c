@@ -379,6 +379,33 @@ int main(void)
     expect_contains("filename shape", out, "looks like a filename");
     expect_contains("filename extension", out, ".pdf");
 
+
+    qb_offline_answer("algebra_2", "steps", "school", "x^2 - 5x + 6 = 0", out, sizeof(out));
+    expect_contains("quadratic normal root1", out, "x1 = 3");
+    expect_contains("quadratic normal root2", out, "x2 = 2");
+
+    qb_offline_answer("algebra_1", "steps", "school", "2/3 = x/12", out, sizeof(out));
+    expect_contains("proportion solve", out, "x = 8");
+
+    qb_offline_answer("algebra_1", "steps", "school", "solve system 2x+y=7; x-y=2", out, sizeof(out));
+    expect_contains("system x", out, "x = 3");
+    expect_contains("system y", out, "y = 1");
+
+    qb_offline_answer("geometry", "answer", "school", "volume of a box 3 4 5", out, sizeof(out));
+    expect_contains("box volume", out, "60");
+
+    qb_offline_answer("geometry", "answer", "school", "volume of a sphere radius 3", out, sizeof(out));
+    expect_contains("sphere volume", out, "113.097");
+
+    qb_offline_answer("physics", "answer", "school", "kinetic energy mass 2 velocity 3", out, sizeof(out));
+    expect_contains("kinetic energy formula", out, "9 J");
+
+    qb_offline_answer("physics", "answer", "school", "momentum mass 4 velocity 5", out, sizeof(out));
+    expect_contains("momentum formula", out, "20 kg*m/s");
+
+    qb_offline_answer("chemistry", "answer", "school", "density mass 20 volume 4", out, sizeof(out));
+    expect_contains("density formula", out, "5");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
