@@ -3293,7 +3293,7 @@ static bool try_cs_bit_tools(char const *prompt, char *out, size_t out_size)
 {
     char lower[260];
     char a[80],b[80],bits[80];
-    unsigned long long va,vb,result;
+    unsigned long long va,vb;
     int wa,wb,width;
 
     lowercase_into(prompt,lower,sizeof(lower));
