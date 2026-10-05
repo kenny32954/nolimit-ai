@@ -2400,33 +2400,103 @@ static int edit_distance_small(char const *a, char const *b)
     return prev[lb];
 }
 
-static char const *suggest_fact(char const *topic)
+static void normalize_phrase(char const *src, char *dst, size_t dst_size)
 {
-    char lower[64];
-    int best = 99;
-    char const *candidate = NULL;
-    unsigned int i;
-    int threshold;
+    size_t i=0;
+    bool space=false;
 
-    if(!topic || !*topic || strlen(topic) >= sizeof(lower)) return NULL;
-    lowercase_into(topic, lower, sizeof(lower));
+    if(dst_size==0) return;
 
-    threshold = strlen(lower) <= 5 ? 1 : 2;
+    while(*src && i+1<dst_size) {
+        unsigned char c=(unsigned char)*src++;
 
-    for(i = 0; i < sizeof(facts)/sizeof(facts[0]); i++) {
-        int d;
-
-        if(strchr(facts[i].needle, ' ') != NULL && strchr(lower, ' ') == NULL) continue;
-        if(abs((int)strlen(facts[i].needle) - (int)strlen(lower)) > threshold) continue;
-
-        d = edit_distance_small(lower, facts[i].needle);
-        if(d < best) {
-            best = d;
-            candidate = facts[i].needle;
+        if(isalnum(c)) {
+            dst[i++]=(char)tolower(c);
+            space=false;
+        }
+        else if(i>0 && !space) {
+            dst[i++]=' ';
+            space=true;
         }
     }
 
-    return best <= threshold ? candidate : NULL;
+    while(i>0 && dst[i-1]==' ') i--;
+    dst[i]='\0';
+}
+
+static int phrase_typo_score(char const *a, char const *b)
+{
+    char aa[180], bb[180];
+    char *pa, *pb;
+    int total=0;
+    int words=0;
+
+    normalize_phrase(a,aa,sizeof(aa));
+    normalize_phrase(b,bb,sizeof(bb));
+
+    pa=aa;
+    pb=bb;
+
+    while(*pa || *pb) {
+        char wa[48], wb[48];
+        size_t ia=0, ib=0;
+        int d;
+
+        while(*pa==' ') pa++;
+        while(*pb==' ') pb++;
+
+        if(!*pa || !*pb) return 99;
+
+        while(*pa && *pa!=' ' && ia+1<sizeof(wa)) wa[ia++]=*pa++;
+        while(*pb && *pb!=' ' && ib+1<sizeof(wb)) wb[ib++]=*pb++;
+        wa[ia]='\0';
+        wb[ib]='\0';
+
+        d=edit_distance_small(wa,wb);
+        if(d>2) return 99;
+
+        if(ia<=4 || ib<=4) {
+            if(d>1) return 99;
+        }
+
+        total += d;
+        words++;
+
+        if(words>8 || total>5) return 99;
+    }
+
+    return total;
+}
+
+static fact_t const *suggest_fact_entry(char const *topic)
+{
+    char lower[180];
+    fact_t const *candidate=NULL;
+    int best=99;
+    unsigned int i;
+
+    if(!topic || !*topic || strlen(topic)>=sizeof(lower)) return NULL;
+    lowercase_into(topic,lower,sizeof(lower));
+
+    for(i=0;i<sizeof(facts)/sizeof(facts[0]);i++) {
+        int d;
+
+        if(strcmp(lower,facts[i].needle)==0) return &facts[i];
+
+        d=phrase_typo_score(lower,facts[i].needle);
+        if(d<best) {
+            best=d;
+            candidate=&facts[i];
+        }
+    }
+
+    return (best>=1 && best<=4) ? candidate : NULL;
+}
+
+static char const *suggest_fact(char const *topic)
+{
+    fact_t const *entry=suggest_fact_entry(topic);
+    return entry ? entry->needle : NULL;
 }
 
 static char memory_topic[180];
@@ -2834,12 +2904,13 @@ static void write_contextual_fallback(char const *subject, char const *mode,
     suggestion = suggest_fact(topic);
 
     if(suggestion) {
-        snprintf(out, out_size,
-            "I don't have an exact match for \"%s\". Did you mean \"%s\"? "
-            "If yes, ask me about \"%s\" and I'll use the stored concept. "
-            "If not, I'll keep your exact wording as the topic.",
-            topic, suggestion, suggestion);
-        return;
+        fact_t const *entry = suggest_fact_entry(topic);
+        if(entry) {
+            snprintf(out, out_size,
+                "Likely correction: \"%s\" -> \"%s\". %s",
+                topic, entry->needle, entry->answer);
+            return;
+        }
     }
 
     if(starts_with(lowerbuf, "what is ") || starts_with(lowerbuf, "wat is ") ||
@@ -2925,10 +2996,10 @@ static void write_contextual_fallback(char const *subject, char const *mode,
         char const *suggestion = suggest_fact(topic);
 
         if(suggestion) {
+            fact_t const *entry = suggest_fact_entry(topic);
             snprintf(out, out_size,
-                "I don't have an exact match for \"%s\". Did you mean \"%s\"? "
-                "If yes, type 'define %s'. If not, keep \"%s\" as the topic and add a little context.",
-                topic, suggestion, suggestion, topic);
+                "Likely correction: \"%s\" -> \"%s\". %s",
+                topic, suggestion, entry ? entry->answer : "Add context if that correction is not what you meant.");
         }
         else if(looks_like_unknown_token(lowerbuf)) {
             snprintf(out, out_size,
