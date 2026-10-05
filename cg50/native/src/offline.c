@@ -365,6 +365,157 @@ static bool has_suffix(char const *word, char const *suffix)
     return strcmp(word + lw - ls, suffix) == 0;
 }
 
+
+typedef struct {
+    char const *short_name;
+    char const *expanded;
+    char const *note;
+} acronym_t;
+
+static acronym_t const acronyms[] = {
+    {"dna", "deoxyribonucleic acid", "DNA stores hereditary information."},
+    {"rna", "ribonucleic acid", "RNA has roles in gene expression, regulation, and protein synthesis."},
+    {"atp", "adenosine triphosphate", "ATP is a major cellular energy-transfer molecule."},
+    {"gdp", "gross domestic product", "GDP measures the market value of final goods and services produced within a country over a period."},
+    {"cpu", "central processing unit", "The CPU executes instructions and coordinates core computation."},
+    {"gpu", "graphics processing unit", "A GPU is specialized for highly parallel computation, originally centered on graphics workloads."},
+    {"ram", "random access memory", "RAM is fast working memory used while programs run."},
+    {"rom", "read-only memory", "ROM broadly refers to nonvolatile memory intended primarily for reading stored data/firmware."},
+    {"html", "hypertext markup language", "HTML gives web documents semantic structure."},
+    {"css", "cascading style sheets", "CSS controls web-page presentation and layout."},
+    {"url", "uniform resource locator", "A URL identifies the location/address of a resource."},
+    {"http", "hypertext transfer protocol", "HTTP is an application-layer protocol used for web communication."},
+    {"https", "hypertext transfer protocol secure", "HTTPS is HTTP carried over an encrypted and authenticated TLS connection."},
+    {"sql", "structured query language", "SQL is used to define, query, and modify relational database data."},
+    {"api", "application programming interface", "An API defines how software components can communicate or expose functionality."},
+    {"ai", "artificial intelligence", "AI is the broad field of systems performing tasks associated with reasoning, perception, learning, language, or decision-making."},
+    {"ml", "machine learning", "Machine learning fits models from data to make predictions or decisions."},
+    {"ip", "internet protocol", "Internet Protocol handles addressing and routing packets across networks."},
+    {"tcp", "transmission control protocol", "TCP provides ordered, reliable byte-stream transport over IP."},
+    {"udp", "user datagram protocol", "UDP provides connectionless datagram transport with low overhead and no built-in delivery guarantee."},
+    {"usb", "universal serial bus", "USB is a standard for connecting, powering, and communicating with peripheral devices."},
+    {"led", "light-emitting diode", "An LED is a semiconductor device that emits light when current flows appropriately."},
+    {"lcd", "liquid-crystal display", "An LCD uses liquid crystals to control light and form images."},
+    {"gps", "global positioning system", "GPS is a satellite-based positioning and timing system."},
+    {"isbn", "international standard book number", "An ISBN identifies a specific book edition/product form."},
+    {"mla", "modern language association", "MLA is also the name behind a widely used humanities citation/style system."},
+    {"apa", "american psychological association", "APA is also the name behind a widely used social-science citation/style system."},
+    {"pemdas", "parentheses, exponents, multiplication/division, addition/subtraction", "PEMDAS is a mnemonic for standard arithmetic operation precedence."},
+    {"foil", "first, outer, inner, last", "FOIL is a mnemonic for multiplying two binomials."}
+};
+
+static bool try_acronym_response(char const *prompt, char *out, size_t out_size)
+{
+    char lower[160];
+    char token[40];
+    char const *p;
+    size_t len = 0;
+    unsigned int i;
+    bool asks_expand = false;
+
+    lowercase_into(prompt, lower, sizeof(lower));
+
+    if(strstr(lower, "stand for") || starts_with(lower, "expand ") ||
+       starts_with(lower, "meaning of ")) {
+        asks_expand = true;
+    }
+
+    p = lower;
+    if(starts_with(p, "what does ")) p += 10;
+    else if(starts_with(p, "what is ")) p += 8;
+    else if(starts_with(p, "expand ")) p += 7;
+    else if(starts_with(p, "meaning of ")) p += 11;
+
+    while(*p && !isalnum((unsigned char)*p)) p++;
+    while(*p && isalnum((unsigned char)*p) && len + 1 < sizeof(token)) {
+        token[len++] = *p++;
+    }
+    token[len] = '\0';
+
+    if(!token[0]) return false;
+
+    for(i = 0; i < sizeof(acronyms)/sizeof(acronyms[0]); i++) {
+        if(strcmp(token, acronyms[i].short_name) == 0) {
+            if(asks_expand || is_all_upper_word(prompt) || strlen(token) <= 5) {
+                snprintf(out, out_size,
+                    "%s = %s. %s",
+                    acronyms[i].short_name, acronyms[i].expanded, acronyms[i].note);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static bool try_numeric_claim(char const *text, char *out, size_t out_size)
+{
+    char claim[220];
+    char *op;
+    char opbuf[3] = "";
+    char *left;
+    char *right;
+    double lv, rv;
+    bool truth = false;
+
+    snprintf(claim, sizeof(claim), "%s", text);
+
+    if(starts_with(claim, "is ")) memmove(claim, claim + 3, strlen(claim + 3) + 1);
+    else if(starts_with(claim, "does ")) memmove(claim, claim + 5, strlen(claim + 5) + 1);
+
+    {
+        size_t n = strlen(claim);
+        while(n > 0 && (claim[n-1] == '?' || claim[n-1] == '!' ||
+              isspace((unsigned char)claim[n-1]))) claim[--n] = '\0';
+    }
+
+    op = strstr(claim, ">=");
+    if(op) strcpy(opbuf, ">=");
+    if(!op) {
+        op = strstr(claim, "<=");
+        if(op) strcpy(opbuf, "<=");
+    }
+    if(!op) {
+        op = strstr(claim, "==");
+        if(op) strcpy(opbuf, "==");
+    }
+    if(!op) {
+        op = strchr(claim, '=');
+        if(op) strcpy(opbuf, "=");
+    }
+    if(!op) {
+        op = strchr(claim, '>');
+        if(op) strcpy(opbuf, ">");
+    }
+    if(!op) {
+        op = strchr(claim, '<');
+        if(op) strcpy(opbuf, "<");
+    }
+
+    if(!op || strchr(claim, 'x') || strchr(claim, 'X')) return false;
+
+    *op = '\0';
+    left = claim;
+    right = op + strlen(opbuf);
+    if(opbuf[1]) op[1] = '\0';
+
+    while(*left && isspace((unsigned char)*left)) left++;
+    while(*right && isspace((unsigned char)*right)) right++;
+
+    if(!eval_expression(left, &lv) || !eval_expression(right, &rv)) return false;
+
+    if(strcmp(opbuf, "=") == 0 || strcmp(opbuf, "==") == 0) truth = fabs(lv-rv) < 1e-10;
+    else if(strcmp(opbuf, ">") == 0) truth = lv > rv;
+    else if(strcmp(opbuf, "<") == 0) truth = lv < rv;
+    else if(strcmp(opbuf, ">=") == 0) truth = lv >= rv;
+    else if(strcmp(opbuf, "<=") == 0) truth = lv <= rv;
+
+    snprintf(out, out_size,
+        "%s. Left side = %.12g; right side = %.12g, so %.12g %s %.12g is %s.",
+        truth ? "TRUE" : "FALSE", lv, rv, lv, opbuf, rv, truth ? "true" : "false");
+    return true;
+}
+
 static bool write_input_shape_response(char const *subject, char const *prompt,
                                        char *out, size_t out_size)
 {
@@ -2260,6 +2411,10 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(try_acronym_response(prompt, out, out_size)) {
+        return true;
+    }
+
     if(try_study_request(subject, prompt, out, out_size)) {
         return true;
     }
@@ -2273,6 +2428,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_prefixed_expression(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_numeric_claim(lowerbuf, out, out_size)) {
         return true;
     }
 
