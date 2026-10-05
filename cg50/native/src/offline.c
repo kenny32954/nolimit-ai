@@ -1429,7 +1429,6 @@ static int extract_flexible_numbers(char const *text, double *values, int cap)
         }
 
         if(isalpha((unsigned char)*p)) {
-            char *start = p;
             char token[32];
             size_t len = 0;
             long current = 0;
@@ -1478,8 +1477,7 @@ static int extract_flexible_numbers(char const *text, double *values, int cap)
                         break;
                     }
                     p = q + len;
-                    start = p;
-                    continue;
+                    break;
                 }
 
                 p = q + len;
@@ -1508,7 +1506,6 @@ static int extract_flexible_numbers(char const *text, double *values, int cap)
                 continue;
             }
 
-            p = start + 1;
             continue;
         }
 
