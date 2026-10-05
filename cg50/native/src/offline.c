@@ -4305,6 +4305,107 @@ static bool try_cs_bit_tools(char const *prompt, char *out, size_t out_size)
         return true;
     }
 
+    if(starts_with(lower,"text to binary ")) {
+        char const *p=prompt+15;
+        size_t used=0;
+        out[0]='\0';
+        while(*p && used+10<out_size) {
+            unsigned char c=(unsigned char)*p++;
+            int bit;
+            if(used>0) out[used++]=' ';
+            for(bit=7;bit>=0;bit--) out[used++]=(char)('0'+((c>>bit)&1));
+            out[used]='\0';
+        }
+        return true;
+    }
+
+    if(starts_with(lower,"binary to text ")) {
+        char work[420];
+        char *tok;
+        size_t used=0;
+        snprintf(work,sizeof(work),"%.419s",prompt+15);
+        tok=strtok(work," ,;\t\r\n");
+        while(tok && used+2<out_size) {
+            unsigned long long value=0;
+            int width=0;
+            if(!parse_binary_u64(tok,&value,&width) || width>8) return false;
+            if(value>255ULL) return false;
+            out[used++]=(char)value;
+            tok=strtok(NULL," ,;\t\r\n");
+        }
+        out[used]='\0';
+        return used>0;
+    }
+
+    if(starts_with(lower,"text to hex ")) {
+        char const *p=prompt+12;
+        size_t used=0;
+        out[0]='\0';
+        while(*p && used+4<out_size) {
+            unsigned char c=(unsigned char)*p++;
+            used+=(size_t)snprintf(out+used,out_size-used,"%s%02X",used?" ":"",c);
+        }
+        return true;
+    }
+
+    if(starts_with(lower,"hex to text ")) {
+        char work[420];
+        char *tok;
+        size_t used=0;
+        snprintf(work,sizeof(work),"%.419s",prompt+12);
+        tok=strtok(work," ,;\t\r\n");
+        while(tok && used+2<out_size) {
+            char *end;
+            unsigned long value=strtoul(tok,&end,16);
+            if(end==tok || *end!='\0' || value>255UL) return false;
+            out[used++]=(char)value;
+            tok=strtok(NULL," ,;\t\r\n");
+        }
+        out[used]='\0';
+        return used>0;
+    }
+
+    if(starts_with(lower,"base ")) {
+        int from_base,to_base;
+        char value_text[100];
+        unsigned long long value;
+        char *end;
+        char converted[100];
+        char digits[]="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        int pos=0;
+
+        if(sscanf(prompt,"base %d %99s to base %d",&from_base,value_text,&to_base)==3) {
+            if(from_base<2 || from_base>36 || to_base<2 || to_base>36) {
+                snprintf(out,out_size,"Bases must be between 2 and 36.");
+                return true;
+            }
+            value=strtoull(value_text,&end,from_base);
+            if(end==value_text || *end!='\0') {
+                snprintf(out,out_size,"\"%s\" is not valid base-%d input.",value_text,from_base);
+                return true;
+            }
+            if(value==0ULL) {
+                snprintf(out,out_size,"base-%d %s = base-%d 0",from_base,value_text,to_base);
+                return true;
+            }
+            while(value && pos<(int)sizeof(converted)-1) {
+                converted[pos++]=digits[value%(unsigned long long)to_base];
+                value/=(unsigned long long)to_base;
+            }
+            {
+                int i;
+                for(i=0;i<pos/2;i++) {
+                    char c=converted[i];
+                    converted[i]=converted[pos-1-i];
+                    converted[pos-1-i]=c;
+                }
+            }
+            converted[pos]='\0';
+            snprintf(out,out_size,"base-%d %s = base-%d %s",from_base,value_text,to_base,converted);
+            return true;
+        }
+    }
+
     if(starts_with(lower,"ascii ")) {
         char const *p=prompt+6;
         while(*p && isspace((unsigned char)*p)) p++;
