@@ -5546,6 +5546,44 @@ static bool try_known_comparison(char const *text, char *out, size_t out_size)
     return false;
 }
 
+
+static bool try_generic_fact_relation(char const *text, char *out, size_t out_size)
+{
+    fact_t const *first=NULL;
+    fact_t const *second=NULL;
+    unsigned int i;
+    bool relation_intent =
+        starts_with(text,"compare ") ||
+        starts_with(text,"difference between ") ||
+        strstr(text," vs ") ||
+        strstr(text," versus ") ||
+        strstr(text," related") ||
+        strstr(text,"relationship between") ||
+        strstr(text,"connection between");
+
+    if(!relation_intent) return false;
+
+    for(i=0;i<sizeof(facts)/sizeof(facts[0]);i++) {
+        if(phrase_match(text,facts[i].needle)) {
+            if(!first) first=&facts[i];
+            else if(strcmp(first->needle,facts[i].needle)!=0) {
+                second=&facts[i];
+                break;
+            }
+        }
+    }
+
+    if(!first || !second) return false;
+
+    snprintf(out,out_size,
+        "Concept A - %s: %.280s\n"
+        "Concept B - %s: %.280s\n"
+        "Compare them using the same dimensions: definition, mechanism/process, inputs and outputs, scale, purpose, and evidence/application.",
+        first->needle,first->answer,
+        second->needle,second->answer);
+    return true;
+}
+
 static bool try_prefixed_expression(char const *text, char *out, size_t out_size)
 {
     char expr[180];
@@ -6870,6 +6908,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_known_comparison(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_generic_fact_relation(lowerbuf, out, out_size)) {
         return true;
     }
 
