@@ -4638,6 +4638,49 @@ static bool qb_offline_answer_core(
 }
 
 
+static bool normalize_request_prefix(char const *prompt, char *out, size_t out_size)
+{
+    char work[700];
+    char lower[700];
+    char *p;
+    int pass;
+    bool changed=false;
+
+    if(!prompt || out_size==0) return false;
+    snprintf(work,sizeof(work),"%s",prompt);
+    p=work;
+
+    for(pass=0;pass<4;pass++) {
+        char *start=p;
+        while(*start && isspace((unsigned char)*start)) start++;
+        lowercase_into(start,lower,sizeof(lower));
+
+        if(starts_with(lower,"please ")) start += 7;
+        else if(starts_with(lower,"pls ")) start += 4;
+        else if(starts_with(lower,"plz ")) start += 4;
+        else if(starts_with(lower,"can you ")) start += 8;
+        else if(starts_with(lower,"could you ")) start += 10;
+        else if(starts_with(lower,"would you ")) start += 10;
+        else if(starts_with(lower,"will you ")) start += 9;
+        else if(starts_with(lower,"hey qbai ")) start += 9;
+        else if(starts_with(lower,"hey qbai, ")) start += 10;
+        else if(starts_with(lower,"yo qbai ")) start += 8;
+        else if(starts_with(lower,"yo qbai, ")) start += 9;
+        else if(starts_with(lower,"qbai ")) start += 5;
+        else if(starts_with(lower,"qbai, ")) start += 6;
+        else if(starts_with(lower,"quantum breaks ai ")) start += 18;
+        else break;
+
+        while(*start && (isspace((unsigned char)*start) || *start==',' || *start==':')) start++;
+        p=start;
+        changed=true;
+    }
+
+    if(!changed || !*p) return false;
+    snprintf(out,out_size,"%s",p);
+    return true;
+}
+
 bool qb_offline_answer(
     char const *subject,
     char const *mode,
@@ -4648,11 +4691,16 @@ bool qb_offline_answer(
 )
 {
     char lower[700];
+    char normalized[700];
     char topic[180];
     char const *effective_subject = subject;
     bool ok;
 
     if(!out || out_size == 0 || !prompt || !*prompt) return false;
+
+    if(normalize_request_prefix(prompt, normalized, sizeof(normalized))) {
+        return qb_offline_answer(subject, mode, level, normalized, out, out_size);
+    }
 
     lowercase_into(prompt, lower, sizeof(lower));
 
