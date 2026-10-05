@@ -665,6 +665,28 @@ int main(void)
     qb_offline_answer("algebra_2", "answer", "school", "nth root 3 of 27", out, sizeof(out));
     expect_contains("nth root tool", out, "3");
 
+
+    qb_offline_answer("auto", "answer", "school", "leap year 2024", out, sizeof(out));
+    expect_contains("leap year", out, "is a leap year");
+
+    qb_offline_answer("auto", "answer", "school", "day of week 2026-10-05", out, sizeof(out));
+    expect_contains("weekday tool", out, "Monday");
+
+    qb_offline_answer("auto", "answer", "school", "days in february 2024", out, sizeof(out));
+    expect_contains("february days", out, "29");
+
+    qb_offline_answer("auto", "answer", "school", "days between 2026-10-05 and 2026-10-20", out, sizeof(out));
+    expect_contains("date difference", out, "15");
+
+    qb_offline_answer("auto", "answer", "school", "morse hello", out, sizeof(out));
+    expect_contains("morse encode", out, ".... . .-.. .-.. ---");
+
+    qb_offline_answer("auto", "answer", "school", "decode morse .... . .-.. .-.. ---", out, sizeof(out));
+    expect_contains("morse decode", out, "HELLO");
+
+    qb_offline_answer("auto", "answer", "school", "nato cat", out, sizeof(out));
+    expect_contains("nato encode", out, "Charlie Alpha Tango");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
