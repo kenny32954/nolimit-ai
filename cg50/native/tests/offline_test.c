@@ -589,6 +589,23 @@ int main(void)
     qb_offline_answer("computer_science", "explain", "school", "what is an operating system", out, sizeof(out));
     expect_contains("knowledge operating system", out, "memory management");
 
+
+    qb_offline_answer("auto", "answer", "school", "please calculate 2+2", out, sizeof(out));
+    expect_contains("polite calculate", out, "4");
+
+    qb_offline_answer("algebra_1", "steps", "school", "can you solve 3x+7=25", out, sizeof(out));
+    expect_contains("polite solve", out, "x = 6");
+
+    qb_offline_answer("biology", "explain", "school", "hey qbai, explain mitosis", out, sizeof(out));
+    expect_contains("qbai prefix explain", out, "daughter cells");
+
+    qb_offline_answer("biology", "explain", "school", "what is meiosis", out, sizeof(out));
+    expect_contains("polite followup base", out, "haploid");
+
+    qb_offline_answer("biology", "explain", "school", "could you please explain that", out, sizeof(out));
+    expect_contains("polite followup", out, "We were talking about");
+    expect_contains("polite followup topic", out, "meiosis");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
