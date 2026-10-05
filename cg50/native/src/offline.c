@@ -3564,6 +3564,149 @@ static bool try_language_tools(char const *prompt, char *out, size_t out_size)
         return true;
     }
 
+    if(starts_with(lower,"word frequency ")) {
+        char work[420];
+        char target[80];
+        char *inpos;
+        char *tok;
+        int count=0;
+
+        snprintf(work,sizeof(work),"%.419s",prompt+15);
+        inpos=strstr(work," in ");
+        if(!inpos) return false;
+        *inpos='\0';
+        snprintf(target,sizeof(target),"%.79s",work);
+        trim_text(target);
+        lowercase_into(target,target,sizeof(target));
+
+        tok=strtok(inpos+4," ,.;:!?\t\r\n");
+        while(tok) {
+            char token[80];
+            lowercase_into(tok,token,sizeof(token));
+            if(strcmp(token,target)==0) count++;
+            tok=strtok(NULL," ,.;:!?\t\r\n");
+        }
+        snprintf(out,out_size,"\"%s\" appears %d time%s.",target,count,count==1?"":"s");
+        return true;
+    }
+
+    if(starts_with(lower,"contains ")) {
+        char work[420];
+        char needle[120];
+        char haystack_lower[420];
+        char needle_lower[120];
+        char *inpos;
+
+        snprintf(work,sizeof(work),"%.419s",prompt+9);
+        inpos=strstr(work," in ");
+        if(!inpos) return false;
+        *inpos='\0';
+        snprintf(needle,sizeof(needle),"%.119s",work);
+        trim_text(needle);
+        lowercase_into(needle,needle_lower,sizeof(needle_lower));
+        lowercase_into(inpos+4,haystack_lower,sizeof(haystack_lower));
+
+        snprintf(out,out_size,"%s. The text %s contain \"%s\".",
+            strstr(haystack_lower,needle_lower)?"Yes":"No",
+            strstr(haystack_lower,needle_lower)?"does":"does not",
+            needle);
+        return true;
+    }
+
+    if(starts_with(lower,"duplicate words ") || starts_with(lower,"repeated words ")) {
+        char work[420];
+        char *words[48];
+        char *tok;
+        int count=0;
+        int i,j;
+        bool found=false;
+        size_t used=0;
+
+        p=starts_with(lower,"duplicate words ")?(char *)prompt+16:(char *)prompt+15;
+        snprintf(work,sizeof(work),"%.419s",p);
+        for(i=0;work[i];i++) work[i]=(char)tolower((unsigned char)work[i]);
+
+        tok=strtok(work," ,.;:!?\t\r\n");
+        while(tok && count<48) {
+            words[count++]=tok;
+            tok=strtok(NULL," ,.;:!?\t\r\n");
+        }
+
+        out[0]='\0';
+        for(i=0;i<count;i++) {
+            bool already=false;
+            int occurrences=1;
+            for(j=0;j<i;j++) if(strcmp(words[j],words[i])==0) already=true;
+            if(already) continue;
+            for(j=i+1;j<count;j++) if(strcmp(words[j],words[i])==0) occurrences++;
+            if(occurrences>1) {
+                used=strlen(out);
+                snprintf(out+used,out_size-used,"%s%s(%d)",found?", ":"",words[i],occurrences);
+                found=true;
+                if(strlen(out)+24>=out_size) break;
+            }
+        }
+
+        if(!found) snprintf(out,out_size,"No repeated words found.");
+        else {
+            char temp[500];
+            snprintf(temp,sizeof(temp),"Repeated words: %s",out);
+            snprintf(out,out_size,"%s",temp);
+        }
+        return true;
+    }
+
+    if(starts_with(lower,"sentence check ")) {
+        char work[420];
+        size_t len;
+        int words=0;
+        bool in_word=false;
+        bool starts_cap=false;
+        bool ends_punct=false;
+        bool adjacent_repeat=false;
+        char prev[80]="";
+        char token[80];
+        size_t ti=0;
+
+        snprintf(work,sizeof(work),"%.419s",prompt+15);
+        trim_text(work);
+        len=strlen(work);
+
+        for(i=0;i<len;i++) {
+            unsigned char c=(unsigned char)work[i];
+            if(isalpha(c) && words==0 && ti==0) starts_cap=isupper(c)!=0;
+
+            if(isalnum(c)) {
+                if(!in_word) words++;
+                in_word=true;
+                if(ti+1<sizeof(token)) token[ti++]=(char)tolower(c);
+            } else {
+                if(in_word) {
+                    token[ti]='\0';
+                    if(prev[0] && strcmp(prev,token)==0) adjacent_repeat=true;
+                    snprintf(prev,sizeof(prev),"%.79s",token);
+                    ti=0;
+                }
+                in_word=false;
+            }
+        }
+        if(in_word) {
+            token[ti]='\0';
+            if(prev[0] && strcmp(prev,token)==0) adjacent_repeat=true;
+        }
+
+        if(len>0) {
+            char c=work[len-1];
+            ends_punct=(c=='.' || c=='!' || c=='?');
+        }
+
+        snprintf(out,out_size,
+            "Sentence mechanics: words=%d; starts with capital=%s; ends with punctuation=%s; adjacent repeated word=%s. "
+            "This checks mechanics, not full grammar or meaning.",
+            words,starts_cap?"yes":"no",ends_punct?"yes":"no",adjacent_repeat?"yes":"no");
+        return true;
+    }
+
     return false;
 }
 
