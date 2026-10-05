@@ -46,6 +46,15 @@ jobs:
           gcc -std=c11 -Wall -Wextra -Werror             cg50/native/tests/offline_test.c             cg50/native/src/offline.c             -Icg50/native/src -lm             -o /tmp/qb_offline_test
           /tmp/qb_offline_test
 
+      - name: Run standalone type-anything fuzz corpus
+        run: |
+          gcc -std=c11 -Wall -Wextra -Werror \
+            cg50/native/tests/offline_fuzz_test.c \
+            cg50/native/src/offline.c \
+            -Icg50/native/src -lm \
+            -o /tmp/qb_offline_fuzz_test
+          /tmp/qb_offline_fuzz_test
+
       - name: Check native C syntax
         run: |
           gcc -std=c11 -Wall -Wextra -Werror -fsyntax-only \
