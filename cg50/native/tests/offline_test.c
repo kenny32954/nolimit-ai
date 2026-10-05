@@ -511,6 +511,34 @@ int main(void)
     qb_offline_answer("biology", "explain", "school", "same for photosynthesis", out, sizeof(out));
     expect_contains("same for followup", out, "chemical energy");
 
+
+    qb_offline_answer("math", "answer", "school", "simplify fraction 42/56", out, sizeof(out));
+    expect_contains("fraction simplify", out, "3/4");
+
+    qb_offline_answer("consumer_math", "answer", "school", "what percent is 15 of 60", out, sizeof(out));
+    expect_contains("reverse percent", out, "25%");
+
+    qb_offline_answer("consumer_math", "answer", "school", "increase 80 by 15 percent", out, sizeof(out));
+    expect_contains("percent increase direct", out, "92");
+
+    qb_offline_answer("geometry", "answer", "school", "midpoint between 1 2 5 8", out, sizeof(out));
+    expect_contains("midpoint tool", out, "(3, 5)");
+
+    qb_offline_answer("math", "answer", "school", "roman 49", out, sizeof(out));
+    expect_contains("roman encode", out, "XLIX");
+
+    qb_offline_answer("math", "answer", "school", "roman to decimal XLIX", out, sizeof(out));
+    expect_contains("roman decode", out, "49");
+
+    qb_offline_answer("auto", "answer", "school", "is listen an anagram of silent", out, sizeof(out));
+    expect_contains("anagram yes", out, "Yes");
+
+    qb_offline_answer("auto", "answer", "school", "rot13 hello", out, sizeof(out));
+    expect_contains("rot13 tool", out, "uryyb");
+
+    qb_offline_answer("auto", "answer", "school", "caesar 3 abc xyz", out, sizeof(out));
+    expect_contains("caesar tool", out, "def abc");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
