@@ -1182,7 +1182,7 @@ static long days_from_civil_int(int y, unsigned m, unsigned d)
     y -= m <= 2;
     era = (y >= 0 ? y : y-399) / 400;
     yoe = (unsigned)(y - era*400);
-    doy = (153*(m + (m > 2 ? (unsigned)-3 : 9)) + 2)/5 + d-1;
+    doy = (153*(m > 2 ? m-3 : m+9) + 2)/5 + d-1;
     doe = yoe*365 + yoe/4 - yoe/100 + doy;
     return (long)era*146097L + (long)doe - 719468L;
 }
