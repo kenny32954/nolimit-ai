@@ -943,6 +943,7 @@ static bool try_word_parts(char const *subject, char const *prompt, char *out, s
     lowercase_into(topic,lower,sizeof(lower));
     friendly_subject(subject,subject_name,sizeof(subject_name));
 
+    if(suggest_fact_entry(topic)) return false;
     if(strchr(lower,' ') || strlen(lower)<5) return false;
 
     for(i=0;i<sizeof(wordparts)/sizeof(wordparts[0]);i++) {
@@ -2888,7 +2889,8 @@ static char const *infer_subject_local(char const *text)
     if(strstr(text, "music") || strstr(text, "chord") || strstr(text, "rhythm") ||
        strstr(text, "tempo")) return "music";
 
-    if(strstr(text, "photo") || strstr(text, "aperture") || strstr(text, "shutter")) return "photography";
+    if(strstr(text, "photography") || phrase_match(text, "photo") ||
+       strstr(text, "aperture") || strstr(text, "shutter")) return "photography";
     if(strstr(text, "nutrition") || strstr(text, "vitamin") || strstr(text, "calorie")) return "nutrition";
     if(strstr(text, "latitude") || strstr(text, "longitude") || strstr(text, "map")) return "geography";
 
