@@ -3912,13 +3912,18 @@ static bool try_relationship_word_problem(char const *text, char *out, size_t ou
         return true;
     }
 
-    if(n>=2 && strstr(text,"sum") && strstr(text,"difference") &&
+    if(strstr(text,"sum") && strstr(text,"difference") &&
        (strstr(text,"two numbers") || strstr(text,"numbers"))) {
-        double sum=v[0], diff=v[1];
-        snprintf(out,out_size,
-            "If x+y=%.12g and x-y=%.12g, the numbers are %.12g and %.12g.",
-            sum,diff,(sum+diff)/2.0,(sum-diff)/2.0);
-        return true;
+        double sumv[2], diffv[2];
+        int ns = extract_flexible_numbers(strstr(text,"sum") + 3, sumv, 2);
+        int nd = extract_flexible_numbers(strstr(text,"difference") + 10, diffv, 2);
+        if(ns>=1 && nd>=1) {
+            double sum=sumv[0], diff=diffv[0];
+            snprintf(out,out_size,
+                "If x+y=%.12g and x-y=%.12g, the numbers are %.12g and %.12g.",
+                sum,diff,(sum+diff)/2.0,(sum-diff)/2.0);
+            return true;
+        }
     }
 
     if(n>=3 && strstr(text,"split") && strstr(text,"ratio")) {
