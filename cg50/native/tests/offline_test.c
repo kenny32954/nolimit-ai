@@ -786,6 +786,33 @@ int main(void)
     qb_offline_answer("statistics", "answer", "school", "zscore 85 75 5", out, sizeof(out));
     expect_contains("zscore tool", out, "2");
 
+
+    qb_offline_answer("algebra_1", "steps", "school", "Alex is 5 years older than Sam. Sam is 12. How old is Alex?", out, sizeof(out));
+    expect_contains("age older problem", out, "17");
+
+    qb_offline_answer("algebra_1", "steps", "school", "Mia is 3 years younger than Jay. Jay is 14. How old is Mia?", out, sizeof(out));
+    expect_contains("age younger problem", out, "11");
+
+    qb_offline_answer("math", "answer", "school", "split 100 in ratio 2:3", out, sizeof(out));
+    expect_contains("ratio split first", out, "40");
+    expect_contains("ratio split second", out, "60");
+
+    qb_offline_answer("consumer_math", "answer", "school", "grade 45 out of 50", out, sizeof(out));
+    expect_contains("grade percentage", out, "90%");
+
+    qb_offline_answer("consumer_math", "answer", "school", "earn 15 dollars per hour for 8 hours", out, sizeof(out));
+    expect_contains("hourly pay", out, "120");
+
+    qb_offline_answer("statistics", "answer", "school", "weighted average 90 40 80 60", out, sizeof(out));
+    expect_contains("weighted average", out, "84");
+
+    qb_offline_answer("math", "answer", "school", "6 boxes each have 4 pencils how many total", out, sizeof(out));
+    expect_contains("equal groups natural", out, "24");
+
+    qb_offline_answer("algebra_1", "answer", "school", "two numbers have sum 20 and difference 4", out, sizeof(out));
+    expect_contains("sum difference first", out, "12");
+    expect_contains("sum difference second", out, "8");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
