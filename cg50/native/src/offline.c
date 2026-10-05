@@ -4263,10 +4263,6 @@ static bool try_science_formula(char const *text, char *out, size_t out_size)
         snprintf(out,out_size,"Electrical power P=VI = %.12g W",v[0]*v[1]);
         return true;
     }
-    if(n>=2 && strstr(text,"wave speed")) {
-        snprintf(out,out_size,"Wave speed v=f*lambda = %.12g",v[0]*v[1]);
-        return true;
-    }
     if(n>=2 && strstr(text,"work") && strstr(text,"force") && strstr(text,"distance")) {
         snprintf(out,out_size,"For force parallel to motion, W=F*d = %.12g J",v[0]*v[1]);
         return true;
@@ -4290,21 +4286,26 @@ static bool try_science_formula(char const *text, char *out, size_t out_size)
         return true;
     }
 
-    if(n>=1 && strstr(text,"frequency") && strstr(text,"period") && !strstr(text,"wavelength")) {
+    if(n>=1 && starts_with(text,"frequency") && strstr(text,"period")) {
         if(v[0]==0.0) snprintf(out,out_size,"Period cannot be zero.");
         else snprintf(out,out_size,"Frequency f=1/T = %.12g Hz",1.0/v[0]);
         return true;
     }
 
-    if(n>=1 && strstr(text,"period") && strstr(text,"frequency") && starts_with(text,"period")) {
+    if(n>=1 && starts_with(text,"period") && strstr(text,"frequency")) {
         if(v[0]==0.0) snprintf(out,out_size,"Frequency cannot be zero.");
         else snprintf(out,out_size,"Period T=1/f = %.12g s",1.0/v[0]);
         return true;
     }
 
-    if(n>=2 && strstr(text,"wavelength") && strstr(text,"wave speed") && strstr(text,"frequency")) {
+    if(n>=2 && starts_with(text,"wavelength") && strstr(text,"wave speed") && strstr(text,"frequency")) {
         if(v[1]==0.0) snprintf(out,out_size,"Frequency cannot be zero.");
         else snprintf(out,out_size,"Wavelength lambda=v/f = %.12g",v[0]/v[1]);
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"wave speed")) {
+        snprintf(out,out_size,"Wave speed v=f*lambda = %.12g",v[0]*v[1]);
         return true;
     }
 
