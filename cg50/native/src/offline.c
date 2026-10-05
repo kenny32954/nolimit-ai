@@ -3669,8 +3669,13 @@ static bool try_language_tools(char const *prompt, char *out, size_t out_size)
         size_t ti=0;
 
         snprintf(work,sizeof(work),"%.419s",prompt+15);
-        trim_text(work);
-        len=strlen(work);
+        {
+            char *start=work;
+            while(*start && isspace((unsigned char)*start)) start++;
+            if(start!=work) memmove(work,start,strlen(start)+1);
+            len=strlen(work);
+            while(len>0 && isspace((unsigned char)work[len-1])) work[--len]='\0';
+        }
 
         for(i=0;i<len;i++) {
             unsigned char c=(unsigned char)work[i];
