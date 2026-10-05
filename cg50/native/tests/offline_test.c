@@ -581,7 +581,7 @@ int main(void)
     expect_contains("knowledge checks balances", out, "branches of government");
 
     qb_offline_answer("history", "explain", "school", "what was the industrial revolution", out, sizeof(out));
-    expect_contains("knowledge industrial revolution", out, "mechanized production");
+    expect_contains("knowledge industrial revolution", out, "mechanization");
 
     qb_offline_answer("economics", "explain", "school", "what is comparative advantage", out, sizeof(out));
     expect_contains("knowledge comparative advantage", out, "opportunity cost");
