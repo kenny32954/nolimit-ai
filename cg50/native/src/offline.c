@@ -2377,6 +2377,217 @@ static bool try_number_theory(char const *text, char *out, size_t out_size)
 }
 
 
+
+static void reduce_fraction_long(long *num, long *den)
+{
+    long g;
+    if(*den<0) { *den=-*den; *num=-*num; }
+    g=gcd_long(*num,*den);
+    if(g==0) g=1;
+    *num/=g;
+    *den/=g;
+}
+
+static bool parse_fraction_operation(char const *text,
+                                     long *a,long *b,char *op,long *c,long *d)
+{
+    char work[220];
+    char *p;
+    int matched;
+
+    snprintf(work,sizeof(work),"%s",text);
+    trim_text(work);
+    p=work;
+
+    if(starts_with(p,"fraction ")) p+=9;
+    else if(starts_with(p,"fractions ")) p+=10;
+    else if(starts_with(p,"calculate ")) p+=10;
+
+    matched=sscanf(p," %ld / %ld %c %ld / %ld ",a,b,op,c,d);
+    if(matched!=5) return false;
+    if(*op!='+' && *op!='-' && *op!='*' && *op!='/') return false;
+    return true;
+}
+
+static bool try_exact_fraction_arithmetic(char const *text, char *out, size_t out_size)
+{
+    long a,b,c,d,numer,denom;
+    char op;
+
+    if(!parse_fraction_operation(text,&a,&b,&op,&c,&d)) return false;
+
+    if(b==0 || d==0) {
+        snprintf(out,out_size,"A denominator cannot be zero.");
+        return true;
+    }
+
+    if(op=='+') { numer=a*d+c*b; denom=b*d; }
+    else if(op=='-') { numer=a*d-c*b; denom=b*d; }
+    else if(op=='*') { numer=a*c; denom=b*d; }
+    else {
+        if(c==0) {
+            snprintf(out,out_size,"Division by a zero fraction is undefined.");
+            return true;
+        }
+        numer=a*d;
+        denom=b*c;
+    }
+
+    reduce_fraction_long(&numer,&denom);
+
+    if(denom==1) snprintf(out,out_size,"%ld/%ld %c %ld/%ld = %ld",a,b,op,c,d,numer);
+    else snprintf(out,out_size,"%ld/%ld %c %ld/%ld = %ld/%ld",a,b,op,c,d,numer,denom);
+    return true;
+}
+
+static bool try_radical_simplify(char const *text, char *out, size_t out_size)
+{
+    double v[4];
+    int n;
+    long value,inside,outside=1,p;
+
+    if(!(starts_with(text,"simplify radical ") ||
+         starts_with(text,"simplify sqrt ") ||
+         starts_with(text,"simplify square root "))) return false;
+
+    n=extract_flexible_numbers(text,v,4);
+    if(n<1) return false;
+
+    value=(long)llround(v[0]);
+    if(fabs(v[0]-(double)value)>1e-10) {
+        snprintf(out,out_size,"Exact radical simplification currently expects an integer radicand.");
+        return true;
+    }
+    if(value<0) {
+        snprintf(out,out_size,"For real-number simplification, the radicand must be nonnegative.");
+        return true;
+    }
+    if(value==0) {
+        snprintf(out,out_size,"sqrt(0) = 0");
+        return true;
+    }
+
+    inside=value;
+    for(p=2;p<=inside/p;p++) {
+        long square=p*p;
+        while(inside%square==0) {
+            inside/=square;
+            outside*=p;
+        }
+    }
+
+    if(inside==1) snprintf(out,out_size,"sqrt(%ld) = %ld",value,outside);
+    else if(outside==1) snprintf(out,out_size,"sqrt(%ld) is already simplified.",value);
+    else snprintf(out,out_size,"sqrt(%ld) = %ld*sqrt(%ld)",value,outside,inside);
+    return true;
+}
+
+static void format_linear_factor(long p, long q, char *out, size_t out_size)
+{
+    if(p==1) {
+        if(q==0) snprintf(out,out_size,"x");
+        else snprintf(out,out_size,"(x %c %ld)",q<0?'-':'+',labs(q));
+    }
+    else if(p==-1) {
+        if(q==0) snprintf(out,out_size,"-x");
+        else snprintf(out,out_size,"(-x %c %ld)",q<0?'-':'+',labs(q));
+    }
+    else {
+        if(q==0) snprintf(out,out_size,"%ldx",p);
+        else snprintf(out,out_size,"(%ldx %c %ld)",p,q<0?'-':'+',labs(q));
+    }
+}
+
+static bool try_quadratic_factor(char const *text, char *out, size_t out_size)
+{
+    char expr[220];
+    char *ptext;
+    double ad,bd,cd;
+    long a,b,c,p,q,r,t;
+    char f1[90],f2[90];
+
+    if(!starts_with(text,"factor ") || !strstr(text,"x^2")) return false;
+
+    snprintf(expr,sizeof(expr),"%s",text+7);
+    trim_text(expr);
+    ptext=expr;
+
+    if(!parse_quadratic_side(ptext,&ad,&bd,&cd)) return false;
+    a=(long)llround(ad); b=(long)llround(bd); c=(long)llround(cd);
+
+    if(fabs(ad-a)>1e-10 || fabs(bd-b)>1e-10 || fabs(cd-c)>1e-10 || a==0) {
+        snprintf(out,out_size,"Integer quadratic factoring currently expects integer coefficients.");
+        return true;
+    }
+
+    for(p=-labs(a);p<=labs(a);p++) {
+        if(p==0 || a%p!=0) continue;
+        r=a/p;
+
+        if(c==0) {
+            if(b%p==0) {
+                q=0; t=b/p;
+                format_linear_factor(p,q,f1,sizeof(f1));
+                format_linear_factor(r,t,f2,sizeof(f2));
+                snprintf(out,out_size,"%s%s",f1,f2);
+                return true;
+            }
+        }
+
+        for(q=-labs(c)-1;q<=labs(c)+1;q++) {
+            if(q==0 || c%q!=0) continue;
+            t=c/q;
+            if(p*t+q*r==b) {
+                format_linear_factor(p,q,f1,sizeof(f1));
+                format_linear_factor(r,t,f2,sizeof(f2));
+                snprintf(out,out_size,"%ldx^2 %c %ldx %c %ld = %s%s",
+                    a,b<0?'-':'+',labs(b),c<0?'-':'+',labs(c),f1,f2);
+                return true;
+            }
+        }
+    }
+
+    snprintf(out,out_size,"That quadratic does not factor cleanly over integers. Use the quadratic formula or roots instead.");
+    return true;
+}
+
+static bool try_scientific_notation(char const *text, char *out, size_t out_size)
+{
+    double v[4],x,mantissa;
+    int n,exp10;
+
+    if(!(starts_with(text,"scientific notation ") ||
+         starts_with(text,"sci notation ") ||
+         starts_with(text,"write in scientific notation "))) return false;
+
+    n=extract_flexible_numbers(text,v,4);
+    if(n<1) return false;
+    x=v[0];
+
+    if(x==0.0) {
+        snprintf(out,out_size,"0 = 0 x 10^0");
+        return true;
+    }
+
+    exp10=(int)floor(log10(fabs(x)));
+    mantissa=x/pow(10.0,exp10);
+
+    if(fabs(mantissa)>=10.0) { mantissa/=10.0; exp10++; }
+    if(fabs(mantissa)<1.0) { mantissa*=10.0; exp10--; }
+
+    snprintf(out,out_size,"%.12g = %.12g x 10^%d",x,mantissa,exp10);
+    return true;
+}
+
+static bool try_exact_math_tools(char const *text, char *out, size_t out_size)
+{
+    if(try_exact_fraction_arithmetic(text,out,out_size)) return true;
+    if(try_radical_simplify(text,out,out_size)) return true;
+    if(try_quadratic_factor(text,out,out_size)) return true;
+    if(try_scientific_notation(text,out,out_size)) return true;
+    return false;
+}
+
 static bool try_fraction_percent_tools(char const *text, char *out, size_t out_size)
 {
     long a,b;
@@ -6125,6 +6336,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_function_analysis(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_exact_math_tools(lowerbuf, out, out_size)) {
         return true;
     }
 
