@@ -4122,6 +4122,59 @@ static bool split_numeric_sides(char const *text,
     return *nl>0 && *nr>0;
 }
 
+
+static double det3_values(double const m[9])
+{
+    return m[0]*(m[4]*m[8]-m[5]*m[7])
+         - m[1]*(m[3]*m[8]-m[5]*m[6])
+         + m[2]*(m[3]*m[7]-m[4]*m[6]);
+}
+
+static bool try_linear_algebra_3x3(char const *text, char *out, size_t out_size)
+{
+    double v[20];
+    int n=extract_flexible_numbers(text,v,20);
+
+    if((starts_with(text,"det3 ") || starts_with(text,"determinant3 ") ||
+        starts_with(text,"3x3 determinant ")) && n>=9) {
+        double m[9];
+        int i;
+        for(i=0;i<9;i++) m[i]=v[i];
+        snprintf(out,out_size,"3x3 determinant = %.12g",det3_values(m));
+        return true;
+    }
+
+    if((starts_with(text,"solve3 ") || starts_with(text,"solve 3x3 ")) && n>=12) {
+        double a[9]={v[0],v[1],v[2],v[4],v[5],v[6],v[8],v[9],v[10]};
+        double rhs[3]={v[3],v[7],v[11]};
+        double ax[9],ay[9],az[9];
+        double d,dx,dy,dz;
+        int i;
+
+        for(i=0;i<9;i++) { ax[i]=a[i]; ay[i]=a[i]; az[i]=a[i]; }
+        ax[0]=rhs[0]; ax[3]=rhs[1]; ax[6]=rhs[2];
+        ay[1]=rhs[0]; ay[4]=rhs[1]; ay[7]=rhs[2];
+        az[2]=rhs[0]; az[5]=rhs[1]; az[8]=rhs[2];
+
+        d=det3_values(a);
+        if(fabs(d)<1e-12) {
+            snprintf(out,out_size,"The 3x3 coefficient matrix has determinant 0, so there is no unique solution.");
+            return true;
+        }
+
+        dx=det3_values(ax);
+        dy=det3_values(ay);
+        dz=det3_values(az);
+
+        snprintf(out,out_size,
+            "3x3 system by Cramer's rule: x=%.12g, y=%.12g, z=%.12g",
+            dx/d,dy/d,dz/d);
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_linear_algebra_tools(char const *text, char *out, size_t out_size)
 {
     double v[16];
@@ -4662,6 +4715,83 @@ static bool try_cs_bit_tools(char const *prompt, char *out, size_t out_size)
     return false;
 }
 
+
+
+static bool try_advanced_geometry(char const *text, char *out, size_t out_size)
+{
+    double v[10];
+    int n=extract_flexible_numbers(text,v,10);
+    const double pi=3.14159265358979323846;
+
+    if(n>=3 && (starts_with(text,"heron ") || strstr(text,"heron area") ||
+       starts_with(text,"triangle area sides "))) {
+        double a=v[0],b=v[1],c=v[2];
+        double p=(a+b+c)/2.0;
+        if(a<=0.0 || b<=0.0 || c<=0.0 || a+b<=c || a+c<=b || b+c<=a) {
+            snprintf(out,out_size,"Those side lengths do not form a valid triangle.");
+        } else {
+            snprintf(out,out_size,
+                "Heron's formula: s=%.12g; area=sqrt(s(s-a)(s-b)(s-c)) = %.12g",
+                p,sqrt(p*(p-a)*(p-b)*(p-c)));
+        }
+        return true;
+    }
+
+    if(n>=2 && (starts_with(text,"arc length ") || strstr(text,"arc length radius"))) {
+        double r=v[0],angle=v[1];
+        if(r<0.0) snprintf(out,out_size,"Radius must be nonnegative.");
+        else snprintf(out,out_size,
+            "Arc length = r*theta = %.12g (theta %.12g deg = %.12g rad)",
+            r*(angle*pi/180.0),angle,angle*pi/180.0);
+        return true;
+    }
+
+    if(n>=2 && (starts_with(text,"sector area ") || strstr(text,"area of sector"))) {
+        double r=v[0],angle=v[1];
+        if(r<0.0) snprintf(out,out_size,"Radius must be nonnegative.");
+        else snprintf(out,out_size,
+            "Sector area = theta/360*pi*r^2 = %.12g",
+            (angle/360.0)*pi*r*r);
+        return true;
+    }
+
+    if(n>=3 && (starts_with(text,"classify triangle ") ||
+       starts_with(text,"triangle classify "))) {
+        double a=v[0],b=v[1],c=v[2];
+        char const *side_type;
+        char const *angle_type;
+        double x=a,y=b,z=c,t;
+
+        if(a<=0.0 || b<=0.0 || c<=0.0 || a+b<=c || a+c<=b || b+c<=a) {
+            snprintf(out,out_size,"Those side lengths do not form a valid triangle.");
+            return true;
+        }
+
+        if(approx_equal(a,b) && approx_equal(b,c)) side_type="equilateral";
+        else if(approx_equal(a,b) || approx_equal(a,c) || approx_equal(b,c)) side_type="isosceles";
+        else side_type="scalene";
+
+        if(x>y) { t=x;x=y;y=t; }
+        if(y>z) { t=y;y=z;z=t; }
+        if(x>y) { t=x;x=y;y=t; }
+
+        if(approx_equal(x*x+y*y,z*z)) angle_type="right";
+        else if(x*x+y*y>z*z) angle_type="acute";
+        else angle_type="obtuse";
+
+        snprintf(out,out_size,"Triangle classification: %s and %s.",side_type,angle_type);
+        return true;
+    }
+
+    if(n>=3 && starts_with(text,"triangle perimeter ")) {
+        if(v[0]<=0.0 || v[1]<=0.0 || v[2]<=0.0)
+            snprintf(out,out_size,"Side lengths must be positive.");
+        else snprintf(out,out_size,"Triangle perimeter = %.12g",v[0]+v[1]+v[2]);
+        return true;
+    }
+
+    return false;
+}
 
 static bool try_geometry_extra(char const *text, char *out, size_t out_size)
 {
@@ -7142,6 +7272,10 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(try_linear_algebra_3x3(lowerbuf, out, out_size)) {
+        return true;
+    }
+
     if(try_linear_algebra_tools(lowerbuf, out, out_size)) {
         return true;
     }
@@ -7175,6 +7309,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_business_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_advanced_geometry(lowerbuf, out, out_size)) {
         return true;
     }
 
