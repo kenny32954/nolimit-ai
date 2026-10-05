@@ -796,7 +796,7 @@ static bool try_literal_analysis(char const *prompt, char *out, size_t out_size)
 
     {
         char const *dot = strrchr(p, '.');
-        if(dot && dot != p && !strchr(dot, ' ') && strlen(dot) <= 12) {
+        if(dot && dot != p && !strchr(p, ' ') && strlen(dot) <= 12) {
             snprintf(out, out_size,
                 "\"%.120s\" looks like a filename. Extension: %s.",
                 p, dot);
