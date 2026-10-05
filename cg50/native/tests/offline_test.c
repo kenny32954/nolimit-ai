@@ -282,6 +282,28 @@ int main(void)
     expect_contains("statement classification", out, "statement rather than a direct question");
     expect_contains("statement exact", out, "empire expanded quickly");
 
+
+    qb_offline_answer("auto", "answer", "school", "twenty five plus seven", out, sizeof(out));
+    expect_contains("number words plus", out, "32");
+
+    qb_offline_answer("auto", "answer", "school", "one hundred divided by four", out, sizeof(out));
+    expect_contains("number words divide", out, "25");
+
+    qb_offline_answer("auto", "answer", "school", "what is forty two minus nineteen", out, sizeof(out));
+    expect_contains("number words subtract", out, "23");
+
+    qb_offline_answer("auto", "steps", "school", "sam has 8 apples and gets 5 more", out, sizeof(out));
+    expect_contains("word problem add", out, "13");
+
+    qb_offline_answer("auto", "steps", "school", "sam has 12 apples and gives 4 away", out, sizeof(out));
+    expect_contains("word problem subtract", out, "8");
+
+    qb_offline_answer("physics", "steps", "school", "a car travels 60 miles per hour for 2 hours", out, sizeof(out));
+    expect_contains("rate time word problem", out, "120 miles");
+
+    qb_offline_answer("consumer_math", "steps", "school", "percent increase from 50 to 75", out, sizeof(out));
+    expect_contains("percent increase word problem", out, "50%");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
