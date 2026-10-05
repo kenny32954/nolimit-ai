@@ -2582,8 +2582,135 @@ static bool try_scientific_notation(char const *text, char *out, size_t out_size
     return true;
 }
 
+
+static bool try_absolute_value_equation(char const *text, char *out, size_t out_size)
+{
+    char work[220];
+    char inside[140];
+    char *bar1,*bar2,*eq,*rhs;
+    double a,b,r,x1,x2;
+
+    if(!strchr(text,'|') || !strchr(text,'=')) return false;
+
+    snprintf(work,sizeof(work),"%s",text);
+    if(starts_with(work,"solve ")) memmove(work,work+6,strlen(work+6)+1);
+
+    bar1=strchr(work,'|');
+    if(!bar1) return false;
+    bar2=strchr(bar1+1,'|');
+    if(!bar2) return false;
+    eq=strchr(bar2+1,'=');
+    if(!eq) return false;
+
+    *bar2='\0';
+    snprintf(inside,sizeof(inside),"%s",bar1+1);
+    rhs=eq+1;
+
+    if(!parse_linear_side(inside,&a,&b)) return false;
+    if(!eval_expression(rhs,&r)) return false;
+
+    if(r<0.0) {
+        snprintf(out,out_size,"No real solution: an absolute value cannot equal a negative number.");
+        return true;
+    }
+
+    if(fabs(a)<1e-12) {
+        if(fabs(fabs(b)-r)<1e-12) snprintf(out,out_size,"Every real x is a solution.");
+        else snprintf(out,out_size,"No solution.");
+        return true;
+    }
+
+    x1=(r-b)/a;
+    x2=(-r-b)/a;
+
+    if(fabs(x1-x2)<1e-12) {
+        snprintf(out,out_size,"|%.12gx %c %.12g| = %.12g -> x = %.12g",
+                 a,b<0?'-':'+',fabs(b),r,x1);
+    } else {
+        snprintf(out,out_size,
+            "Absolute-value equation splits into two cases.\n"
+            "x1 = %.12g\nx2 = %.12g",x1,x2);
+    }
+    return true;
+}
+
+static bool try_discriminant_tool(char const *text, char *out, size_t out_size)
+{
+    double a,b,c,d;
+    double v[6];
+    int n;
+    char expr[220];
+
+    if(!starts_with(text,"discriminant ")) return false;
+
+    snprintf(expr,sizeof(expr),"%s",text+13);
+    trim_text(expr);
+
+    if(strstr(expr,"x^2")) {
+        if(!parse_quadratic_side(expr,&a,&b,&c)) return false;
+    } else {
+        n=extract_flexible_numbers(expr,v,6);
+        if(n<3) return false;
+        a=v[0]; b=v[1]; c=v[2];
+    }
+
+    if(fabs(a)<1e-12) {
+        snprintf(out,out_size,"a must be nonzero for a quadratic.");
+        return true;
+    }
+
+    d=b*b-4.0*a*c;
+    snprintf(out,out_size,
+        "Discriminant b^2-4ac = %.12g. %s",
+        d,
+        d>0.0 ? "Two distinct real roots." :
+        (fabs(d)<1e-12 ? "One repeated real root." : "Two complex conjugate roots."));
+    return true;
+}
+
+static bool try_common_denominator(char const *text, char *out, size_t out_size)
+{
+    long a,b,c,d,g,lcd,n1,n2;
+    char work[220];
+    char *p;
+
+    if(!(starts_with(text,"common denominator ") ||
+         starts_with(text,"lcd fractions ") ||
+         starts_with(text,"least common denominator "))) return false;
+
+    snprintf(work,sizeof(work),"%s",text);
+
+    if(starts_with(work,"common denominator ")) p=work+19;
+    else if(starts_with(work,"lcd fractions ")) p=work+14;
+    else p=work+25;
+
+    if(sscanf(p," %ld / %ld %ld / %ld",&a,&b,&c,&d)!=4 &&
+       sscanf(p," %ld/%ld , %ld/%ld",&a,&b,&c,&d)!=4) {
+        return false;
+    }
+
+    if(b==0 || d==0) {
+        snprintf(out,out_size,"A denominator cannot be zero.");
+        return true;
+    }
+
+    b=labs(b); d=labs(d);
+    g=gcd_long(b,d);
+    lcd=labs((b/g)*d);
+    n1=a*(lcd/b);
+    n2=c*(lcd/d);
+
+    snprintf(out,out_size,
+        "LCD = %ld. Equivalent fractions: %ld/%ld and %ld/%ld.",
+        lcd,n1,lcd,n2,lcd);
+    return true;
+}
+
 static bool try_exact_math_tools(char const *text, char *out, size_t out_size)
 {
+    if(try_absolute_value_equation(text,out,out_size)) return true;
+    if(try_discriminant_tool(text,out,out_size)) return true;
+    if(try_common_denominator(text,out,out_size)) return true;
     if(try_exact_fraction_arithmetic(text,out,out_size)) return true;
     if(try_radical_simplify(text,out,out_size)) return true;
     if(try_quadratic_factor(text,out,out_size)) return true;
