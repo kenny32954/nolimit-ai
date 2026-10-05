@@ -3125,6 +3125,234 @@ static bool try_log_root_tools(char const *text, char *out, size_t out_size)
     return false;
 }
 
+
+typedef struct {
+    char const *symbol;
+    double mass;
+} atomic_mass_t;
+
+static atomic_mass_t const common_masses[] = {
+    {"H",1.008},{"He",4.0026},{"Li",6.94},{"Be",9.0122},{"B",10.81},
+    {"C",12.011},{"N",14.007},{"O",15.999},{"F",18.998},{"Ne",20.180},
+    {"Na",22.990},{"Mg",24.305},{"Al",26.982},{"Si",28.085},{"P",30.974},
+    {"S",32.06},{"Cl",35.45},{"Ar",39.948},{"K",39.0983},{"Ca",40.078},
+    {"Sc",44.956},{"Ti",47.867},{"V",50.942},{"Cr",51.996},{"Mn",54.938},
+    {"Fe",55.845},{"Co",58.933},{"Ni",58.693},{"Cu",63.546},{"Zn",65.38},
+    {"Br",79.904},{"Ag",107.8682},{"I",126.90447},{"Ba",137.327},
+    {"Au",196.96657},{"Hg",200.59},{"Pb",207.2}
+};
+
+static bool atomic_mass_lookup(char const *symbol, double *mass)
+{
+    unsigned int i;
+    for(i=0;i<sizeof(common_masses)/sizeof(common_masses[0]);i++) {
+        if(strcmp(symbol,common_masses[i].symbol)==0) {
+            *mass=common_masses[i].mass;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool simple_formula_mass(char const *formula, double *mass_out)
+{
+    char const *p=formula;
+    double total=0.0;
+    bool any=false;
+
+    while(*p) {
+        char symbol[3]={0,0,0};
+        char *end;
+        long count=1;
+        double mass;
+
+        if(!isupper((unsigned char)*p)) return false;
+        symbol[0]=*p++;
+        if(islower((unsigned char)*p)) symbol[1]=*p++;
+
+        if(!atomic_mass_lookup(symbol,&mass)) return false;
+
+        if(isdigit((unsigned char)*p)) {
+            count=strtol(p,&end,10);
+            if(end==p || count<=0) return false;
+            p=end;
+        }
+
+        total += mass*(double)count;
+        any=true;
+    }
+
+    if(!any) return false;
+    *mass_out=total;
+    return true;
+}
+
+static char const *last_token_ptr(char const *text)
+{
+    char const *last=text;
+    char const *p=text;
+    while(*p) {
+        if(isspace((unsigned char)*p) && p[1] && !isspace((unsigned char)p[1])) last=p+1;
+        p++;
+    }
+    return last;
+}
+
+static bool try_chemistry_formula_tools(char const *prompt, char *out, size_t out_size)
+{
+    char lower[260];
+    char formula[64];
+    char const *tok;
+    double mass;
+    double v[8];
+    int n;
+
+    lowercase_into(prompt,lower,sizeof(lower));
+
+    if(starts_with(lower,"molar mass ") || starts_with(lower,"formula mass ")) {
+        tok=last_token_ptr(prompt);
+        snprintf(formula,sizeof(formula),"%.63s",tok);
+        trim_text(formula);
+        if(simple_formula_mass(formula,&mass)) {
+            snprintf(out,out_size,"Molar mass of %s = %.6g g/mol.",formula,mass);
+        } else {
+            snprintf(out,out_size,
+                "I couldn't parse that simple formula. This standalone molar-mass tool supports common element symbols and numeric subscripts without parentheses.");
+        }
+        return true;
+    }
+
+    if(starts_with(lower,"moles from ") && strstr(lower," g ")) {
+        n=extract_flexible_numbers(lower,v,8);
+        tok=last_token_ptr(prompt);
+        snprintf(formula,sizeof(formula),"%.63s",tok);
+        trim_text(formula);
+        if(n>=1 && simple_formula_mass(formula,&mass)) {
+            snprintf(out,out_size,"Moles = mass/molar_mass = %.12g mol.",v[0]/mass);
+        } else {
+            snprintf(out,out_size,"Use: moles from <grams> g <simple formula>, for example: moles from 18 g H2O.");
+        }
+        return true;
+    }
+
+    if(starts_with(lower,"grams from ") && strstr(lower," mol ")) {
+        n=extract_flexible_numbers(lower,v,8);
+        tok=last_token_ptr(prompt);
+        snprintf(formula,sizeof(formula),"%.63s",tok);
+        trim_text(formula);
+        if(n>=1 && simple_formula_mass(formula,&mass)) {
+            snprintf(out,out_size,"Mass = moles*molar_mass = %.12g g.",v[0]*mass);
+        } else {
+            snprintf(out,out_size,"Use: grams from <moles> mol <simple formula>, for example: grams from 2 mol CO2.");
+        }
+        return true;
+    }
+
+    if((starts_with(lower,"particles from ") || starts_with(lower,"molecules from ")) &&
+       strstr(lower," mol")) {
+        n=extract_flexible_numbers(lower,v,8);
+        if(n>=1) {
+            snprintf(out,out_size,"Particles = moles*N_A = %.12g",v[0]*6.02214076e23);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool parse_binary_u64(char const *bits, unsigned long long *value, int *width)
+{
+    unsigned long long v=0;
+    int n=0;
+    while(*bits) {
+        if(*bits!='0' && *bits!='1') return false;
+        if(n>=64) return false;
+        v=(v<<1) | (unsigned long long)(*bits-'0');
+        bits++;
+        n++;
+    }
+    if(n==0) return false;
+    *value=v;
+    if(width) *width=n;
+    return true;
+}
+
+static void format_binary_u64(unsigned long long value, int width, char *out, size_t out_size)
+{
+    int i;
+    size_t used=0;
+    if(width<1) width=1;
+    if(width>64) width=64;
+    for(i=width-1;i>=0 && used+1<out_size;i--) {
+        out[used++]=(char)('0'+((value>>i)&1ULL));
+    }
+    out[used]='\0';
+}
+
+static bool try_cs_bit_tools(char const *prompt, char *out, size_t out_size)
+{
+    char lower[260];
+    char a[80],b[80],bits[80];
+    unsigned long long va,vb,result;
+    int wa,wb,width;
+
+    lowercase_into(prompt,lower,sizeof(lower));
+
+    if(sscanf(lower,"binary and %79s %79s",a,b)==2) {
+        if(!parse_binary_u64(a,&va,&wa) || !parse_binary_u64(b,&vb,&wb)) return false;
+        width=wa>wb?wa:wb;
+        format_binary_u64(va&vb,width,bits,sizeof(bits));
+        snprintf(out,out_size,"Binary AND = %s",bits);
+        return true;
+    }
+
+    if(sscanf(lower,"binary or %79s %79s",a,b)==2) {
+        if(!parse_binary_u64(a,&va,&wa) || !parse_binary_u64(b,&vb,&wb)) return false;
+        width=wa>wb?wa:wb;
+        format_binary_u64(va|vb,width,bits,sizeof(bits));
+        snprintf(out,out_size,"Binary OR = %s",bits);
+        return true;
+    }
+
+    if(sscanf(lower,"binary xor %79s %79s",a,b)==2) {
+        if(!parse_binary_u64(a,&va,&wa) || !parse_binary_u64(b,&vb,&wb)) return false;
+        width=wa>wb?wa:wb;
+        format_binary_u64(va^vb,width,bits,sizeof(bits));
+        snprintf(out,out_size,"Binary XOR = %s",bits);
+        return true;
+    }
+
+    if(sscanf(lower,"binary not %79s",a)==1) {
+        unsigned long long mask;
+        if(!parse_binary_u64(a,&va,&wa)) return false;
+        mask = wa==64 ? ~0ULL : ((1ULL<<wa)-1ULL);
+        format_binary_u64((~va)&mask,wa,bits,sizeof(bits));
+        snprintf(out,out_size,"Binary NOT = %s",bits);
+        return true;
+    }
+
+    if(starts_with(lower,"ascii ")) {
+        char const *p=prompt+6;
+        while(*p && isspace((unsigned char)*p)) p++;
+        if(*p && !p[1]) {
+            snprintf(out,out_size,"ASCII code for '%c' = %u",*p,(unsigned int)(unsigned char)*p);
+            return true;
+        }
+    }
+
+    if(starts_with(lower,"char ")) {
+        long code;
+        char *end;
+        code=strtol(prompt+5,&end,10);
+        if(end!=prompt+5 && code>=0 && code<=127) {
+            snprintf(out,out_size,"ASCII %ld = '%c'",code,(char)code);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static bool try_science_formula(char const *text, char *out, size_t out_size)
 {
     double v[8];
@@ -4851,6 +5079,14 @@ static bool qb_offline_answer_core(
     }
 
     if(try_encoding_tools(prompt, out, out_size)) {
+        return true;
+    }
+
+    if(try_cs_bit_tools(prompt, out, out_size)) {
+        return true;
+    }
+
+    if(try_chemistry_formula_tools(prompt, out, out_size)) {
         return true;
     }
 
