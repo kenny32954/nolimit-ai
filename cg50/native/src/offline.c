@@ -959,12 +959,18 @@ static void copy_topic(char const *prompt, char *topic, size_t topic_size)
     while(*p && isspace((unsigned char)*p)) p++;
 
     if(starts_with(lowerbuf, "what is ")) p = prompt + 8;
+    else if(starts_with(lowerbuf, "wat is ")) p = prompt + 7;
+    else if(starts_with(lowerbuf, "wut is ")) p = prompt + 7;
     else if(starts_with(lowerbuf, "what are ")) p = prompt + 9;
     else if(starts_with(lowerbuf, "what's ")) p = prompt + 7;
     else if(starts_with(lowerbuf, "whats ")) p = prompt + 6;
     else if(starts_with(lowerbuf, "what does ") && strstr(lowerbuf, " mean")) p = prompt + 10;
     else if(starts_with(lowerbuf, "define ")) p = prompt + 7;
     else if(starts_with(lowerbuf, "explain ")) p = prompt + 8;
+    else if(starts_with(lowerbuf, "pls explain ")) p = prompt + 12;
+    else if(starts_with(lowerbuf, "plz explain ")) p = prompt + 12;
+    else if(starts_with(lowerbuf, "can u explain ")) p = prompt + 14;
+    else if(starts_with(lowerbuf, "can you explain ")) p = prompt + 16;
     else if(starts_with(lowerbuf, "tell me about ")) p = prompt + 14;
     else if(starts_with(lowerbuf, "summarize ")) p = prompt + 10;
     else if(starts_with(lowerbuf, "summary of ")) p = prompt + 11;
@@ -1934,7 +1940,8 @@ static bool handle_followup(char const *prompt, char const *mode, char const *le
         return true;
     }
 
-    if(strstr(lower, "what do you mean")) {
+    if(strstr(lower, "what do you mean") || exact_or_punct(lower, "wdym") ||
+       exact_or_punct(lower, "wdym?")) {
         first_sentence(memory_answer, short_answer, sizeof(short_answer));
         snprintf(out, out_size,
             "I mean this about \"%s\": %s",
@@ -2126,6 +2133,20 @@ static bool write_conversation(char const *subject, char const *prompt,
         return true;
     }
 
+    if(exact_or_punct(lowerbuf, "wsp") || exact_or_punct(lowerbuf, "wassgood") ||
+       exact_or_punct(lowerbuf, "whatup")) {
+        snprintf(out, out_size,
+            "QBAI Standalone is up. Current subject: %s. Send me anything.", subject_name);
+        return true;
+    }
+
+    if(exact_or_punct(lowerbuf, "wyd") || exact_or_punct(lowerbuf, "whatcha doing")) {
+        snprintf(out, out_size,
+            "Running locally on the calculator and ready for your next %s question, calculation, or random input.",
+            subject_name);
+        return true;
+    }
+
     if(strstr(lowerbuf, "what's up") || strstr(lowerbuf, "whats up") ||
        strstr(lowerbuf, "how's it going") || strstr(lowerbuf, "hows it going")) {
         snprintf(out, out_size,
@@ -2257,10 +2278,13 @@ static void write_contextual_fallback(char const *subject, char const *mode,
         return;
     }
 
-    if(starts_with(lowerbuf, "what is ") || starts_with(lowerbuf, "what are ") ||
+    if(starts_with(lowerbuf, "what is ") || starts_with(lowerbuf, "wat is ") ||
+       starts_with(lowerbuf, "wut is ") || starts_with(lowerbuf, "what are ") ||
        starts_with(lowerbuf, "what's ") || starts_with(lowerbuf, "whats ") ||
        (starts_with(lowerbuf, "what does ") && strstr(lowerbuf, " mean")) ||
        starts_with(lowerbuf, "define ") || starts_with(lowerbuf, "explain ") ||
+       starts_with(lowerbuf, "pls explain ") || starts_with(lowerbuf, "plz explain ") ||
+       starts_with(lowerbuf, "can u explain ") || starts_with(lowerbuf, "can you explain ") ||
        starts_with(lowerbuf, "tell me about ")) {
         snprintf(out, out_size,
             "You're asking for an explanation of \"%s\". I don't have a stored definition for that exact term yet. "
@@ -2578,10 +2602,13 @@ static bool qb_offline_answer_core(
     copy_topic(prompt, fact_topic, sizeof(fact_topic));
     lowercase_into(fact_topic, fact_topic_lower, sizeof(fact_topic_lower));
 
-    if(starts_with(lowerbuf, "what is ") || starts_with(lowerbuf, "what are ") ||
+    if(starts_with(lowerbuf, "what is ") || starts_with(lowerbuf, "wat is ") ||
+       starts_with(lowerbuf, "wut is ") || starts_with(lowerbuf, "what are ") ||
        starts_with(lowerbuf, "what's ") || starts_with(lowerbuf, "whats ") ||
        starts_with(lowerbuf, "what does ") || starts_with(lowerbuf, "define ") ||
-       starts_with(lowerbuf, "explain ") || starts_with(lowerbuf, "tell me about ") ||
+       starts_with(lowerbuf, "explain ") || starts_with(lowerbuf, "pls explain ") ||
+       starts_with(lowerbuf, "plz explain ") || starts_with(lowerbuf, "can u explain ") ||
+       starts_with(lowerbuf, "can you explain ") || starts_with(lowerbuf, "tell me about ") ||
        starts_with(lowerbuf, "why ") || starts_with(lowerbuf, "how ") ||
        starts_with(lowerbuf, "who ") || starts_with(lowerbuf, "when ") ||
        starts_with(lowerbuf, "where ") || starts_with(lowerbuf, "compare ") ||
