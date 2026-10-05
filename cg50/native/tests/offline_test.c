@@ -718,6 +718,43 @@ int main(void)
     qb_offline_answer("computer_science", "answer", "school", "char 65", out, sizeof(out));
     expect_contains("ascii decode", out, "'A'");
 
+
+    qb_offline_answer("geometry", "answer", "school", "third angle 50 60", out, sizeof(out));
+    expect_contains("triangle third angle", out, "70");
+
+    qb_offline_answer("geometry", "answer", "school", "interior angle sum 6", out, sizeof(out));
+    expect_contains("polygon angle sum", out, "720");
+
+    qb_offline_answer("geometry", "answer", "school", "regular polygon interior angle 6", out, sizeof(out));
+    expect_contains("regular polygon angle", out, "120");
+
+    qb_offline_answer("algebra_1", "answer", "school", "line through 1 2 3 6", out, sizeof(out));
+    expect_contains("line through points", out, "2x");
+
+    qb_offline_answer("physics", "answer", "school", "final velocity 5 2 3", out, sizeof(out));
+    expect_contains("kinematics velocity", out, "11");
+
+    qb_offline_answer("physics", "answer", "school", "kinematic distance 5 2 3", out, sizeof(out));
+    expect_contains("kinematics displacement", out, "24");
+
+    qb_offline_answer("physics", "answer", "school", "free fall time height 19.6133", out, sizeof(out));
+    expect_contains("free fall time", out, "2");
+
+    qb_offline_answer("business", "answer", "school", "profit revenue 1000 cost 700", out, sizeof(out));
+    expect_contains("business profit", out, "300");
+
+    qb_offline_answer("business", "answer", "school", "break even fixed 1000 price 20 variable 12", out, sizeof(out));
+    expect_contains("break even", out, "125");
+
+    qb_offline_answer("business", "answer", "school", "roi profit 100 investment 500", out, sizeof(out));
+    expect_contains("roi tool", out, "20%");
+
+    qb_offline_answer("consumer_math", "steps", "school", "3 notebooks cost 12 dollars how much do 5 notebooks cost", out, sizeof(out));
+    expect_contains("unit rate cost", out, "20");
+
+    qb_offline_answer("physics", "steps", "school", "120 miles in 2 hours how fast", out, sizeof(out));
+    expect_contains("natural speed problem", out, "60 mph");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
