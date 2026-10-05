@@ -304,6 +304,22 @@ int main(void)
     qb_offline_answer("consumer_math", "steps", "school", "percent increase from 50 to 75", out, sizeof(out));
     expect_contains("percent increase word problem", out, "50%");
 
+
+    qb_offline_answer("auto", "explain", "school", "DNA", out, sizeof(out));
+    expect_contains("known acronym dna", out, "deoxyribonucleic acid");
+
+    qb_offline_answer("auto", "explain", "school", "what does CPU stand for?", out, sizeof(out));
+    expect_contains("known acronym cpu", out, "central processing unit");
+
+    qb_offline_answer("auto", "answer", "school", "is 2+2=4?", out, sizeof(out));
+    expect_contains("numeric claim true", out, "TRUE");
+
+    qb_offline_answer("auto", "answer", "school", "is 2+2=5?", out, sizeof(out));
+    expect_contains("numeric claim false", out, "FALSE");
+
+    qb_offline_answer("auto", "answer", "school", "10/2 >= 5", out, sizeof(out));
+    expect_contains("numeric inequality", out, "TRUE");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
