@@ -897,6 +897,22 @@ int main(void)
     expect_contains("natural speed problem", out, "60 mph");
 
 
+    qb_offline_answer("physics", "answer", "school", "series resistance 10 20 30", out, sizeof(out));
+    expect_contains("series resistance", out, "60 ohms");
+
+    qb_offline_answer("physics", "answer", "school", "parallel resistance 10 20", out, sizeof(out));
+    expect_contains("parallel resistance", out, "6.666");
+
+    qb_offline_answer("physics", "answer", "college", "coulomb force 1e-6 2e-6 0.1", out, sizeof(out));
+    expect_contains("coulomb force", out, "1.797");
+
+    qb_offline_answer("physics", "answer", "college", "gravitational force 10 20 2", out, sizeof(out));
+    expect_contains("gravitational force", out, "3.33715e-09");
+
+    qb_offline_answer("physics", "answer", "college", "photon energy frequency 5e14", out, sizeof(out));
+    expect_contains("photon energy", out, "3.313");
+
+
     qb_offline_answer("algebra_2", "answer", "school", "evaluate f(x)=3x^2+2x-5 at x=4", out, sizeof(out));
     expect_contains("function evaluate", out, "51");
 
