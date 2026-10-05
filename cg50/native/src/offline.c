@@ -2330,6 +2330,16 @@ static int compare_double_asc(void const *a, void const *b)
     return (x>y)-(x<y);
 }
 
+
+static double median_sorted_slice(double const *v, int start, int count)
+{
+    int mid;
+    if(count<=0) return 0.0;
+    mid=start+count/2;
+    if(count%2) return v[mid];
+    return (v[mid-1]+v[mid])/2.0;
+}
+
 static bool try_statistics_tools(char const *text, char *out, size_t out_size)
 {
     double v[32];
@@ -2378,6 +2388,83 @@ static bool try_statistics_tools(char const *text, char *out, size_t out_size)
         double m=v[0];
         for(i=1;i<n;i++) if(v[i]>m) m=v[i];
         snprintf(out,out_size,"Maximum = %.12g",m);
+        return true;
+    }
+
+    if(starts_with(text,"mode ") || starts_with(text,"mode of ")) {
+        double copy[32];
+        int best_count=1;
+        int current=1;
+        int modes=0;
+        char buf[300];
+        size_t used=0;
+
+        for(i=0;i<n;i++) copy[i]=v[i];
+        qsort(copy,(size_t)n,sizeof(double),compare_double_asc);
+
+        for(i=1;i<=n;i++) {
+            if(i<n && approx_equal(copy[i],copy[i-1])) current++;
+            else {
+                if(current>best_count) best_count=current;
+                current=1;
+            }
+        }
+
+        if(best_count==1) {
+            snprintf(out,out_size,"No mode: every value occurs once.");
+            return true;
+        }
+
+        current=1;
+        buf[0]='\0';
+        for(i=1;i<=n;i++) {
+            if(i<n && approx_equal(copy[i],copy[i-1])) current++;
+            else {
+                if(current==best_count) {
+                    double value=copy[i-1];
+                    used=strlen(buf);
+                    snprintf(buf+used,sizeof(buf)-used,"%s%.12g",modes?", ":"",value);
+                    modes++;
+                }
+                current=1;
+            }
+        }
+        snprintf(out,out_size,"Mode%s (frequency %d): %s",modes==1?"":"s",best_count,buf);
+        return true;
+    }
+
+    if(starts_with(text,"quartiles ") || starts_with(text,"quartiles of ") ||
+       starts_with(text,"iqr ") || starts_with(text,"iqr of ") ||
+       strstr(text,"five number summary") || strstr(text,"five-number summary")) {
+        double copy[32];
+        double q1,q2,q3,iqr;
+        int lower_count, upper_start, upper_count;
+
+        for(i=0;i<n;i++) copy[i]=v[i];
+        qsort(copy,(size_t)n,sizeof(double),compare_double_asc);
+
+        q2=median_sorted_slice(copy,0,n);
+        lower_count=n/2;
+        upper_start=(n+1)/2;
+        upper_count=n/2;
+        q1=median_sorted_slice(copy,0,lower_count);
+        q3=median_sorted_slice(copy,upper_start,upper_count);
+        iqr=q3-q1;
+
+        snprintf(out,out_size,
+            "Five-number summary: min %.12g, Q1 %.12g, median %.12g, Q3 %.12g, max %.12g. IQR = %.12g.",
+            copy[0],q1,q2,q3,copy[n-1],iqr);
+        return true;
+    }
+
+    if(starts_with(text,"zscore ") || starts_with(text,"z-score ") ||
+       starts_with(text,"z score ")) {
+        if(n<3) {
+            snprintf(out,out_size,"Use: zscore value mean standard_deviation");
+            return true;
+        }
+        if(fabs(v[2])<1e-12) snprintf(out,out_size,"Standard deviation cannot be zero for a z-score.");
+        else snprintf(out,out_size,"z = (x-mean)/sd = %.12g",(v[0]-v[1])/v[2]);
         return true;
     }
 
@@ -2519,6 +2606,122 @@ static bool approx_equal(double a, double b)
 {
     double scale = fabs(a) + fabs(b) + 1.0;
     return fabs(a-b) <= 1e-9 * scale;
+}
+
+
+static double eval_poly_coeff(double const c[7], double x)
+{
+    double y=0.0;
+    int p;
+    for(p=6;p>=0;p--) y=y*x+c[p];
+    return y;
+}
+
+static char const *strip_function_prefix(char const *text)
+{
+    if(starts_with(text,"f(x)=")) return text+5;
+    if(starts_with(text,"y=")) return text+2;
+    return text;
+}
+
+static bool try_function_analysis(char const *text, char *out, size_t out_size)
+{
+    char work[300];
+    char expr[220];
+    char *at;
+    char *p;
+    double c[7];
+    double x,y;
+    int degree=6;
+
+    if(starts_with(text,"evaluate f(x)=") || starts_with(text,"evaluate y=") ||
+       (starts_with(text,"f(x)=") && strstr(text," at x="))) {
+        char *end;
+        if(starts_with(text,"evaluate ")) snprintf(work,sizeof(work),"%s",text+9);
+        else snprintf(work,sizeof(work),"%s",text);
+
+        at=strstr(work," at x=");
+        if(!at) return false;
+        *at='\0';
+        x=strtod(at+6,&end);
+        if(end==at+6) return false;
+
+        p=(char *)strip_function_prefix(work);
+        snprintf(expr,sizeof(expr),"%s",p);
+        trim_text(expr);
+        if(!parse_polynomial(expr,c)) return false;
+
+        y=eval_poly_coeff(c,x);
+        snprintf(out,out_size,"f(%.12g) = %.12g",x,y);
+        return true;
+    }
+
+    if(starts_with(text,"vertex ") || starts_with(text,"axis of symmetry ") ||
+       starts_with(text,"axis ") || starts_with(text,"zeros ") ||
+       starts_with(text,"roots of ") || starts_with(text,"y intercept ") ||
+       starts_with(text,"y-intercept ")) {
+        char const *src=text;
+        double a,b,cc;
+
+        if(starts_with(src,"vertex ")) src+=7;
+        else if(starts_with(src,"axis of symmetry ")) src+=17;
+        else if(starts_with(src,"axis ")) src+=5;
+        else if(starts_with(src,"zeros ")) src+=6;
+        else if(starts_with(src,"roots of ")) src+=9;
+        else if(starts_with(src,"y intercept ")) src+=12;
+        else if(starts_with(src,"y-intercept ")) src+=12;
+
+        src=strip_function_prefix(src);
+        snprintf(expr,sizeof(expr),"%s",src);
+        trim_text(expr);
+        if(!parse_polynomial(expr,c)) return false;
+
+        while(degree>0 && fabs(c[degree])<1e-12) degree--;
+        a=c[2]; b=c[1]; cc=c[0];
+
+        if(starts_with(text,"y intercept ") || starts_with(text,"y-intercept ")) {
+            snprintf(out,out_size,"y-intercept = (0, %.12g)",cc);
+            return true;
+        }
+
+        if(starts_with(text,"vertex ") || starts_with(text,"axis")) {
+            if(degree!=2 || fabs(a)<1e-12) {
+                snprintf(out,out_size,"Vertex/axis analysis here expects a quadratic polynomial.");
+                return true;
+            }
+            x=-b/(2.0*a);
+            y=eval_poly_coeff(c,x);
+            if(starts_with(text,"vertex "))
+                snprintf(out,out_size,"Vertex = (%.12g, %.12g). Axis of symmetry: x = %.12g",x,y,x);
+            else
+                snprintf(out,out_size,"Axis of symmetry: x = %.12g",x);
+            return true;
+        }
+
+        if(starts_with(text,"zeros ") || starts_with(text,"roots of ")) {
+            if(degree==1 && fabs(b)>1e-12) {
+                snprintf(out,out_size,"Zero: x = %.12g",-cc/b);
+                return true;
+            }
+            if(degree==2 && fabs(a)>1e-12) {
+                double d=b*b-4.0*a*cc;
+                if(d>1e-12) {
+                    snprintf(out,out_size,"Zeros: x = %.12g and x = %.12g",
+                             (-b+sqrt(d))/(2.0*a),(-b-sqrt(d))/(2.0*a));
+                } else if(fabs(d)<=1e-12) {
+                    snprintf(out,out_size,"Repeated zero: x = %.12g",-b/(2.0*a));
+                } else {
+                    double real=-b/(2.0*a), imag=sqrt(-d)/fabs(2.0*a);
+                    snprintf(out,out_size,"Complex zeros: %.12g +/- %.12gi",real,imag);
+                }
+                return true;
+            }
+            snprintf(out,out_size,"Zero finding currently supports linear and quadratic polynomials.");
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static bool try_sequence_pattern(char const *text, char *out, size_t out_size)
@@ -5308,6 +5511,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_statistics_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_function_analysis(lowerbuf, out, out_size)) {
         return true;
     }
 
