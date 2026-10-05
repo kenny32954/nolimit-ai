@@ -333,6 +333,7 @@ static void friendly_subject(char const *subject, char *out, size_t out_size);
 static void copy_topic(char const *prompt, char *topic, size_t topic_size);
 static int alpha_word_count(char const *text);
 static bool eval_expression(char const *text, double *value);
+static bool approx_equal(double a, double b);
 static int extract_flexible_numbers(char const *text, double *values, int cap);
 static void trim_text(char *text);
 static fact_t const *suggest_fact_entry(char const *topic);
