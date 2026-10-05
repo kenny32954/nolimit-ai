@@ -2725,6 +2725,152 @@ static bool try_function_analysis(char const *text, char *out, size_t out_size)
     return false;
 }
 
+
+static double eval_poly_derivative(double const c[7], double x)
+{
+    double y=0.0;
+    int p;
+    for(p=6;p>=1;p--) y=y*x+(double)p*c[p];
+    return y;
+}
+
+static double eval_poly_antiderivative(double const c[7], double x)
+{
+    double sum=0.0;
+    int p;
+    for(p=0;p<=6;p++) sum += c[p]*pow(x,(double)(p+1))/(double)(p+1);
+    return sum;
+}
+
+static bool parse_poly_before_marker(char const *src, char const *marker,
+                                     char *expr, size_t expr_size,
+                                     char const **after)
+{
+    char const *pos=strstr(src,marker);
+    size_t n;
+    if(!pos) return false;
+    n=(size_t)(pos-src);
+    if(n==0 || n>=expr_size) return false;
+    memcpy(expr,src,n);
+    expr[n]='\0';
+    trim_text(expr);
+    *after=pos+strlen(marker);
+    return true;
+}
+
+static bool try_calculus_analysis(char const *text, char *out, size_t out_size)
+{
+    char expr[240];
+    char const *p=NULL;
+    char const *after=NULL;
+    char *end;
+    double c[7];
+    double x,a,b,y,m,area;
+
+    if(starts_with(text,"derivative at x=")) {
+        p=text+16;
+        x=strtod(p,&end);
+        if(end==p || !strstr(end," of ")) return false;
+        p=strstr(end," of ")+4;
+        snprintf(expr,sizeof(expr),"%s",p);
+        trim_text(expr);
+        if(!parse_polynomial(expr,c)) return false;
+        snprintf(out,out_size,"f'(%.12g) = %.12g",x,eval_poly_derivative(c,x));
+        return true;
+    }
+
+    if(starts_with(text,"tangent line ") || starts_with(text,"tangent to ")) {
+        p=starts_with(text,"tangent line ")?text+13:text+11;
+        if(!parse_poly_before_marker(p," at x=",expr,sizeof(expr),&after)) return false;
+        x=strtod(after,&end);
+        if(end==after || !parse_polynomial(expr,c)) return false;
+        y=eval_poly_coeff(c,x);
+        m=eval_poly_derivative(c,x);
+        snprintf(out,out_size,
+            "At x=%.12g: point (%.12g, %.12g), slope %.12g. Tangent: y = %.12gx %+.12g",
+            x,x,y,m,y-m*x);
+        return true;
+    }
+
+    if(starts_with(text,"definite integral ")) {
+        p=text+18;
+        if(!parse_poly_before_marker(p," from ",expr,sizeof(expr),&after)) return false;
+        a=strtod(after,&end);
+        if(end==after || !starts_with(end," to ")) return false;
+        b=strtod(end+4,&end);
+        if(!parse_polynomial(expr,c)) return false;
+        area=eval_poly_antiderivative(c,b)-eval_poly_antiderivative(c,a);
+        snprintf(out,out_size,
+            "Definite integral from %.12g to %.12g = %.12g",a,b,area);
+        return true;
+    }
+
+    if(starts_with(text,"limit ")) {
+        p=text+6;
+        if(!parse_poly_before_marker(p," as x->",expr,sizeof(expr),&after) &&
+           !parse_poly_before_marker(p," at x=",expr,sizeof(expr),&after)) return false;
+        x=strtod(after,&end);
+        if(end==after || !parse_polynomial(expr,c)) return false;
+        snprintf(out,out_size,
+            "Polynomial functions are continuous, so the limit equals direct substitution: %.12g",
+            eval_poly_coeff(c,x));
+        return true;
+    }
+
+    return false;
+}
+
+static bool try_sequence_formula(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+
+    if(n>=3 && (starts_with(text,"arithmetic nth ") ||
+       strstr(text,"arithmetic nth term") || strstr(text,"arithmetic sequence nth"))) {
+        double first=v[0], diff=v[1];
+        long term=(long)v[2];
+        if(term<1) snprintf(out,out_size,"Sequence term number must be at least 1.");
+        else snprintf(out,out_size,
+            "a_n = a1+(n-1)d = %.12g",first+(term-1)*diff);
+        return true;
+    }
+
+    if(n>=3 && (starts_with(text,"geometric nth ") ||
+       strstr(text,"geometric nth term") || strstr(text,"geometric sequence nth"))) {
+        double first=v[0], ratio=v[1];
+        long term=(long)v[2];
+        if(term<1) snprintf(out,out_size,"Sequence term number must be at least 1.");
+        else snprintf(out,out_size,
+            "a_n = a1*r^(n-1) = %.12g",first*pow(ratio,(double)(term-1)));
+        return true;
+    }
+
+    if(n>=3 && strstr(text,"arithmetic sum") && strstr(text,"terms")) {
+        double first=v[0], diff=v[1];
+        long terms=(long)v[2];
+        if(terms<1) snprintf(out,out_size,"Number of terms must be at least 1.");
+        else snprintf(out,out_size,
+            "S_n = n/2*(2a1+(n-1)d) = %.12g",
+            terms/2.0*(2.0*first+(terms-1)*diff));
+        return true;
+    }
+
+    if(n>=3 && strstr(text,"geometric sum") && strstr(text,"terms")) {
+        double first=v[0], ratio=v[1];
+        long terms=(long)v[2];
+        if(terms<1) snprintf(out,out_size,"Number of terms must be at least 1.");
+        else if(approx_equal(ratio,1.0))
+            snprintf(out,out_size,"S_n = n*a1 = %.12g",terms*first);
+        else
+            snprintf(out,out_size,
+                "S_n = a1*(1-r^n)/(1-r) = %.12g",
+                first*(1.0-pow(ratio,(double)terms))/(1.0-ratio));
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_sequence_pattern(char const *text, char *out, size_t out_size)
 {
     double v[20];
@@ -5588,6 +5734,10 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(try_calculus_analysis(lowerbuf, out, out_size)) {
+        return true;
+    }
+
     if(try_polynomial_calculus(lowerbuf, out, out_size)) {
         return true;
     }
@@ -5666,6 +5816,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_log_root_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_sequence_formula(lowerbuf, out, out_size)) {
         return true;
     }
 
