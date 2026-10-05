@@ -695,7 +695,7 @@ int main(void)
     expect_contains("grams to moles", out, "1.998");
 
     qb_offline_answer("chemistry", "answer", "school", "grams from 2 mol CO2", out, sizeof(out));
-    expect_contains("moles to grams", out, "88.02");
+    expect_contains("moles to grams", out, "88.018");
 
     qb_offline_answer("chemistry", "answer", "school", "particles from 2 mol", out, sizeof(out));
     expect_contains("avogadro particles", out, "1.204428152e+24");
