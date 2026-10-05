@@ -755,6 +755,37 @@ int main(void)
     qb_offline_answer("physics", "steps", "school", "120 miles in 2 hours how fast", out, sizeof(out));
     expect_contains("natural speed problem", out, "60 mph");
 
+
+    qb_offline_answer("algebra_2", "answer", "school", "evaluate f(x)=3x^2+2x-5 at x=4", out, sizeof(out));
+    expect_contains("function evaluate", out, "51");
+
+    qb_offline_answer("algebra_2", "answer", "school", "vertex y=2x^2-8x+3", out, sizeof(out));
+    expect_contains("quadratic vertex", out, "(2, -5)");
+    expect_contains("quadratic axis from vertex", out, "x = 2");
+
+    qb_offline_answer("algebra_2", "answer", "school", "axis of symmetry y=x^2-6x+5", out, sizeof(out));
+    expect_contains("axis symmetry", out, "x = 3");
+
+    qb_offline_answer("algebra_2", "answer", "school", "zeros x^2-5x+6", out, sizeof(out));
+    expect_contains("function zero 1", out, "3");
+    expect_contains("function zero 2", out, "2");
+
+    qb_offline_answer("algebra_1", "answer", "school", "y intercept y=4x-7", out, sizeof(out));
+    expect_contains("y intercept", out, "(0, -7)");
+
+    qb_offline_answer("statistics", "answer", "school", "mode 1 2 2 3 3 3 4", out, sizeof(out));
+    expect_contains("mode tool", out, "3");
+    expect_contains("mode frequency", out, "frequency 3");
+
+    qb_offline_answer("statistics", "answer", "school", "quartiles 1 2 3 4 5 6 7 8", out, sizeof(out));
+    expect_contains("quartiles q1", out, "Q1 2.5");
+    expect_contains("quartiles median", out, "median 4.5");
+    expect_contains("quartiles q3", out, "Q3 6.5");
+    expect_contains("quartiles iqr", out, "IQR = 4");
+
+    qb_offline_answer("statistics", "answer", "school", "zscore 85 75 5", out, sizeof(out));
+    expect_contains("zscore tool", out, "2");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
