@@ -339,6 +339,25 @@ int main(void)
     qb_offline_answer("biology", "explain", "school", "wdym", out, sizeof(out));
     expect_contains("shorthand wdym", out, "I mean this about");
 
+
+    qb_offline_answer("auto", "answer", "school", "reverse hello", out, sizeof(out));
+    expect_contains("text reverse", out, "olleh");
+
+    qb_offline_answer("auto", "answer", "school", "count letters in banana", out, sizeof(out));
+    expect_contains("letter count", out, "6");
+
+    qb_offline_answer("auto", "answer", "school", "how many words in one two three", out, sizeof(out));
+    expect_contains("word count", out, "3");
+
+    qb_offline_answer("auto", "answer", "school", "is racecar a palindrome", out, sizeof(out));
+    expect_contains("palindrome yes", out, "Yes");
+
+    qb_offline_answer("auto", "answer", "school", "binary of 10", out, sizeof(out));
+    expect_contains("binary conversion", out, "1010");
+
+    qb_offline_answer("auto", "answer", "school", "hex of 255", out, sizeof(out));
+    expect_contains("hex conversion", out, "0xFF");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
