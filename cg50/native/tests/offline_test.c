@@ -885,6 +885,28 @@ int main(void)
     qb_offline_answer("geography", "answer", "school", "latitude distance 2", out, sizeof(out));
     expect_contains("latitude distance tool", out, "222.39");
 
+
+    qb_offline_answer("geometry", "answer", "school", "heron 3 4 5", out, sizeof(out));
+    expect_contains("heron area", out, "6");
+
+    qb_offline_answer("geometry", "answer", "school", "arc length 10 90", out, sizeof(out));
+    expect_contains("arc length", out, "15.707");
+
+    qb_offline_answer("geometry", "answer", "school", "sector area 10 90", out, sizeof(out));
+    expect_contains("sector area", out, "78.539");
+
+    qb_offline_answer("geometry", "answer", "school", "classify triangle 3 4 5", out, sizeof(out));
+    expect_contains("triangle side class", out, "scalene");
+    expect_contains("triangle angle class", out, "right");
+
+    qb_offline_answer("linear_algebra", "answer", "college", "det3 1 2 3 0 1 4 5 6 0", out, sizeof(out));
+    expect_contains("3x3 determinant", out, "1");
+
+    qb_offline_answer("linear_algebra", "answer", "college", "solve3 1 1 1 6 2 -1 1 3 1 2 -1 3", out, sizeof(out));
+    expect_contains("3x3 solve x", out, "x=1");
+    expect_contains("3x3 solve y", out, "y=2");
+    expect_contains("3x3 solve z", out, "z=3");
+
     qb_offline_answer("algebra_1", "answer", "school", "line through 1 2 3 6", out, sizeof(out));
     expect_contains("line through points", out, "2x");
 
