@@ -643,6 +643,117 @@ static bool try_text_tools(char const *prompt, char *out, size_t out_size)
     return false;
 }
 
+
+static bool is_prime_long(long n)
+{
+    long d;
+
+    if(n < 2) return false;
+    if(n == 2) return true;
+    if((n % 2) == 0) return false;
+
+    for(d = 3; d <= n / d; d += 2) {
+        if((n % d) == 0) return false;
+    }
+
+    return true;
+}
+
+static bool try_literal_analysis(char const *prompt, char *out, size_t out_size)
+{
+    char text[180];
+    char *p = text;
+    char *end;
+    size_t len;
+    double dv;
+
+    snprintf(text, sizeof(text), "%.179s", prompt);
+    while(*p && isspace((unsigned char)*p)) p++;
+
+    len = strlen(p);
+    while(len > 0 && isspace((unsigned char)p[len - 1])) p[--len] = '\0';
+
+    if(len == 1 && isalpha((unsigned char)p[0])) {
+        char c = (char)toupper((unsigned char)p[0]);
+        int index = c - 'A' + 1;
+        bool vowel = strchr("AEIOU", c) != NULL;
+
+        snprintf(out, out_size,
+            "%c is letter %d of the English alphabet and is a %s.",
+            c, index, vowel ? "vowel" : "consonant");
+        return true;
+    }
+
+    if(len > 3 && p[0] == '0' && (p[1] == 'b' || p[1] == 'B')) {
+        unsigned long value = 0;
+        size_t i;
+
+        for(i = 2; i < len; i++) {
+            if(p[i] != '0' && p[i] != '1') return false;
+            value = (value << 1) | (unsigned long)(p[i] - '0');
+        }
+
+        snprintf(out, out_size, "%s in decimal = %lu.", p, value);
+        return true;
+    }
+
+    if(len > 3 && p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+        unsigned long value = strtoul(p + 2, &end, 16);
+        if(end == p + 2 || *end != '\0') return false;
+
+        snprintf(out, out_size, "%s in decimal = %lu.", p, value);
+        return true;
+    }
+
+    dv = strtod(p, &end);
+    if(end != p && *end == '\0') {
+        double rounded = floor(dv);
+        if(fabs(dv - rounded) < 1e-10 &&
+           rounded >= -2147483647.0 && rounded <= 2147483647.0) {
+            long n = (long)rounded;
+            bool even = (n % 2L) == 0L;
+            bool prime = is_prime_long(n);
+            long absn = n < 0 ? -n : n;
+            long root = (long)(sqrt((double)absn) + 0.5);
+            bool square = absn >= 0 && root * root == absn;
+
+            snprintf(out, out_size,
+                "%ld is %s, %s, %s%s.",
+                n,
+                n > 0 ? "positive" : (n < 0 ? "negative" : "zero"),
+                even ? "even" : "odd",
+                prime ? "prime" : "not prime",
+                square ? ", and a perfect square" : "");
+        }
+        else {
+            snprintf(out, out_size,
+                "%.12g is a real number; it is %s.",
+                dv, dv > 0.0 ? "positive" : (dv < 0.0 ? "negative" : "zero"));
+        }
+        return true;
+    }
+
+    if(strchr(p, '@') && strchr(p, '.') && !strchr(p, ' ')) {
+        snprintf(out, out_size,
+            "\"%.120s\" looks like an email address. Standalone QBAI cannot send mail, "
+            "but it can recognize the address shape and reason about text you paste from a message.",
+            p);
+        return true;
+    }
+
+    {
+        char const *dot = strrchr(p, '.');
+        if(dot && dot != p && !strchr(dot, ' ') && strlen(dot) <= 12) {
+            snprintf(out, out_size,
+                "\"%.120s\" looks like a filename. Extension: %s.",
+                p, dot);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static bool write_input_shape_response(char const *subject, char const *prompt,
                                        char *out, size_t out_size)
 {
@@ -2556,6 +2667,10 @@ static bool qb_offline_answer_core(
     lowercase(prompt);
 
     if(write_conversation(subject, prompt, out, out_size)) {
+        return true;
+    }
+
+    if(try_literal_analysis(prompt, out, out_size)) {
         return true;
     }
 
