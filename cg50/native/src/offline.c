@@ -3353,6 +3353,154 @@ static bool try_cs_bit_tools(char const *prompt, char *out, size_t out_size)
     return false;
 }
 
+
+static bool try_geometry_extra(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+
+    if(n>=2 && (strstr(text,"third angle") || strstr(text,"missing angle"))) {
+        double angle=180.0-v[0]-v[1];
+        if(angle<=0.0) snprintf(out,out_size,"Those two angles do not leave a positive third angle in a triangle.");
+        else snprintf(out,out_size,"Third triangle angle = 180 - %.12g - %.12g = %.12g degrees.",v[0],v[1],angle);
+        return true;
+    }
+
+    if(n>=1 && (strstr(text,"interior angle sum") || strstr(text,"sum of interior angles"))) {
+        int sides=(int)v[0];
+        if(sides<3) snprintf(out,out_size,"A polygon needs at least 3 sides.");
+        else snprintf(out,out_size,"Interior-angle sum = (n-2)*180 = %d degrees.",(sides-2)*180);
+        return true;
+    }
+
+    if(n>=1 && strstr(text,"regular polygon") && strstr(text,"interior angle")) {
+        int sides=(int)v[0];
+        if(sides<3) snprintf(out,out_size,"A polygon needs at least 3 sides.");
+        else snprintf(out,out_size,"Each regular interior angle = (n-2)*180/n = %.12g degrees.",
+                      (double)(sides-2)*180.0/(double)sides);
+        return true;
+    }
+
+    if(n>=1 && strstr(text,"exterior angle") && (strstr(text,"regular") || strstr(text,"polygon"))) {
+        int sides=(int)v[0];
+        if(sides<3) snprintf(out,out_size,"A polygon needs at least 3 sides.");
+        else snprintf(out,out_size,"Each regular exterior angle = 360/n = %.12g degrees.",360.0/(double)sides);
+        return true;
+    }
+
+    if(n>=4 && (starts_with(text,"line through ") || strstr(text,"equation of line through"))) {
+        double x1=v[0],y1=v[1],x2=v[2],y2=v[3];
+        if(approx_equal(x1,x2)) {
+            snprintf(out,out_size,"Vertical line: x = %.12g",x1);
+        } else {
+            double m=(y2-y1)/(x2-x1);
+            double b=y1-m*x1;
+            snprintf(out,out_size,"Line through the points: y = %.12gx %+.12g",m,b);
+        }
+        return true;
+    }
+
+    return false;
+}
+
+static bool try_kinematics_tools(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+    const double g=9.80665;
+
+    if(n>=3 && (starts_with(text,"final velocity ") || strstr(text,"final velocity from"))) {
+        snprintf(out,out_size,"v = v0 + a*t = %.12g",v[0]+v[1]*v[2]);
+        return true;
+    }
+
+    if(n>=3 && (starts_with(text,"kinematic distance ") || starts_with(text,"displacement "))) {
+        snprintf(out,out_size,"Delta x = v0*t + 1/2*a*t^2 = %.12g",v[0]*v[2]+0.5*v[1]*v[2]*v[2]);
+        return true;
+    }
+
+    if(n>=1 && strstr(text,"free fall time") && strstr(text,"height")) {
+        if(v[0]<0.0) snprintf(out,out_size,"Height must be nonnegative.");
+        else snprintf(out,out_size,"Free-fall time from rest t=sqrt(2h/g) = %.12g s",sqrt(2.0*v[0]/g));
+        return true;
+    }
+
+    if(n>=3 && strstr(text,"acceleration") && strstr(text,"velocity") && strstr(text,"time")) {
+        if(approx_equal(v[2],0.0)) snprintf(out,out_size,"Elapsed time cannot be zero.");
+        else snprintf(out,out_size,"a=(vf-vi)/t = %.12g",(v[1]-v[0])/v[2]);
+        return true;
+    }
+
+    return false;
+}
+
+static bool try_business_tools(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+
+    if(n>=2 && starts_with(text,"profit ") && strstr(text,"revenue") && strstr(text,"cost")) {
+        snprintf(out,out_size,"Profit = revenue - cost = %.12g",v[0]-v[1]);
+        return true;
+    }
+
+    if(n>=3 && (strstr(text,"break even") || strstr(text,"break-even")) &&
+       strstr(text,"fixed") && strstr(text,"price") && strstr(text,"variable")) {
+        double contribution=v[1]-v[2];
+        if(contribution<=0.0) snprintf(out,out_size,"Price must exceed variable cost for a finite unit break-even point.");
+        else snprintf(out,out_size,"Break-even units = fixed_cost/(price-variable_cost) = %.12g",v[0]/contribution);
+        return true;
+    }
+
+    if(n>=2 && starts_with(text,"roi ") && strstr(text,"profit") && strstr(text,"investment")) {
+        if(approx_equal(v[1],0.0)) snprintf(out,out_size,"Investment cannot be zero for ROI.");
+        else snprintf(out,out_size,"ROI = profit/investment * 100 = %.12g%%",100.0*v[0]/v[1]);
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"profit margin") && strstr(text,"revenue")) {
+        if(approx_equal(v[1],0.0)) snprintf(out,out_size,"Revenue cannot be zero for profit margin.");
+        else snprintf(out,out_size,"Profit margin = profit/revenue * 100 = %.12g%%",100.0*v[0]/v[1]);
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"markup") && strstr(text,"cost") && strstr(text,"price")) {
+        if(approx_equal(v[0],0.0)) snprintf(out,out_size,"Cost cannot be zero for markup percentage.");
+        else snprintf(out,out_size,"Markup = (price-cost)/cost * 100 = %.12g%%",100.0*(v[1]-v[0])/v[0]);
+        return true;
+    }
+
+    return false;
+}
+
+static bool try_unit_rate_word_problem(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+
+    if(n>=3 && strstr(text,"cost") && strstr(text,"how much")) {
+        if(approx_equal(v[0],0.0)) snprintf(out,out_size,"The original item count cannot be zero.");
+        else snprintf(out,out_size,
+            "Unit-rate method: %.12g/%.12g * %.12g = %.12g",
+            v[1],v[0],v[2],v[1]/v[0]*v[2]);
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"miles") && strstr(text,"hours") &&
+       (strstr(text,"how fast") || strstr(text,"average speed"))) {
+        if(approx_equal(v[1],0.0)) snprintf(out,out_size,"Elapsed time cannot be zero.");
+        else snprintf(out,out_size,"Average speed = distance/time = %.12g mph",v[0]/v[1]);
+        return true;
+    }
+
+    if(n>=3 && strstr(text,"per ") && (strstr(text,"how many") || strstr(text,"total"))) {
+        snprintf(out,out_size,"Rate calculation: %.12g * %.12g = %.12g",v[0],v[1],v[0]*v[1]);
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_science_formula(char const *text, char *out, size_t out_size)
 {
     double v[8];
@@ -5180,6 +5328,22 @@ static bool qb_offline_answer_core(
     }
 
     if(try_finance_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_business_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_geometry_extra(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_kinematics_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_unit_rate_word_problem(lowerbuf, out, out_size)) {
         return true;
     }
 
