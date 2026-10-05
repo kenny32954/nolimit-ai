@@ -606,6 +606,26 @@ int main(void)
     expect_contains("polite followup", out, "We were talking about");
     expect_contains("polite followup topic", out, "meiosis");
 
+
+    qb_offline_answer("auto", "explain", "school", "my name is Kenny", out, sizeof(out));
+    expect_contains("session name store", out, "Kenny");
+
+    qb_offline_answer("auto", "explain", "school", "what is my name?", out, sizeof(out));
+    expect_contains("session name recall", out, "Kenny");
+
+    qb_offline_answer("auto", "explain", "school", "remember that project alpha uses triangles", out, sizeof(out));
+    expect_contains("session note store", out, "project alpha uses triangles");
+
+    qb_offline_answer("auto", "explain", "school", "what do you remember?", out, sizeof(out));
+    expect_contains("session note recall name", out, "Kenny");
+    expect_contains("session note recall note", out, "project alpha uses triangles");
+
+    qb_offline_answer("auto", "explain", "school", "forget everything", out, sizeof(out));
+    expect_contains("session memory clear", out, "Cleared");
+
+    qb_offline_answer("auto", "explain", "school", "what do you remember?", out, sizeof(out));
+    expect_contains("session memory empty", out, "don't have any");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
