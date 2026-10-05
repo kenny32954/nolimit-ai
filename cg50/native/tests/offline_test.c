@@ -561,6 +561,19 @@ int main(void)
     expect_contains("lcd first fraction", out, "3/12");
     expect_contains("lcd second fraction", out, "2/12");
 
+
+    qb_offline_answer("auto", "answer", "school", "5 ft 8 in to inches", out, sizeof(out));
+    expect_contains("compound feet inches", out, "68");
+
+    qb_offline_answer("auto", "answer", "school", "2 hours 30 minutes to minutes", out, sizeof(out));
+    expect_contains("compound time", out, "150");
+
+    qb_offline_answer("auto", "answer", "school", "1 lb 8 oz to ounces", out, sizeof(out));
+    expect_contains("compound weight", out, "24");
+
+    qb_offline_answer("consumer_math", "answer", "school", "3 dollars 50 cents to cents", out, sizeof(out));
+    expect_contains("compound money", out, "350");
+
     qb_offline_answer("consumer_math", "answer", "school", "what percent is 15 of 60", out, sizeof(out));
     expect_contains("reverse percent", out, "25%");
 
