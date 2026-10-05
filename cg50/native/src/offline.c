@@ -930,16 +930,18 @@ static wordpart_t const wordparts[] = {
     {"phile","liking/affinity"},{"itis","inflammation"},{"osis","condition/process"}
 };
 
-static bool try_word_parts(char const *prompt, char *out, size_t out_size)
+static bool try_word_parts(char const *subject, char const *prompt, char *out, size_t out_size)
 {
     char topic[120];
     char lower[120];
+    char subject_name[64];
     unsigned int i;
     size_t used=0;
     int hits=0;
 
     copy_topic(prompt,topic,sizeof(topic));
     lowercase_into(topic,lower,sizeof(lower));
+    friendly_subject(subject,subject_name,sizeof(subject_name));
 
     if(strchr(lower,' ') || strlen(lower)<5) return false;
 
@@ -947,8 +949,8 @@ static bool try_word_parts(char const *prompt, char *out, size_t out_size)
         if(strstr(lower,wordparts[i].part)) {
             if(hits==0) {
                 used+=(size_t)snprintf(out+used,out_size-used,
-                    "I don't have a verified exact dictionary entry for \"%s\", but its word parts suggest: ",
-                    topic);
+                    "In %s, I don't have a verified exact dictionary entry for \"%s\", but its word parts suggest: ",
+                    subject_name,topic);
             }
             used+=(size_t)snprintf(out+used,out_size-used,
                 "%s%s = %s",hits?"; ":"",wordparts[i].part,wordparts[i].meaning);
@@ -3821,7 +3823,7 @@ static bool qb_offline_answer_core(
         }
     }
 
-    if(try_word_parts(prompt, out, out_size)) {
+    if(try_word_parts(subject, prompt, out, out_size)) {
         return true;
     }
 
