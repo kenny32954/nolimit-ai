@@ -419,6 +419,32 @@ int main(void)
     expect_contains("government typo correction", out, "separation of powers");
     expect_contains("government typo answer", out, "branches");
 
+
+    qb_offline_answer("number_theory", "answer", "college", "gcd 84 126", out, sizeof(out));
+    expect_contains("gcd tool", out, "42");
+
+    qb_offline_answer("number_theory", "answer", "college", "lcm 12 18", out, sizeof(out));
+    expect_contains("lcm tool", out, "36");
+
+    qb_offline_answer("number_theory", "answer", "college", "factor 360", out, sizeof(out));
+    expect_contains("factorization tool", out, "2^3");
+    expect_contains("factorization tool 3", out, "3^2");
+
+    qb_offline_answer("math", "answer", "school", "factorial 6", out, sizeof(out));
+    expect_contains("factorial tool", out, "720");
+
+    qb_offline_answer("statistics", "answer", "school", "median 1 3 8 10", out, sizeof(out));
+    expect_contains("median tool", out, "5.5");
+
+    qb_offline_answer("statistics", "answer", "school", "standard deviation 2 2 4 4", out, sizeof(out));
+    expect_contains("stdev tool", out, "1");
+
+    qb_offline_answer("calculus", "derive", "college", "derive 3x^2+2x-5", out, sizeof(out));
+    expect_contains("polynomial derivative", out, "6x + 2");
+
+    qb_offline_answer("calculus", "derive", "college", "integrate 6x+4", out, sizeof(out));
+    expect_contains("polynomial integral", out, "3x^2 + 4x + C");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
