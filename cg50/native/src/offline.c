@@ -1586,6 +1586,321 @@ static bool try_system_2x2(char const *text, char *out, size_t out_size)
     return true;
 }
 
+
+static long gcd_long(long a, long b)
+{
+    if(a < 0) a = -a;
+    if(b < 0) b = -b;
+    while(b) {
+        long t = a % b;
+        a = b;
+        b = t;
+    }
+    return a;
+}
+
+static bool try_number_theory(char const *text, char *out, size_t out_size)
+{
+    double v[16];
+    int n = extract_flexible_numbers(text, v, 16);
+
+    if(starts_with(text, "gcd ") || strstr(text, "greatest common factor") ||
+       strstr(text, "greatest common divisor")) {
+        if(n >= 2) {
+            long a=(long)v[0], b=(long)v[1];
+            snprintf(out,out_size,"gcd(%ld,%ld) = %ld",a,b,gcd_long(a,b));
+            return true;
+        }
+    }
+
+    if(starts_with(text, "lcm ") || strstr(text, "least common multiple")) {
+        if(n >= 2) {
+            long a=(long)v[0], b=(long)v[1];
+            long g=gcd_long(a,b);
+            long l=(g==0)?0:labs((a/g)*b);
+            snprintf(out,out_size,"lcm(%ld,%ld) = %ld",a,b,l);
+            return true;
+        }
+    }
+
+    if(starts_with(text, "factor ") || starts_with(text, "prime factors ") ||
+       strstr(text, "prime factorization")) {
+        if(n >= 1) {
+            long x=(long)v[0];
+            long value=x<0?-x:x;
+            long d;
+            char buf[420];
+            size_t used=0;
+            bool first=true;
+
+            if(value < 2) {
+                snprintf(out,out_size,"%ld has no prime factorization into positive primes.",x);
+                return true;
+            }
+
+            if(x<0) used += (size_t)snprintf(buf+used,sizeof(buf)-used,"-1 * ");
+
+            for(d=2; d<=value/d; d += (d==2 ? 1 : 2)) {
+                int count=0;
+                while(value%d==0) {
+                    value/=d;
+                    count++;
+                }
+                if(count) {
+                    used += (size_t)snprintf(buf+used,sizeof(buf)-used,
+                        "%s%ld%s",first?"":" * ",d,count>1?"^":"");
+                    if(count>1) used += (size_t)snprintf(buf+used,sizeof(buf)-used,"%d",count);
+                    first=false;
+                }
+            }
+            if(value>1) {
+                used += (size_t)snprintf(buf+used,sizeof(buf)-used,
+                    "%s%ld",first?"":" * ",value);
+            }
+
+            snprintf(out,out_size,"Prime factorization: %s",buf);
+            return true;
+        }
+    }
+
+    if(starts_with(text, "factorial ") || strstr(text, " factorial")) {
+        if(n>=1) {
+            long k=(long)v[0];
+            unsigned long long result=1;
+            long i;
+            if(k<0 || k>20) {
+                snprintf(out,out_size,"Standalone factorial supports integers 0 through 20.");
+                return true;
+            }
+            for(i=2;i<=k;i++) result *= (unsigned long long)i;
+            snprintf(out,out_size,"%ld! = %llu",k,result);
+            return true;
+        }
+    }
+
+    if(starts_with(text, "ncr ") || strstr(text, " combination")) {
+        if(n>=2) {
+            long nn=(long)v[0], rr=(long)v[1], i;
+            unsigned long long result=1;
+            if(nn<0 || rr<0 || rr>nn || nn>20) {
+                snprintf(out,out_size,"Use 0 <= r <= n <= 20 for exact standalone nCr.");
+                return true;
+            }
+            if(rr>nn-rr) rr=nn-rr;
+            for(i=1;i<=rr;i++) result=result*(unsigned long long)(nn-rr+i)/(unsigned long long)i;
+            snprintf(out,out_size,"%ldC%ld = %llu",nn,(long)v[1],result);
+            return true;
+        }
+    }
+
+    if(starts_with(text, "npr ") || strstr(text, " permutation")) {
+        if(n>=2) {
+            long nn=(long)v[0], rr=(long)v[1], i;
+            unsigned long long result=1;
+            if(nn<0 || rr<0 || rr>nn || nn>20) {
+                snprintf(out,out_size,"Use 0 <= r <= n <= 20 for exact standalone nPr.");
+                return true;
+            }
+            for(i=0;i<rr;i++) result *= (unsigned long long)(nn-i);
+            snprintf(out,out_size,"%ldP%ld = %llu",nn,rr,result);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static int compare_double_asc(void const *a, void const *b)
+{
+    double x=*(double const *)a;
+    double y=*(double const *)b;
+    return (x>y)-(x<y);
+}
+
+static bool try_statistics_tools(char const *text, char *out, size_t out_size)
+{
+    double v[32];
+    int n=extract_flexible_numbers(text,v,32);
+    int i;
+
+    if(n<=0) return false;
+
+    if(starts_with(text,"median ") || starts_with(text,"median of ")) {
+        double copy[32];
+        double med;
+        for(i=0;i<n;i++) copy[i]=v[i];
+        qsort(copy,(size_t)n,sizeof(double),compare_double_asc);
+        med = (n%2)?copy[n/2]:(copy[n/2-1]+copy[n/2])/2.0;
+        snprintf(out,out_size,"Median of %d values = %.12g",n,med);
+        return true;
+    }
+
+    if(starts_with(text,"range ") || starts_with(text,"range of ")) {
+        double lo=v[0], hi=v[0];
+        for(i=1;i<n;i++) { if(v[i]<lo) lo=v[i]; if(v[i]>hi) hi=v[i]; }
+        snprintf(out,out_size,"Range = max-min = %.12g - %.12g = %.12g",hi,lo,hi-lo);
+        return true;
+    }
+
+    if(starts_with(text,"stdev ") || starts_with(text,"standard deviation ") ||
+       starts_with(text,"standard deviation of ")) {
+        double mean=0.0, ss=0.0;
+        for(i=0;i<n;i++) mean+=v[i];
+        mean/=n;
+        for(i=0;i<n;i++) { double d=v[i]-mean; ss+=d*d; }
+        snprintf(out,out_size,
+            "Population stdev = %.12g (mean %.12g, n=%d)",
+            sqrt(ss/n),mean,n);
+        return true;
+    }
+
+    if(starts_with(text,"min ") || starts_with(text,"minimum ")) {
+        double m=v[0];
+        for(i=1;i<n;i++) if(v[i]<m) m=v[i];
+        snprintf(out,out_size,"Minimum = %.12g",m);
+        return true;
+    }
+
+    if(starts_with(text,"max ") || starts_with(text,"maximum ")) {
+        double m=v[0];
+        for(i=1;i<n;i++) if(v[i]>m) m=v[i];
+        snprintf(out,out_size,"Maximum = %.12g",m);
+        return true;
+    }
+
+    return false;
+}
+
+static bool parse_polynomial(char const *text, double coeff[7])
+{
+    double sign=1.0;
+    bool got=false;
+    int i;
+
+    for(i=0;i<7;i++) coeff[i]=0.0;
+
+    while(*text) {
+        char *end;
+        double c=1.0;
+        bool explicit_c=false;
+        int power=0;
+
+        while(*text && isspace((unsigned char)*text)) text++;
+        if(!*text) break;
+
+        if(*text=='+') { sign=1.0; text++; continue; }
+        if(*text=='-') { sign=-1.0; text++; continue; }
+
+        while(*text && isspace((unsigned char)*text)) text++;
+
+        if(isdigit((unsigned char)*text) || *text=='.') {
+            c=strtod(text,&end);
+            if(end==text) return false;
+            text=end;
+            explicit_c=true;
+            while(*text && isspace((unsigned char)*text)) text++;
+            if(*text=='*') { text++; while(*text && isspace((unsigned char)*text)) text++; }
+        }
+
+        if(*text=='x' || *text=='X') {
+            power=1;
+            text++;
+            if(*text=='^') {
+                long p;
+                text++;
+                p=strtol(text,&end,10);
+                if(end==text || p<0 || p>6) return false;
+                power=(int)p;
+                text=end;
+            }
+        }
+        else {
+            if(!explicit_c) return false;
+            power=0;
+        }
+
+        coeff[power] += sign*c;
+        sign=1.0;
+        got=true;
+
+        while(*text && isspace((unsigned char)*text)) text++;
+        if(*text && *text!='+' && *text!='-') return false;
+    }
+
+    return got;
+}
+
+static void format_polynomial(double const coeff[8], int max_power,
+                              char *out, size_t out_size, bool integral_constant)
+{
+    size_t used=0;
+    bool first=true;
+    int p;
+
+    if(out_size==0) return;
+    out[0]='\0';
+
+    for(p=max_power;p>=0;p--) {
+        double c=coeff[p];
+        double abs_c;
+        char term[80];
+
+        if(fabs(c)<1e-12) continue;
+        abs_c=fabs(c);
+
+        if(p==0) snprintf(term,sizeof(term),"%.12g",abs_c);
+        else if(p==1) {
+            if(fabs(abs_c-1.0)<1e-12) snprintf(term,sizeof(term),"x");
+            else snprintf(term,sizeof(term),"%.12gx",abs_c);
+        }
+        else {
+            if(fabs(abs_c-1.0)<1e-12) snprintf(term,sizeof(term),"x^%d",p);
+            else snprintf(term,sizeof(term),"%.12gx^%d",abs_c,p);
+        }
+
+        used += (size_t)snprintf(out+used,out_size-used,
+            "%s%s%s",first?(c<0?"-":""):(c<0?" - ":" + "),term,"");
+        if(used>=out_size) break;
+        first=false;
+    }
+
+    if(first) snprintf(out,out_size,"0");
+    if(integral_constant && strlen(out)+4<out_size) strcat(out," + C");
+}
+
+static bool try_polynomial_calculus(char const *text, char *out, size_t out_size)
+{
+    char expr[220];
+    char const *p=NULL;
+    double c[7], result[8]={0};
+    int i;
+    char formatted[420];
+
+    if(starts_with(text,"derive ")) p=text+7;
+    else if(starts_with(text,"derivative of ")) p=text+14;
+    else if(starts_with(text,"differentiate ")) p=text+14;
+    else if(starts_with(text,"integrate ")) p=text+10;
+    else if(starts_with(text,"integral of ")) p=text+12;
+    else return false;
+
+    snprintf(expr,sizeof(expr),"%s",p);
+    trim_text(expr);
+    if(!parse_polynomial(expr,c)) return false;
+
+    if(starts_with(text,"integrate ") || starts_with(text,"integral of ")) {
+        for(i=0;i<=6;i++) result[i+1]=c[i]/(i+1);
+        format_polynomial(result,7,formatted,sizeof(formatted),true);
+        snprintf(out,out_size,"Integral: %s",formatted);
+    }
+    else {
+        for(i=1;i<=6;i++) result[i-1]=c[i]*i;
+        format_polynomial(result,6,formatted,sizeof(formatted),false);
+        snprintf(out,out_size,"Derivative: %s",formatted);
+    }
+
+    return true;
+}
+
 static bool try_science_formula(char const *text, char *out, size_t out_size)
 {
     double v[8];
@@ -3125,6 +3440,18 @@ static bool qb_offline_answer_core(
     }
 
     if(try_unit_conversion(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_number_theory(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_statistics_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_polynomial_calculus(lowerbuf, out, out_size)) {
         return true;
     }
 
