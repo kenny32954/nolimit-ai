@@ -4844,6 +4844,56 @@ static bool try_linear_inequality(char const *text, char *out, size_t out_size)
     return true;
 }
 
+
+static bool try_compound_unit_conversion(char const *text, char *out, size_t out_size)
+{
+    double a,b;
+
+    if(sscanf(text,"%lf ft %lf in to inches",&a,&b)==2 ||
+       sscanf(text,"%lf feet %lf inches to inches",&a,&b)==2) {
+        snprintf(out,out_size,"%.12g ft %.12g in = %.12g inches",a,b,a*12.0+b);
+        return true;
+    }
+
+    if(sscanf(text,"%lf ft %lf in to feet",&a,&b)==2 ||
+       sscanf(text,"%lf feet %lf inches to feet",&a,&b)==2) {
+        snprintf(out,out_size,"%.12g ft %.12g in = %.12g feet",a,b,a+b/12.0);
+        return true;
+    }
+
+    if(sscanf(text,"%lf hours %lf minutes to minutes",&a,&b)==2 ||
+       sscanf(text,"%lf hr %lf min to minutes",&a,&b)==2) {
+        snprintf(out,out_size,"%.12g hours %.12g minutes = %.12g minutes",a,b,a*60.0+b);
+        return true;
+    }
+
+    if(sscanf(text,"%lf hours %lf minutes to hours",&a,&b)==2 ||
+       sscanf(text,"%lf hr %lf min to hours",&a,&b)==2) {
+        snprintf(out,out_size,"%.12g hours %.12g minutes = %.12g hours",a,b,a+b/60.0);
+        return true;
+    }
+
+    if(sscanf(text,"%lf lb %lf oz to ounces",&a,&b)==2 ||
+       sscanf(text,"%lf pounds %lf ounces to ounces",&a,&b)==2) {
+        snprintf(out,out_size,"%.12g lb %.12g oz = %.12g ounces",a,b,a*16.0+b);
+        return true;
+    }
+
+    if(sscanf(text,"%lf lb %lf oz to pounds",&a,&b)==2 ||
+       sscanf(text,"%lf pounds %lf ounces to pounds",&a,&b)==2) {
+        snprintf(out,out_size,"%.12g lb %.12g oz = %.12g pounds",a,b,a+b/16.0);
+        return true;
+    }
+
+    if(sscanf(text,"%lf dollars %lf cents to cents",&a,&b)==2 ||
+       sscanf(text,"$%lf %lf cents to cents",&a,&b)==2) {
+        snprintf(out,out_size,"%.12g dollars %.12g cents = %.12g cents",a,b,a*100.0+b);
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_unit_conversion(char const *text, char *out, size_t out_size)
 {
     double v[4];
@@ -6500,6 +6550,10 @@ static bool qb_offline_answer_core(
             "Standalone linear solving supports forms like 3x+7=25 or 2x-4=x+9. "
             "Your exact input was: \"%.180s\".",
             prompt);
+        return true;
+    }
+
+    if(try_compound_unit_conversion(lowerbuf, out, out_size)) {
         return true;
     }
 
