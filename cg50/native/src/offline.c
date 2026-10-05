@@ -2538,6 +2538,9 @@ static bool try_quadratic_factor(char const *text, char *out, size_t out_size)
             if(q==0 || c%q!=0) continue;
             t=c/q;
             if(p*t+q*r==b) {
+                if(p<0 && r<0) {
+                    p=-p; q=-q; r=-r; t=-t;
+                }
                 format_linear_factor(p,q,f1,sizeof(f1));
                 format_linear_factor(r,t,f2,sizeof(f2));
                 snprintf(out,out_size,"%ldx^2 %c %ldx %c %ld = %s%s",
