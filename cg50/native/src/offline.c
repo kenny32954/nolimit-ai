@@ -2707,11 +2707,127 @@ static bool try_common_denominator(char const *text, char *out, size_t out_size)
     return true;
 }
 
+
+static bool approximate_fraction(double x, long max_den, long *num, long *den)
+{
+    long h1=1,h0=0,k1=0,k0=1;
+    double value=x;
+    int iter=0;
+
+    if(!isfinite(x) || max_den<=0) return false;
+
+    while(iter++<32) {
+        long a=(long)floor(value);
+        long h2=a*h1+h0;
+        long k2=a*k1+k0;
+        double frac=value-a;
+
+        if(k2>max_den || k2<=0) break;
+
+        h0=h1; h1=h2;
+        k0=k1; k1=k2;
+
+        if(fabs(frac)<1e-12) break;
+        value=1.0/frac;
+    }
+
+    if(k1==0) return false;
+    *num=h1;
+    *den=k1;
+    return true;
+}
+
+static bool try_ratio_fraction_conversion(char const *text, char *out, size_t out_size)
+{
+    double v[6];
+    int n=extract_flexible_numbers(text,v,6);
+
+    if((starts_with(text,"simplify ratio ") || starts_with(text,"reduce ratio ")) && n>=2) {
+        long a=(long)llround(v[0]);
+        long b=(long)llround(v[1]);
+        long g;
+
+        if(fabs(v[0]-a)>1e-10 || fabs(v[1]-b)>1e-10) {
+            snprintf(out,out_size,"Exact ratio simplification currently expects integers.");
+            return true;
+        }
+        if(a==0 && b==0) {
+            snprintf(out,out_size,"0:0 does not define a meaningful ratio.");
+            return true;
+        }
+        g=gcd_long(a,b);
+        if(g==0) g=1;
+        if(g<0) g=-g;
+        snprintf(out,out_size,"%ld:%ld simplifies to %ld:%ld",a,b,a/g,b/g);
+        return true;
+    }
+
+    if((starts_with(text,"decimal to fraction ") || strstr(text," as fraction")) && n>=1) {
+        double x=v[0];
+        long num,den;
+        bool neg=x<0.0;
+        if(neg) x=-x;
+
+        if(!approximate_fraction(x,1000000,&num,&den)) return false;
+        if(neg) num=-num;
+        reduce_fraction_long(&num,&den);
+
+        snprintf(out,out_size,"%.12g = %ld/%ld",v[0],num,den);
+        return true;
+    }
+
+    if(starts_with(text,"fraction to decimal ")) {
+        long a,b;
+        char const *p=text+20;
+        if(sscanf(p," %ld / %ld",&a,&b)==2) {
+            if(b==0) snprintf(out,out_size,"A denominator cannot be zero.");
+            else snprintf(out,out_size,"%ld/%ld = %.12g",a,b,(double)a/(double)b);
+            return true;
+        }
+    }
+
+    if((starts_with(text,"compare fractions ") || starts_with(text,"which is larger ") ||
+        starts_with(text,"which is bigger ")) && strchr(text,'/')) {
+        long a,b,c,d;
+        char work[220];
+        char *p=work;
+        long double left,right;
+
+        snprintf(work,sizeof(work),"%s",text);
+        if(starts_with(p,"compare fractions ")) p+=18;
+        else if(starts_with(p,"which is larger ")) p+=16;
+        else if(starts_with(p,"which is bigger ")) p+=16;
+
+        if(sscanf(p," %ld / %ld %*[^-0-9] %ld / %ld",&a,&b,&c,&d)!=4 &&
+           sscanf(p," %ld/%ld %ld/%ld",&a,&b,&c,&d)!=4) return false;
+
+        if(b==0 || d==0) {
+            snprintf(out,out_size,"A denominator cannot be zero.");
+            return true;
+        }
+
+        left=(long double)a/(long double)b;
+        right=(long double)c/(long double)d;
+
+        if(fabsl(left-right)<1e-15L) {
+            snprintf(out,out_size,"%ld/%ld = %ld/%ld",a,b,c,d);
+        } else if(left>right) {
+            snprintf(out,out_size,"%ld/%ld is larger than %ld/%ld",a,b,c,d);
+        } else {
+            snprintf(out,out_size,"%ld/%ld is larger than %ld/%ld",c,d,a,b);
+        }
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_exact_math_tools(char const *text, char *out, size_t out_size)
 {
     if(try_absolute_value_equation(text,out,out_size)) return true;
     if(try_discriminant_tool(text,out,out_size)) return true;
     if(try_common_denominator(text,out,out_size)) return true;
+    if(try_ratio_fraction_conversion(text,out,out_size)) return true;
     if(try_exact_fraction_arithmetic(text,out,out_size)) return true;
     if(try_radical_simplify(text,out,out_size)) return true;
     if(try_quadratic_factor(text,out,out_size)) return true;
