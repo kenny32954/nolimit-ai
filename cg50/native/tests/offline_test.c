@@ -539,6 +539,28 @@ int main(void)
     qb_offline_answer("math", "answer", "school", "scientific notation 0.00123", out, sizeof(out));
     expect_contains("scientific notation small", out, "1.23 x 10^-3");
 
+
+    qb_offline_answer("algebra_1", "steps", "school", "solve |x-3|=5", out, sizeof(out));
+    expect_contains("absolute value solution one", out, "8");
+    expect_contains("absolute value solution two", out, "-2");
+
+    qb_offline_answer("algebra_1", "steps", "school", "solve |2x+1|=7", out, sizeof(out));
+    expect_contains("absolute value coefficient one", out, "3");
+    expect_contains("absolute value coefficient two", out, "-4");
+
+    qb_offline_answer("algebra_2", "answer", "school", "discriminant x^2-5x+6", out, sizeof(out));
+    expect_contains("discriminant expression", out, "1");
+    expect_contains("discriminant roots", out, "Two distinct real roots");
+
+    qb_offline_answer("algebra_2", "answer", "school", "discriminant 1 2 5", out, sizeof(out));
+    expect_contains("discriminant complex", out, "-16");
+    expect_contains("discriminant complex roots", out, "complex conjugate");
+
+    qb_offline_answer("math", "answer", "school", "common denominator 1/4 1/6", out, sizeof(out));
+    expect_contains("lcd value", out, "LCD = 12");
+    expect_contains("lcd first fraction", out, "3/12");
+    expect_contains("lcd second fraction", out, "2/12");
+
     qb_offline_answer("consumer_math", "answer", "school", "what percent is 15 of 60", out, sizeof(out));
     expect_contains("reverse percent", out, "25%");
 
