@@ -3399,6 +3399,10 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(try_polynomial_calculus(lowerbuf, out, out_size)) {
+        return true;
+    }
+
     if(write_intent_response(subject, mode, prompt, out, out_size)) {
         return true;
     }
@@ -3449,10 +3453,6 @@ static bool qb_offline_answer_core(
     }
 
     if(try_statistics_tools(lowerbuf, out, out_size)) {
-        return true;
-    }
-
-    if(try_polynomial_calculus(lowerbuf, out, out_size)) {
         return true;
     }
 
