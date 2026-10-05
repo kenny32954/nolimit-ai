@@ -797,6 +797,32 @@ int main(void)
     expect_contains("zscore tool", out, "2");
 
 
+    qb_offline_answer("calculus", "answer", "college", "derivative at x=2 of 3x^2+2x-5", out, sizeof(out));
+    expect_contains("derivative at point", out, "14");
+
+    qb_offline_answer("calculus", "answer", "college", "tangent line x^2 at x=3", out, sizeof(out));
+    expect_contains("tangent line slope", out, "slope 6");
+    expect_contains("tangent line equation", out, "6x -9");
+
+    qb_offline_answer("calculus", "answer", "college", "definite integral x^2 from 0 to 3", out, sizeof(out));
+    expect_contains("definite integral", out, "9");
+
+    qb_offline_answer("calculus", "answer", "college", "limit x^2+2x as x->3", out, sizeof(out));
+    expect_contains("polynomial limit", out, "15");
+
+    qb_offline_answer("algebra_2", "answer", "school", "arithmetic nth 5 3 10", out, sizeof(out));
+    expect_contains("arithmetic nth", out, "32");
+
+    qb_offline_answer("algebra_2", "answer", "school", "geometric nth 2 3 5", out, sizeof(out));
+    expect_contains("geometric nth", out, "162");
+
+    qb_offline_answer("algebra_2", "answer", "school", "arithmetic sum first 5 difference 3 terms 10", out, sizeof(out));
+    expect_contains("arithmetic sum", out, "185");
+
+    qb_offline_answer("algebra_2", "answer", "school", "geometric sum first 2 ratio 3 terms 4", out, sizeof(out));
+    expect_contains("geometric sum", out, "80");
+
+
     qb_offline_answer("algebra_1", "steps", "school", "Alex is 5 years older than Sam. Sam is 12. How old is Alex?", out, sizeof(out));
     expect_contains("age older problem", out, "17");
 
