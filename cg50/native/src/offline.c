@@ -1222,10 +1222,271 @@ static bool try_prefixed_expression(char const *text, char *out, size_t out_size
     return false;
 }
 
+
+static int basic_number_word(char const *word)
+{
+    static char const *ones[] = {
+        "zero","one","two","three","four","five","six","seven","eight","nine",
+        "ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen",
+        "seventeen","eighteen","nineteen"
+    };
+    static char const *tens_words[] = {
+        "twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety"
+    };
+    int i;
+
+    for(i = 0; i < 20; i++) {
+        if(strcmp(word, ones[i]) == 0) return i;
+    }
+
+    for(i = 0; i < 8; i++) {
+        if(strcmp(word, tens_words[i]) == 0) return (i + 2) * 10;
+    }
+
+    return -1;
+}
+
+static bool token_is_number_word(char const *word)
+{
+    return basic_number_word(word) >= 0 ||
+           strcmp(word, "hundred") == 0 ||
+           strcmp(word, "thousand") == 0;
+}
+
+static int extract_flexible_numbers(char const *text, double *values, int cap)
+{
+    int count = 0;
+    char copy[700];
+    char *p;
+
+    snprintf(copy, sizeof(copy), "%s", text);
+
+    p = copy;
+    while(*p && count < cap) {
+        char *end;
+        double numeric;
+
+        if(isdigit((unsigned char)*p) || *p == '.' ||
+           ((*p == '+' || *p == '-') &&
+            (isdigit((unsigned char)p[1]) || p[1] == '.'))) {
+            numeric = strtod(p, &end);
+            if(end != p) {
+                values[count++] = numeric;
+                p = end;
+                continue;
+            }
+        }
+
+        if(isalpha((unsigned char)*p)) {
+            char *start = p;
+            char token[32];
+            size_t len = 0;
+            long current = 0;
+            long total = 0;
+            bool got = false;
+
+            while(*p && count < cap) {
+                char *q = p;
+                int val;
+
+                while(*q && !isalpha((unsigned char)*q)) q++;
+                if(!*q) {
+                    p = q;
+                    break;
+                }
+
+                len = 0;
+                while(q[len] && isalpha((unsigned char)q[len]) &&
+                      len + 1 < sizeof(token)) {
+                    token[len] = (char)tolower((unsigned char)q[len]);
+                    len++;
+                }
+                token[len] = '\0';
+
+                val = basic_number_word(token);
+
+                if(val >= 0) {
+                    current += val;
+                    got = true;
+                }
+                else if(strcmp(token, "hundred") == 0 && got) {
+                    if(current == 0) current = 1;
+                    current *= 100;
+                }
+                else if(strcmp(token, "thousand") == 0 && got) {
+                    if(current == 0) current = 1;
+                    total += current * 1000;
+                    current = 0;
+                }
+                else if(strcmp(token, "and") == 0 && got) {
+                    /* allow: one hundred and five */
+                }
+                else {
+                    if(got) {
+                        p = q;
+                        break;
+                    }
+                    p = q + len;
+                    start = p;
+                    continue;
+                }
+
+                p = q + len;
+
+                {
+                    char look[32];
+                    char *r = p;
+                    size_t k = 0;
+                    while(*r && !isalpha((unsigned char)*r) &&
+                          !isdigit((unsigned char)*r)) r++;
+                    while(r[k] && isalpha((unsigned char)r[k]) &&
+                          k + 1 < sizeof(look)) {
+                        look[k] = (char)tolower((unsigned char)r[k]);
+                        k++;
+                    }
+                    look[k] = '\0';
+
+                    if(!token_is_number_word(look) && strcmp(look, "and") != 0) {
+                        break;
+                    }
+                }
+            }
+
+            if(got) {
+                values[count++] = (double)(total + current);
+                continue;
+            }
+
+            p = start + 1;
+            continue;
+        }
+
+        p++;
+    }
+
+    return count;
+}
+
+static bool try_word_problem(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n = extract_flexible_numbers(text, v, 8);
+    double result;
+
+    if(n >= 2 &&
+       (strstr(text, "has ") || strstr(text, "have ") ||
+        strstr(text, "had ") || strstr(text, "starts with ")) &&
+       (strstr(text, "gets ") || strstr(text, "get ") ||
+        strstr(text, "buys ") || strstr(text, "buy ") ||
+        strstr(text, "receives ") || strstr(text, "receive ") ||
+        strstr(text, "finds ") || strstr(text, "gains ") ||
+        strstr(text, "adds "))) {
+        result = v[0] + v[1];
+        snprintf(out, out_size,
+            "This looks like an addition word problem: %.12g + %.12g = %.12g.",
+            v[0], v[1], result);
+        return true;
+    }
+
+    if(n >= 2 &&
+       (strstr(text, "has ") || strstr(text, "have ") ||
+        strstr(text, "had ") || strstr(text, "starts with ")) &&
+       (strstr(text, "gives ") || strstr(text, "give ") ||
+        strstr(text, "loses ") || strstr(text, "lose ") ||
+        strstr(text, "sells ") || strstr(text, "sell ") ||
+        strstr(text, "uses ") || strstr(text, "spends ") ||
+        strstr(text, "takes away "))) {
+        result = v[0] - v[1];
+        snprintf(out, out_size,
+            "This looks like a subtraction word problem: %.12g - %.12g = %.12g.",
+            v[0], v[1], result);
+        return true;
+    }
+
+    if(n >= 2 &&
+       (strstr(text, "each ") || strstr(text, "per group") ||
+        strstr(text, "groups of ") || strstr(text, "rows of ")) &&
+       (strstr(text, "groups") || strstr(text, "rows") ||
+        strstr(text, "boxes") || strstr(text, "bags") ||
+        strstr(text, "teams"))) {
+        result = v[0] * v[1];
+        snprintf(out, out_size,
+            "This looks like equal-group multiplication: %.12g * %.12g = %.12g.",
+            v[0], v[1], result);
+        return true;
+    }
+
+    if(n >= 2 &&
+       (strstr(text, "split ") || strstr(text, "shared ") ||
+        strstr(text, "divide ") || strstr(text, "equally among") ||
+        strstr(text, "each person"))) {
+        if(v[1] == 0.0) {
+            snprintf(out, out_size, "The word problem would require division by zero, which is undefined.");
+        }
+        else {
+            result = v[0] / v[1];
+            snprintf(out, out_size,
+                "This looks like equal sharing/division: %.12g / %.12g = %.12g.",
+                v[0], v[1], result);
+        }
+        return true;
+    }
+
+    if(n >= 2 && strstr(text, "miles per hour") &&
+       (strstr(text, "for ") || strstr(text, "hours"))) {
+        result = v[0] * v[1];
+        snprintf(out, out_size,
+            "Distance = rate*time = %.12g mph * %.12g h = %.12g miles.",
+            v[0], v[1], result);
+        return true;
+    }
+
+    if(n >= 2 && strstr(text, "miles") && strstr(text, "hours") &&
+       (strstr(text, "speed") || strstr(text, "average speed") ||
+        strstr(text, "rate"))) {
+        if(v[1] == 0.0) {
+            snprintf(out, out_size, "Average speed is undefined for zero elapsed time.");
+        }
+        else {
+            result = v[0] / v[1];
+            snprintf(out, out_size,
+                "Average speed = distance/time = %.12g / %.12g = %.12g mph.",
+                v[0], v[1], result);
+        }
+        return true;
+    }
+
+    if(n >= 2 && strstr(text, "percent increase")) {
+        if(v[0] == 0.0) {
+            snprintf(out, out_size, "Percent increase from zero is not defined by the usual (new-old)/old formula.");
+        }
+        else {
+            result = (v[1] - v[0]) / v[0] * 100.0;
+            snprintf(out, out_size,
+                "Percent change = (new-old)/old * 100 = %.12g%%.", result);
+        }
+        return true;
+    }
+
+    if(n >= 2 && strstr(text, "percent decrease")) {
+        if(v[0] == 0.0) {
+            snprintf(out, out_size, "Percent decrease from zero is not defined by the usual (old-new)/old formula.");
+        }
+        else {
+            result = (v[0] - v[1]) / v[0] * 100.0;
+            snprintf(out, out_size,
+                "Percent decrease = (old-new)/old * 100 = %.12g%%.", result);
+        }
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_natural_math(char const *text, char *out, size_t out_size)
 {
     double v[16];
-    int n = extract_numbers(text, v, 16);
+    int n = extract_flexible_numbers(text, v, 16);
     double result;
 
     if((strstr(text, "square root of ") || starts_with(text, "sqrt of ")) && n >= 1) {
@@ -2029,6 +2290,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_unit_conversion(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_word_problem(lowerbuf, out, out_size)) {
         return true;
     }
 
