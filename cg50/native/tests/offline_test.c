@@ -807,6 +807,26 @@ int main(void)
     expect_contains("ascii decode", out, "'A'");
 
 
+    qb_offline_answer("computer_science", "answer", "school", "text to binary Hi", out, sizeof(out));
+    expect_contains("text binary H", out, "01001000");
+    expect_contains("text binary i", out, "01101001");
+
+    qb_offline_answer("computer_science", "answer", "school", "binary to text 01001000 01101001", out, sizeof(out));
+    expect_contains("binary text decode", out, "Hi");
+
+    qb_offline_answer("computer_science", "answer", "school", "text to hex Hi", out, sizeof(out));
+    expect_contains("text hex encode", out, "48 69");
+
+    qb_offline_answer("computer_science", "answer", "school", "hex to text 48 69", out, sizeof(out));
+    expect_contains("hex text decode", out, "Hi");
+
+    qb_offline_answer("computer_science", "answer", "school", "base 16 FF to base 2", out, sizeof(out));
+    expect_contains("base conversion hex binary", out, "11111111");
+
+    qb_offline_answer("computer_science", "answer", "school", "base 2 11111111 to base 16", out, sizeof(out));
+    expect_contains("base conversion binary hex", out, "FF");
+
+
     qb_offline_answer("geometry", "answer", "school", "third angle 50 60", out, sizeof(out));
     expect_contains("triangle third angle", out, "70");
 
