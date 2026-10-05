@@ -626,6 +626,45 @@ int main(void)
     qb_offline_answer("auto", "explain", "school", "what do you remember?", out, sizeof(out));
     expect_contains("session memory empty", out, "don't have any");
 
+
+    qb_offline_answer("linear_algebra", "answer", "college", "det 1 2 3 4", out, sizeof(out));
+    expect_contains("matrix determinant", out, "-2");
+
+    qb_offline_answer("linear_algebra", "answer", "college", "inverse 1 2 3 4", out, sizeof(out));
+    expect_contains("matrix inverse", out, "-2");
+    expect_contains("matrix inverse element", out, "1.5");
+
+    qb_offline_answer("linear_algebra", "answer", "college", "vector magnitude 3 4 12", out, sizeof(out));
+    expect_contains("vector magnitude", out, "13");
+
+    qb_offline_answer("linear_algebra", "answer", "college", "dot 1 2 3 ; 4 5 6", out, sizeof(out));
+    expect_contains("dot product", out, "32");
+
+    qb_offline_answer("linear_algebra", "answer", "college", "cross 1 0 0 ; 0 1 0", out, sizeof(out));
+    expect_contains("cross product", out, "<0, 0, 1>");
+
+    qb_offline_answer("linear_algebra", "answer", "college", "matmul 1 2 3 4 ; 5 6 7 8", out, sizeof(out));
+    expect_contains("matrix multiply", out, "19");
+    expect_contains("matrix multiply 2", out, "50");
+
+    qb_offline_answer("statistics", "answer", "school", "probability 3 out of 10", out, sizeof(out));
+    expect_contains("probability fraction", out, "30%");
+
+    qb_offline_answer("statistics", "answer", "school", "complement 0.3", out, sizeof(out));
+    expect_contains("probability complement", out, "70%");
+
+    qb_offline_answer("statistics", "answer", "college", "binomial 10 0.5 3", out, sizeof(out));
+    expect_contains("binomial probability", out, "11.71875");
+
+    qb_offline_answer("algebra_2", "answer", "school", "log base 2 of 8", out, sizeof(out));
+    expect_contains("log base tool", out, "3");
+
+    qb_offline_answer("algebra_2", "answer", "school", "log 1000", out, sizeof(out));
+    expect_contains("log10 tool", out, "3");
+
+    qb_offline_answer("algebra_2", "answer", "school", "nth root 3 of 27", out, sizeof(out));
+    expect_contains("nth root tool", out, "3");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
