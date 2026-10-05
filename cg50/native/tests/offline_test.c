@@ -406,6 +406,19 @@ int main(void)
     qb_offline_answer("chemistry", "answer", "school", "density mass 20 volume 4", out, sizeof(out));
     expect_contains("density formula", out, "5");
 
+
+    qb_offline_answer("biology", "explain", "school", "what is celluar respiration", out, sizeof(out));
+    expect_contains("multiword typo correction", out, "cellular respiration");
+    expect_contains("multiword typo answer", out, "ATP");
+
+    qb_offline_answer("statistics", "explain", "school", "define standerd deviation", out, sizeof(out));
+    expect_contains("stats typo correction", out, "standard deviation");
+    expect_contains("stats typo answer", out, "spread");
+
+    qb_offline_answer("government", "explain", "school", "explain seperation of powers", out, sizeof(out));
+    expect_contains("government typo correction", out, "separation of powers");
+    expect_contains("government typo answer", out, "branches");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
