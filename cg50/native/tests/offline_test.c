@@ -320,6 +320,25 @@ int main(void)
     qb_offline_answer("auto", "answer", "school", "10/2 >= 5", out, sizeof(out));
     expect_contains("numeric inequality", out, "TRUE");
 
+
+    qb_offline_answer("auto", "explain", "school", "wut is mitosis", out, sizeof(out));
+    expect_contains("shorthand wut", out, "daughter cells");
+
+    qb_offline_answer("algebra_1", "explain", "school", "pls explain slope", out, sizeof(out));
+    expect_contains("shorthand pls", out, "rate of change");
+
+    qb_offline_answer("auto", "explain", "school", "wsp", out, sizeof(out));
+    expect_contains("shorthand wsp", out, "Standalone is up");
+
+    qb_offline_answer("auto", "explain", "school", "wyd", out, sizeof(out));
+    expect_contains("shorthand wyd", out, "Running locally");
+
+    qb_offline_answer("biology", "explain", "school", "what is dna", out, sizeof(out));
+    expect_contains("wdym base", out, "DNA stores hereditary");
+
+    qb_offline_answer("biology", "explain", "school", "wdym", out, sizeof(out));
+    expect_contains("shorthand wdym", out, "I mean this about");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
