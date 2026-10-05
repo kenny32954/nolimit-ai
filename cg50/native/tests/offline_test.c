@@ -358,6 +358,27 @@ int main(void)
     qb_offline_answer("auto", "answer", "school", "hex of 255", out, sizeof(out));
     expect_contains("hex conversion", out, "0xFF");
 
+
+    qb_offline_answer("auto", "answer", "school", "42", out, sizeof(out));
+    expect_contains("raw integer", out, "42 is positive");
+    expect_contains("raw integer parity", out, "even");
+
+    qb_offline_answer("auto", "answer", "school", "Q", out, sizeof(out));
+    expect_contains("raw letter", out, "letter 17");
+
+    qb_offline_answer("auto", "answer", "school", "0b1010", out, sizeof(out));
+    expect_contains("binary literal", out, "10");
+
+    qb_offline_answer("auto", "answer", "school", "0xFF", out, sizeof(out));
+    expect_contains("hex literal", out, "255");
+
+    qb_offline_answer("auto", "explain", "school", "name@example.com", out, sizeof(out));
+    expect_contains("email shape", out, "looks like an email address");
+
+    qb_offline_answer("auto", "explain", "school", "notes.pdf", out, sizeof(out));
+    expect_contains("filename shape", out, "looks like a filename");
+    expect_contains("filename extension", out, ".pdf");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
