@@ -869,6 +869,22 @@ int main(void)
     qb_offline_answer("geometry", "answer", "school", "regular polygon interior angle 6", out, sizeof(out));
     expect_contains("regular polygon angle", out, "120");
 
+
+    qb_offline_answer("geography", "answer", "school", "great circle distance 0 0 0 1", out, sizeof(out));
+    expect_contains("great circle distance", out, "111.195");
+
+    qb_offline_answer("geography", "answer", "school", "bearing 0 0 0 1", out, sizeof(out));
+    expect_contains("initial bearing east", out, "90");
+
+    qb_offline_answer("geography", "answer", "school", "population density 100000 50", out, sizeof(out));
+    expect_contains("population density tool", out, "2000");
+
+    qb_offline_answer("geography", "answer", "school", "map scale 5 50000", out, sizeof(out));
+    expect_contains("map scale tool", out, "2.5 km");
+
+    qb_offline_answer("geography", "answer", "school", "latitude distance 2", out, sizeof(out));
+    expect_contains("latitude distance tool", out, "222.39");
+
     qb_offline_answer("algebra_1", "answer", "school", "line through 1 2 3 6", out, sizeof(out));
     expect_contains("line through points", out, "2x");
 
