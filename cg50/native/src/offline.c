@@ -762,6 +762,210 @@ static bool try_literal_analysis(char const *prompt, char *out, size_t out_size)
     return false;
 }
 
+
+typedef struct {
+    char const *symbol;
+    char const *name;
+} element_t;
+
+static element_t const elements[] = {
+    {"H","hydrogen"},{"He","helium"},{"Li","lithium"},{"Be","beryllium"},
+    {"B","boron"},{"C","carbon"},{"N","nitrogen"},{"O","oxygen"},
+    {"F","fluorine"},{"Ne","neon"},{"Na","sodium"},{"Mg","magnesium"},
+    {"Al","aluminum"},{"Si","silicon"},{"P","phosphorus"},{"S","sulfur"},
+    {"Cl","chlorine"},{"Ar","argon"},{"K","potassium"},{"Ca","calcium"},
+    {"Sc","scandium"},{"Ti","titanium"},{"V","vanadium"},{"Cr","chromium"},
+    {"Mn","manganese"},{"Fe","iron"},{"Co","cobalt"},{"Ni","nickel"},
+    {"Cu","copper"},{"Zn","zinc"},{"Ga","gallium"},{"Ge","germanium"},
+    {"As","arsenic"},{"Se","selenium"},{"Br","bromine"},{"Kr","krypton"},
+    {"Rb","rubidium"},{"Sr","strontium"},{"Y","yttrium"},{"Zr","zirconium"},
+    {"Nb","niobium"},{"Mo","molybdenum"},{"Tc","technetium"},{"Ru","ruthenium"},
+    {"Rh","rhodium"},{"Pd","palladium"},{"Ag","silver"},{"Cd","cadmium"},
+    {"In","indium"},{"Sn","tin"},{"Sb","antimony"},{"Te","tellurium"},
+    {"I","iodine"},{"Xe","xenon"},{"Cs","cesium"},{"Ba","barium"},
+    {"La","lanthanum"},{"Ce","cerium"},{"Pr","praseodymium"},{"Nd","neodymium"},
+    {"Pm","promethium"},{"Sm","samarium"},{"Eu","europium"},{"Gd","gadolinium"},
+    {"Tb","terbium"},{"Dy","dysprosium"},{"Ho","holmium"},{"Er","erbium"},
+    {"Tm","thulium"},{"Yb","ytterbium"},{"Lu","lutetium"},{"Hf","hafnium"},
+    {"Ta","tantalum"},{"W","tungsten"},{"Re","rhenium"},{"Os","osmium"},
+    {"Ir","iridium"},{"Pt","platinum"},{"Au","gold"},{"Hg","mercury"},
+    {"Tl","thallium"},{"Pb","lead"},{"Bi","bismuth"},{"Po","polonium"},
+    {"At","astatine"},{"Rn","radon"},{"Fr","francium"},{"Ra","radium"},
+    {"Ac","actinium"},{"Th","thorium"},{"Pa","protactinium"},{"U","uranium"},
+    {"Np","neptunium"},{"Pu","plutonium"},{"Am","americium"},{"Cm","curium"},
+    {"Bk","berkelium"},{"Cf","californium"},{"Es","einsteinium"},{"Fm","fermium"},
+    {"Md","mendelevium"},{"No","nobelium"},{"Lr","lawrencium"},{"Rf","rutherfordium"},
+    {"Db","dubnium"},{"Sg","seaborgium"},{"Bh","bohrium"},{"Hs","hassium"},
+    {"Mt","meitnerium"},{"Ds","darmstadtium"},{"Rg","roentgenium"},{"Cn","copernicium"},
+    {"Nh","nihonium"},{"Fl","flerovium"},{"Mc","moscovium"},{"Lv","livermorium"},
+    {"Ts","tennessine"},{"Og","oganesson"}
+};
+
+static bool same_ci(char const *a, char const *b)
+{
+    while(*a && *b) {
+        if(tolower((unsigned char)*a) != tolower((unsigned char)*b)) return false;
+        a++; b++;
+    }
+    return *a=='\0' && *b=='\0';
+}
+
+static element_t const *element_by_symbol(char const *symbol, int *atomic_number)
+{
+    unsigned int i;
+    for(i=0;i<sizeof(elements)/sizeof(elements[0]);i++) {
+        if(same_ci(symbol,elements[i].symbol)) {
+            if(atomic_number) *atomic_number=(int)i+1;
+            return &elements[i];
+        }
+    }
+    return NULL;
+}
+
+static element_t const *element_by_name(char const *name, int *atomic_number)
+{
+    unsigned int i;
+    for(i=0;i<sizeof(elements)/sizeof(elements[0]);i++) {
+        if(same_ci(name,elements[i].name)) {
+            if(atomic_number) *atomic_number=(int)i+1;
+            return &elements[i];
+        }
+    }
+    return NULL;
+}
+
+static bool try_periodic_table(char const *subject, char const *prompt,
+                               char *out, size_t out_size)
+{
+    char raw[120];
+    char lower[120];
+    char token[48];
+    char const *p;
+    element_t const *e=NULL;
+    int number=0;
+    long requested=0;
+    char *end;
+
+    snprintf(raw,sizeof(raw),"%.119s",prompt);
+    trim_text(raw);
+    lowercase_into(raw,lower,sizeof(lower));
+
+    if(starts_with(lower,"atomic number ")) {
+        requested=strtol(lower+14,&end,10);
+        if(end!=lower+14 && requested>=1 && requested<=118) {
+            e=&elements[requested-1];
+            snprintf(out,out_size,
+                "Atomic number %ld = %s (%s).",requested,e->name,e->symbol);
+            return true;
+        }
+    }
+
+    if(starts_with(lower,"element ")) p=raw+8;
+    else if(starts_with(lower,"symbol for ")) {
+        p=raw+11;
+        while(*p && isspace((unsigned char)*p)) p++;
+        e=element_by_name(p,&number);
+        if(e) {
+            snprintf(out,out_size,"%s has symbol %s and atomic number %d.",e->name,e->symbol,number);
+            return true;
+        }
+        return false;
+    }
+    else if(starts_with(lower,"what element is ")) p=raw+16;
+    else if(starts_with(lower,"what is element ")) p=raw+16;
+    else if(starts_with(lower,"what is ")) p=raw+8;
+    else p=raw;
+
+    while(*p && isspace((unsigned char)*p)) p++;
+    snprintf(token,sizeof(token),"%.47s",p);
+    trim_text(token);
+
+    if(strchr(token,' ')) return false;
+
+    e=element_by_symbol(token,&number);
+    if(!e) e=element_by_name(token,&number);
+
+    if(e) {
+        bool chemistry_context = subject && (
+            strcmp(subject,"chemistry")==0 ||
+            strcmp(subject,"organic_chemistry")==0 ||
+            strcmp(subject,"biochemistry")==0 ||
+            strcmp(subject,"physical_science")==0
+        );
+
+        if(strlen(token)==1 && !chemistry_context &&
+           !starts_with(lower,"element ") &&
+           !starts_with(lower,"what element is ") &&
+           !starts_with(lower,"what is element ")) {
+            return false;
+        }
+
+        snprintf(out,out_size,
+            "%s (%s) is element %d on the periodic table.",
+            e->name,e->symbol,number);
+        return true;
+    }
+
+    return false;
+}
+
+typedef struct {
+    char const *part;
+    char const *meaning;
+} wordpart_t;
+
+static wordpart_t const wordparts[] = {
+    {"bio","life"},{"geo","earth"},{"hydro","water"},{"thermo","heat"},
+    {"photo","light"},{"chrono","time"},{"micro","small"},{"macro","large"},
+    {"mono","one"},{"bi","two"},{"tri","three"},{"poly","many"},
+    {"auto","self"},{"anti","against/opposed"},{"pre","before"},{"post","after"},
+    {"inter","between"},{"intra","within"},{"trans","across"},{"sub","under/below"},
+    {"super","above/beyond"},{"hyper","over/excessive"},{"hypo","under/below"},
+    {"neo","new"},{"paleo","ancient"},{"aero","air"},{"astro","star/space"},
+    {"cardio","heart"},{"neuro","nerve/nervous system"},{"derm","skin"},
+    {"hemo","blood"},{"cyto","cell"},{"zoo","animal"},{"anthrop","human"},
+    {"psych","mind"},{"socio","society"},{"eco","environment/home"},
+    {"phon","sound"},{"graph","write/record"},{"meter","measure"},
+    {"scope","view/examine"},{"logy","study/field"},{"phobia","fear/aversion"},
+    {"phile","liking/affinity"},{"itis","inflammation"},{"osis","condition/process"}
+};
+
+static bool try_word_parts(char const *prompt, char *out, size_t out_size)
+{
+    char topic[120];
+    char lower[120];
+    unsigned int i;
+    size_t used=0;
+    int hits=0;
+
+    copy_topic(prompt,topic,sizeof(topic));
+    lowercase_into(topic,lower,sizeof(lower));
+
+    if(strchr(lower,' ') || strlen(lower)<5) return false;
+
+    for(i=0;i<sizeof(wordparts)/sizeof(wordparts[0]);i++) {
+        if(strstr(lower,wordparts[i].part)) {
+            if(hits==0) {
+                used+=(size_t)snprintf(out+used,out_size-used,
+                    "I don't have a verified exact dictionary entry for \"%s\", but its word parts suggest: ",
+                    topic);
+            }
+            used+=(size_t)snprintf(out+used,out_size-used,
+                "%s%s = %s",hits?"; ":"",wordparts[i].part,wordparts[i].meaning);
+            hits++;
+            if(hits>=4 || used+60>=out_size) break;
+        }
+    }
+
+    if(hits) {
+        snprintf(out+strlen(out),out_size-strlen(out),
+            ". Word-root analysis is only a clue, not a guaranteed definition.");
+        return true;
+    }
+
+    return false;
+}
+
 static bool write_input_shape_response(char const *subject, char const *prompt,
                                        char *out, size_t out_size)
 {
@@ -3383,6 +3587,10 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(try_periodic_table(subject, prompt, out, out_size)) {
+        return true;
+    }
+
     if(try_literal_analysis(prompt, out, out_size)) {
         return true;
     }
@@ -3611,6 +3819,10 @@ static bool qb_offline_answer_core(
             snprintf(out, out_size, "%s", facts[i].answer);
             return true;
         }
+    }
+
+    if(try_word_parts(prompt, out, out_size)) {
+        return true;
     }
 
     if(write_input_shape_response(subject, prompt, out, out_size)) {
