@@ -3705,6 +3705,105 @@ static bool try_unit_rate_word_problem(char const *text, char *out, size_t out_s
     return false;
 }
 
+
+static bool try_relationship_word_problem(char const *text, char *out, size_t out_size)
+{
+    double v[10];
+    int n=extract_flexible_numbers(text,v,10);
+
+    if(n>=2 && strstr(text,"years older than") &&
+       (strstr(text,"how old") || strstr(text,"age"))) {
+        snprintf(out,out_size,
+            "Age relationship: %.12g + %.12g = %.12g years old.",
+            v[1],v[0],v[1]+v[0]);
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"years younger than") &&
+       (strstr(text,"how old") || strstr(text,"age"))) {
+        snprintf(out,out_size,
+            "Age relationship: %.12g - %.12g = %.12g years old.",
+            v[1],v[0],v[1]-v[0]);
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"sum") && strstr(text,"difference") &&
+       (strstr(text,"two numbers") || strstr(text,"numbers"))) {
+        double sum=v[0], diff=v[1];
+        snprintf(out,out_size,
+            "If x+y=%.12g and x-y=%.12g, the numbers are %.12g and %.12g.",
+            sum,diff,(sum+diff)/2.0,(sum-diff)/2.0);
+        return true;
+    }
+
+    if(n>=3 && strstr(text,"split") && strstr(text,"ratio")) {
+        double total=v[0], a=v[1], b=v[2];
+        if(a<0.0 || b<0.0 || approx_equal(a+b,0.0)) {
+            snprintf(out,out_size,"Ratio parts must have a positive total weight.");
+        } else {
+            snprintf(out,out_size,
+                "Split %.12g in ratio %.12g:%.12g -> %.12g and %.12g.",
+                total,a,b,total*a/(a+b),total*b/(a+b));
+        }
+        return true;
+    }
+
+    if(n>=2 && (strstr(text,"grade") || strstr(text,"score") ||
+       strstr(text,"percent score")) && strstr(text,"out of")) {
+        if(approx_equal(v[1],0.0)) snprintf(out,out_size,"Total possible points cannot be zero.");
+        else snprintf(out,out_size,
+            "Score = %.12g/%.12g * 100 = %.12g%%.",
+            v[0],v[1],100.0*v[0]/v[1]);
+        return true;
+    }
+
+    if(n>=2 && (strstr(text,"per hour") || strstr(text,"an hour")) &&
+       (strstr(text,"earn") || strstr(text,"pay") || strstr(text,"wage")) &&
+       (strstr(text,"hours") || strstr(text,"worked"))) {
+        snprintf(out,out_size,
+            "Pay = hourly rate * hours = %.12g * %.12g = %.12g.",
+            v[0],v[1],v[0]*v[1]);
+        return true;
+    }
+
+    if(n>=2 && (strstr(text,"unit price") || strstr(text,"cost per") ||
+       strstr(text,"price per")) {
+        if(approx_equal(v[1],0.0)) snprintf(out,out_size,"Item count cannot be zero.");
+        else snprintf(out,out_size,
+            "Unit price = total cost / quantity = %.12g / %.12g = %.12g.",
+            v[0],v[1],v[0]/v[1]);
+        return true;
+    }
+
+    if(n>=4 && (strstr(text,"weighted average") || strstr(text,"weighted mean"))) {
+        double sum=0.0, weights=0.0;
+        int i;
+        if(n%2!=0) {
+            snprintf(out,out_size,"Weighted average expects value/weight pairs.");
+            return true;
+        }
+        for(i=0;i<n;i+=2) {
+            double w=v[i+1];
+            if(w>1.0) w/=100.0;
+            sum+=v[i]*w;
+            weights+=w;
+        }
+        if(approx_equal(weights,0.0)) snprintf(out,out_size,"Total weight cannot be zero.");
+        else snprintf(out,out_size,"Weighted average = %.12g",sum/weights);
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"each") && (strstr(text,"how many total") ||
+       strstr(text,"how many altogether") || strstr(text,"total"))) {
+        snprintf(out,out_size,
+            "Equal groups: %.12g * %.12g = %.12g total.",
+            v[0],v[1],v[0]*v[1]);
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_science_formula(char const *text, char *out, size_t out_size)
 {
     double v[8];
@@ -5552,6 +5651,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_unit_rate_word_problem(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_relationship_word_problem(lowerbuf, out, out_size)) {
         return true;
     }
 
