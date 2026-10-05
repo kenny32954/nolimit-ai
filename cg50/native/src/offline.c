@@ -670,6 +670,12 @@ static bool try_literal_analysis(char const *prompt, char *out, size_t out_size)
     snprintf(text, sizeof(text), "%.179s", prompt);
     while(*p && isspace((unsigned char)*p)) p++;
 
+    {
+        char lower[180];
+        lowercase_into(p, lower, sizeof(lower));
+        if(looks_like_url(lower) || looks_like_code(lower)) return false;
+    }
+
     len = strlen(p);
     while(len > 0 && isspace((unsigned char)p[len - 1])) p[--len] = '\0';
 
