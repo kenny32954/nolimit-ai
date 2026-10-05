@@ -204,6 +204,16 @@ int main(void)
     expect_contains("bond comparison", out, "electron transfer");
 
 
+    qb_offline_answer("biology", "explain", "school", "compare photosynthesis and cellular respiration", out, sizeof(out));
+    expect_contains("generic comparison photosynthesis", out, "light energy");
+    expect_contains("generic comparison respiration", out, "ATP");
+    expect_contains("generic comparison structure", out, "Compare them using the same dimensions");
+
+    qb_offline_answer("economics", "explain", "school", "compare inflation and gross domestic product", out, sizeof(out));
+    expect_contains("generic comparison inflation", out, "price level");
+    expect_contains("generic comparison gdp", out, "final goods and services");
+
+
     qb_offline_answer("biology", "summary", "school", "summarize photosynthesis", out, sizeof(out));
     expect_contains("summary request", out, "Summary - photosynthesis");
 
