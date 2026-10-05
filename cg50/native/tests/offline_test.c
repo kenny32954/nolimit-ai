@@ -562,6 +562,19 @@ int main(void)
     expect_contains("lcd second fraction", out, "2/12");
 
 
+    qb_offline_answer("math", "answer", "school", "simplify ratio 18:24", out, sizeof(out));
+    expect_contains("ratio simplify exact", out, "3:4");
+
+    qb_offline_answer("math", "answer", "school", "decimal to fraction 0.375", out, sizeof(out));
+    expect_contains("decimal fraction convert", out, "3/8");
+
+    qb_offline_answer("math", "answer", "school", "fraction to decimal 3/8", out, sizeof(out));
+    expect_contains("fraction decimal convert", out, "0.375");
+
+    qb_offline_answer("math", "answer", "school", "which is larger 3/4 or 2/3", out, sizeof(out));
+    expect_contains("fraction comparison", out, "3/4 is larger");
+
+
     qb_offline_answer("auto", "answer", "school", "5 ft 8 in to inches", out, sizeof(out));
     expect_contains("compound feet inches", out, "68");
 
