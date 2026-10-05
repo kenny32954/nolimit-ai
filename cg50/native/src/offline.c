@@ -289,6 +289,7 @@ static void friendly_subject(char const *subject, char *out, size_t out_size);
 static void copy_topic(char const *prompt, char *topic, size_t topic_size);
 static int alpha_word_count(char const *text);
 static bool eval_expression(char const *text, double *value);
+static int extract_flexible_numbers(char const *text, double *values, int cap);
 
 static bool phrase_match(char const *text, char const *phrase)
 {
