@@ -519,6 +519,130 @@ static bool try_numeric_claim(char const *text, char *out, size_t out_size)
     return true;
 }
 
+
+static bool try_text_tools(char const *prompt, char *out, size_t out_size)
+{
+    char lower[700];
+    char text[300];
+    char reversed[300];
+    char cleaned[300];
+    size_t i, len, j;
+    int words = 0;
+    int letters = 0;
+    bool in_word = false;
+    char const *p = NULL;
+
+    lowercase_into(prompt, lower, sizeof(lower));
+
+    if(starts_with(lower, "reverse ")) {
+        p = prompt + 8;
+        snprintf(text, sizeof(text), "%.299s", p);
+        len = strlen(text);
+        for(i = 0; i < len && i + 1 < sizeof(reversed); i++) {
+            reversed[i] = text[len - 1 - i];
+        }
+        reversed[i] = '\0';
+        snprintf(out, out_size, "Reversed: %s", reversed);
+        return true;
+    }
+
+    if(starts_with(lower, "count letters in ") ||
+       starts_with(lower, "how many letters in ")) {
+        p = starts_with(lower, "count letters in ") ? prompt + 17 : prompt + 20;
+        while(*p) {
+            if(isalpha((unsigned char)*p)) letters++;
+            p++;
+        }
+        snprintf(out, out_size, "Letter count = %d.", letters);
+        return true;
+    }
+
+    if(starts_with(lower, "count words in ") ||
+       starts_with(lower, "how many words in ")) {
+        p = starts_with(lower, "count words in ") ? prompt + 15 : prompt + 18;
+        while(*p) {
+            bool isword = isalnum((unsigned char)*p) != 0;
+            if(isword && !in_word) words++;
+            in_word = isword;
+            p++;
+        }
+        snprintf(out, out_size, "Word count = %d.", words);
+        return true;
+    }
+
+    if(starts_with(lower, "is ") && strstr(lower, " a palindrome")) {
+        char *marker;
+        snprintf(text, sizeof(text), "%.299s", prompt + 3);
+        marker = strstr(text, " a palindrome");
+        if(!marker) marker = strstr(text, " A palindrome");
+        if(marker) *marker = '\0';
+
+        j = 0;
+        for(i = 0; text[i] && j + 1 < sizeof(cleaned); i++) {
+            if(isalnum((unsigned char)text[i])) {
+                cleaned[j++] = (char)tolower((unsigned char)text[i]);
+            }
+        }
+        cleaned[j] = '\0';
+
+        if(j == 0) return false;
+
+        for(i = 0; i < j / 2; i++) {
+            if(cleaned[i] != cleaned[j - 1 - i]) {
+                snprintf(out, out_size, "No. \"%s\" is not a palindrome.", text);
+                return true;
+            }
+        }
+
+        snprintf(out, out_size, "Yes. \"%s\" is a palindrome.", text);
+        return true;
+    }
+
+    if(starts_with(lower, "binary of ") || starts_with(lower, "to binary ")) {
+        char *end;
+        long value;
+        char bits[80];
+        int pos = 0;
+        unsigned long u;
+
+        p = starts_with(lower, "binary of ") ? prompt + 10 : prompt + 10;
+        value = strtol(p, &end, 10);
+        if(end == p || value < 0) return false;
+        u = (unsigned long)value;
+
+        if(u == 0) {
+            snprintf(out, out_size, "%ld in binary = 0", value);
+            return true;
+        }
+
+        while(u && pos < (int)sizeof(bits) - 1) {
+            bits[pos++] = (char)('0' + (u & 1UL));
+            u >>= 1;
+        }
+        for(i = 0; i < (size_t)pos / 2; i++) {
+            char c = bits[i];
+            bits[i] = bits[pos - 1 - (int)i];
+            bits[pos - 1 - (int)i] = c;
+        }
+        bits[pos] = '\0';
+
+        snprintf(out, out_size, "%ld in binary = %s", value, bits);
+        return true;
+    }
+
+    if(starts_with(lower, "hex of ") || starts_with(lower, "to hex ")) {
+        char *end;
+        long value;
+        p = starts_with(lower, "hex of ") ? prompt + 7 : prompt + 7;
+        value = strtol(p, &end, 10);
+        if(end == p) return false;
+        snprintf(out, out_size, "%ld in hexadecimal = 0x%lX", value, (unsigned long)value);
+        return true;
+    }
+
+    return false;
+}
+
 static bool write_input_shape_response(char const *subject, char const *prompt,
                                        char *out, size_t out_size)
 {
@@ -2436,6 +2560,10 @@ static bool qb_offline_answer_core(
     }
 
     if(try_acronym_response(prompt, out, out_size)) {
+        return true;
+    }
+
+    if(try_text_tools(prompt, out, out_size)) {
         return true;
     }
 
