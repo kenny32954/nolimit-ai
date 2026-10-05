@@ -1203,7 +1203,9 @@ static bool try_date_tools(char const *prompt, char *out, size_t out_size)
 
     lowercase_into(prompt,lower,sizeof(lower));
 
-    if(sscanf(lower,"leap year %d",&y)==1 || sscanf(lower,"is %d a leap year",&y)==1) {
+    if((starts_with(lower,"leap year ") && sscanf(lower,"leap year %d",&y)==1) ||
+       (starts_with(lower,"is ") && strstr(lower," a leap year") &&
+        sscanf(lower,"is %d a leap year",&y)==1)) {
         snprintf(out,out_size,"%d %s a leap year.",y,leap_year_int(y)?"is":"is not");
         return true;
     }
