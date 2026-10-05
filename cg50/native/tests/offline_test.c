@@ -515,6 +515,30 @@ int main(void)
     qb_offline_answer("math", "answer", "school", "simplify fraction 42/56", out, sizeof(out));
     expect_contains("fraction simplify", out, "3/4");
 
+
+    qb_offline_answer("math", "answer", "school", "fraction 1/2 + 1/3", out, sizeof(out));
+    expect_contains("fraction add exact", out, "5/6");
+
+    qb_offline_answer("math", "answer", "school", "fraction 3/4 * 2/5", out, sizeof(out));
+    expect_contains("fraction multiply exact", out, "3/10");
+
+    qb_offline_answer("algebra_1", "answer", "school", "simplify radical 72", out, sizeof(out));
+    expect_contains("radical simplify", out, "6*sqrt(2)");
+
+    qb_offline_answer("algebra_2", "answer", "school", "factor x^2-5x+6", out, sizeof(out));
+    expect_contains("quadratic factor one", out, "(x - 2)");
+    expect_contains("quadratic factor two", out, "(x - 3)");
+
+    qb_offline_answer("algebra_2", "answer", "school", "factor 2x^2+7x+3", out, sizeof(out));
+    expect_contains("quadratic factor leading", out, "(2x + 1)");
+    expect_contains("quadratic factor second", out, "(x + 3)");
+
+    qb_offline_answer("math", "answer", "school", "scientific notation 123000", out, sizeof(out));
+    expect_contains("scientific notation large", out, "1.23 x 10^5");
+
+    qb_offline_answer("math", "answer", "school", "scientific notation 0.00123", out, sizeof(out));
+    expect_contains("scientific notation small", out, "1.23 x 10^-3");
+
     qb_offline_answer("consumer_math", "answer", "school", "what percent is 15 of 60", out, sizeof(out));
     expect_contains("reverse percent", out, "25%");
 
