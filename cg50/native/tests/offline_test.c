@@ -700,6 +700,16 @@ int main(void)
     qb_offline_answer("chemistry", "answer", "school", "particles from 2 mol", out, sizeof(out));
     expect_contains("avogadro particles", out, "1.204428152e+24");
 
+
+    qb_offline_answer("chemistry", "answer", "school", "molar mass Ca(OH)2", out, sizeof(out));
+    expect_contains("molar mass calcium hydroxide", out, "74.092");
+
+    qb_offline_answer("chemistry", "answer", "school", "molar mass Al2(SO4)3", out, sizeof(out));
+    expect_contains("molar mass aluminum sulfate", out, "342.132");
+
+    qb_offline_answer("chemistry", "answer", "school", "molar mass Mg(NO3)2", out, sizeof(out));
+    expect_contains("molar mass magnesium nitrate", out, "148.313");
+
     qb_offline_answer("computer_science", "answer", "school", "binary and 1010 1100", out, sizeof(out));
     expect_contains("binary and", out, "1000");
 
