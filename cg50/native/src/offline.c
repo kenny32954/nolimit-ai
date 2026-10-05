@@ -2110,6 +2110,267 @@ static bool try_polynomial_calculus(char const *text, char *out, size_t out_size
     return true;
 }
 
+
+static bool approx_equal(double a, double b)
+{
+    double scale = fabs(a) + fabs(b) + 1.0;
+    return fabs(a-b) <= 1e-9 * scale;
+}
+
+static bool try_sequence_pattern(char const *text, char *out, size_t out_size)
+{
+    double v[20];
+    int n;
+    int i;
+    bool arithmetic=true, geometric=true, fibonacci=true;
+    double d=0.0, r=0.0, next;
+
+    if(!(strstr(text,"sequence") || strstr(text,"pattern") ||
+         starts_with(text,"next ") || starts_with(text,"next number"))) return false;
+
+    n=extract_flexible_numbers(text,v,20);
+    if(n<3) return false;
+
+    d=v[1]-v[0];
+    for(i=2;i<n;i++) {
+        if(!approx_equal(v[i]-v[i-1],d)) arithmetic=false;
+    }
+    if(arithmetic) {
+        next=v[n-1]+d;
+        snprintf(out,out_size,
+            "Arithmetic sequence: common difference %.12g. Next term = %.12g.",
+            d,next);
+        return true;
+    }
+
+    if(fabs(v[0])<1e-12) geometric=false;
+    else {
+        r=v[1]/v[0];
+        for(i=2;i<n;i++) {
+            if(fabs(v[i-1])<1e-12 || !approx_equal(v[i]/v[i-1],r)) geometric=false;
+        }
+    }
+    if(geometric) {
+        next=v[n-1]*r;
+        snprintf(out,out_size,
+            "Geometric sequence: common ratio %.12g. Next term = %.12g.",
+            r,next);
+        return true;
+    }
+
+    for(i=2;i<n;i++) {
+        if(!approx_equal(v[i],v[i-1]+v[i-2])) fibonacci=false;
+    }
+    if(fibonacci) {
+        next=v[n-1]+v[n-2];
+        snprintf(out,out_size,
+            "Fibonacci-style pattern: each term is the previous two added. Next term = %.12g.",
+            next);
+        return true;
+    }
+
+    {
+        double dd=v[2]-2.0*v[1]+v[0];
+        bool second=true;
+        for(i=3;i<n;i++) {
+            double cur=v[i]-2.0*v[i-1]+v[i-2];
+            if(!approx_equal(cur,dd)) second=false;
+        }
+        if(second) {
+            double last_diff=v[n-1]-v[n-2];
+            next=v[n-1]+last_diff+dd;
+            snprintf(out,out_size,
+                "Constant second-difference pattern: second difference %.12g. Next term = %.12g.",
+                dd,next);
+            return true;
+        }
+    }
+
+    snprintf(out,out_size,
+        "I can read the sequence values, but they do not match my built-in arithmetic, geometric, Fibonacci-style, or constant-second-difference patterns.");
+    return true;
+}
+
+static bool try_finance_tools(char const *text, char *out, size_t out_size)
+{
+    double v[8];
+    int n=extract_flexible_numbers(text,v,8);
+
+    if(n>=3 && strstr(text,"simple interest")) {
+        double p=v[0], rate=v[1], years=v[2];
+        double r=fabs(rate)>1.0 ? rate/100.0 : rate;
+        double interest=p*r*years;
+        snprintf(out,out_size,
+            "Simple interest I=P*r*t = %.12g. Final amount = %.12g.",
+            interest,p+interest);
+        return true;
+    }
+
+    if(n>=2 && (strstr(text,"discount") || strstr(text,"percent off") || strstr(text,"% off"))) {
+        double percent=v[0], price=v[1];
+        double saved=price*percent/100.0;
+        snprintf(out,out_size,
+            "%.12g%% discount on %.12g saves %.12g; final price = %.12g.",
+            percent,price,saved,price-saved);
+        return true;
+    }
+
+    if(n>=2 && (strstr(text,"sales tax") || strstr(text,"tax on "))) {
+        double percent=v[0], price=v[1];
+        double tax=price*percent/100.0;
+        snprintf(out,out_size,
+            "%.12g%% tax on %.12g = %.12g; total = %.12g.",
+            percent,price,tax,price+tax);
+        return true;
+    }
+
+    if(n>=2 && strstr(text,"tip")) {
+        double percent=v[0], bill=v[1];
+        double tip=bill*percent/100.0;
+        snprintf(out,out_size,
+            "%.12g%% tip on %.12g = %.12g; total = %.12g.",
+            percent,bill,tip,bill+tip);
+        return true;
+    }
+
+    if(n>=4 && (strstr(text,"compound interest") || strstr(text,"compound amount"))) {
+        double p=v[0], rate=v[1], periods=v[2], years=v[3];
+        double r=fabs(rate)>1.0 ? rate/100.0 : rate;
+        if(periods<=0.0) {
+            snprintf(out,out_size,"Compounding periods per year must be positive.");
+            return true;
+        }
+        snprintf(out,out_size,
+            "Compound amount A=P(1+r/n)^(nt) = %.12g.",
+            p*pow(1.0+r/periods,periods*years));
+        return true;
+    }
+
+    return false;
+}
+
+static int compare_cstr(const void *a, const void *b)
+{
+    char const * const *sa=(char const * const *)a;
+    char const * const *sb=(char const * const *)b;
+    return strcmp(*sa,*sb);
+}
+
+static bool try_language_tools(char const *prompt, char *out, size_t out_size)
+{
+    char lower[500];
+    char text[420];
+    char *p=NULL;
+    size_t i;
+
+    lowercase_into(prompt,lower,sizeof(lower));
+
+    if(starts_with(lower,"uppercase ")) {
+        snprintf(text,sizeof(text),"%.419s",prompt+10);
+        for(i=0;text[i];i++) text[i]=(char)toupper((unsigned char)text[i]);
+        snprintf(out,out_size,"%s",text);
+        return true;
+    }
+
+    if(starts_with(lower,"lowercase ")) {
+        snprintf(text,sizeof(text),"%.419s",prompt+10);
+        for(i=0;text[i];i++) text[i]=(char)tolower((unsigned char)text[i]);
+        snprintf(out,out_size,"%s",text);
+        return true;
+    }
+
+    if(starts_with(lower,"title case ")) {
+        bool new_word=true;
+        snprintf(text,sizeof(text),"%.419s",prompt+11);
+        for(i=0;text[i];i++) {
+            if(isalpha((unsigned char)text[i])) {
+                text[i]=new_word?(char)toupper((unsigned char)text[i]):(char)tolower((unsigned char)text[i]);
+                new_word=false;
+            } else new_word=true;
+        }
+        snprintf(out,out_size,"%s",text);
+        return true;
+    }
+
+    if(starts_with(lower,"count vowels in ") || starts_with(lower,"how many vowels in ")) {
+        int count=0;
+        p=starts_with(lower,"count vowels in ")?(char *)prompt+16:(char *)prompt+19;
+        while(*p) {
+            char c=(char)tolower((unsigned char)*p++);
+            if(strchr("aeiou",c)) count++;
+        }
+        snprintf(out,out_size,"Vowel count = %d.",count);
+        return true;
+    }
+
+    if(starts_with(lower,"count consonants in ") || starts_with(lower,"how many consonants in ")) {
+        int count=0;
+        p=starts_with(lower,"count consonants in ")?(char *)prompt+20:(char *)prompt+23;
+        while(*p) {
+            char c=(char)tolower((unsigned char)*p++);
+            if(isalpha((unsigned char)c) && !strchr("aeiou",c)) count++;
+        }
+        snprintf(out,out_size,"Consonant count = %d.",count);
+        return true;
+    }
+
+    if(starts_with(lower,"initials of ") || starts_with(lower,"acronym of ")) {
+        char initials[80];
+        int k=0;
+        bool start=true;
+        p=starts_with(lower,"initials of ")?(char *)prompt+12:(char *)prompt+11;
+        while(*p && k+1<(int)sizeof(initials)) {
+            if(isalnum((unsigned char)*p)) {
+                if(start) initials[k++]=(char)toupper((unsigned char)*p);
+                start=false;
+            } else start=true;
+            p++;
+        }
+        initials[k]='\0';
+        snprintf(out,out_size,"Initials: %s",initials);
+        return true;
+    }
+
+    if(starts_with(lower,"alphabetize ") || starts_with(lower,"sort words ")) {
+        char work[420];
+        char *words[32];
+        int count=0;
+        char *tok;
+
+        p=starts_with(lower,"alphabetize ")?(char *)prompt+12:(char *)prompt+11;
+        snprintf(work,sizeof(work),"%.419s",p);
+        tok=strtok(work," ,;\t\r\n");
+        while(tok && count<32) {
+            words[count++]=tok;
+            tok=strtok(NULL," ,;\t\r\n");
+        }
+        if(count==0) return false;
+        qsort(words,(size_t)count,sizeof(words[0]),compare_cstr);
+        out[0]='\0';
+        for(i=0;i<(size_t)count;i++) {
+            size_t used=strlen(out);
+            snprintf(out+used,out_size-used,"%s%s",i?", ":"",words[i]);
+            if(strlen(out)+2>=out_size) break;
+        }
+        return true;
+    }
+
+    if(starts_with(lower,"sentence type ")) {
+        snprintf(text,sizeof(text),"%.419s",prompt+14);
+        trim_text(text);
+        {
+            size_t len=strlen(prompt+14);
+            while(len>0 && isspace((unsigned char)(prompt+14)[len-1])) len--;
+            if(len>0 && (prompt+14)[len-1]=='?') snprintf(out,out_size,"Question.");
+            else if(len>0 && (prompt+14)[len-1]=='!') snprintf(out,out_size,"Exclamation or emphatic sentence.");
+            else snprintf(out,out_size,"Declarative statement based on punctuation.");
+        }
+        return true;
+    }
+
+    return false;
+}
+
 static bool try_science_formula(char const *text, char *out, size_t out_size)
 {
     double v[8];
@@ -2266,7 +2527,7 @@ static bool try_linear_equation(char const *text, char *out, size_t out_size)
 static bool try_unit_conversion(char const *text, char *out, size_t out_size)
 {
     double v[4];
-    int n = extract_numbers(text, v, 4);
+    int n = extract_flexible_numbers(text, v, 4);
     double x;
 
     if(n < 1) return false;
@@ -2330,6 +2591,70 @@ static bool try_unit_conversion(char const *text, char *out, size_t out_size)
     }
     if(strstr(text, "hours to minutes") || strstr(text, "hr to min")) {
         snprintf(out, out_size, "%.12g hr = %.12g min", x, x * 60.0);
+        return true;
+    }
+    if(strstr(text, "kilograms to pounds") || strstr(text, "kg to lb") || strstr(text, "kg to pounds")) {
+        snprintf(out, out_size, "%.12g kg = %.12g lb", x, x * 2.20462262185);
+        return true;
+    }
+    if(strstr(text, "pounds to kilograms") || strstr(text, "lb to kg") || strstr(text, "pounds to kg")) {
+        snprintf(out, out_size, "%.12g lb = %.12g kg", x, x / 2.20462262185);
+        return true;
+    }
+    if(strstr(text, "grams to kilograms") || strstr(text, "g to kg")) {
+        snprintf(out, out_size, "%.12g g = %.12g kg", x, x / 1000.0);
+        return true;
+    }
+    if(strstr(text, "kilograms to grams") || strstr(text, "kg to g")) {
+        snprintf(out, out_size, "%.12g kg = %.12g g", x, x * 1000.0);
+        return true;
+    }
+    if(strstr(text, "liters to milliliters") || strstr(text, "litres to millilitres") || strstr(text, "l to ml")) {
+        snprintf(out, out_size, "%.12g L = %.12g mL", x, x * 1000.0);
+        return true;
+    }
+    if(strstr(text, "milliliters to liters") || strstr(text, "millilitres to litres") || strstr(text, "ml to l")) {
+        snprintf(out, out_size, "%.12g mL = %.12g L", x, x / 1000.0);
+        return true;
+    }
+    if(strstr(text, "inches to centimeters") || strstr(text, "inches to centimetres") || strstr(text, "in to cm")) {
+        snprintf(out, out_size, "%.12g in = %.12g cm", x, x * 2.54);
+        return true;
+    }
+    if(strstr(text, "centimeters to inches") || strstr(text, "centimetres to inches") || strstr(text, "cm to in")) {
+        snprintf(out, out_size, "%.12g cm = %.12g in", x, x / 2.54);
+        return true;
+    }
+    if(strstr(text, "feet to meters") || strstr(text, "feet to metres") || strstr(text, "ft to m")) {
+        snprintf(out, out_size, "%.12g ft = %.12g m", x, x * 0.3048);
+        return true;
+    }
+    if(strstr(text, "meters to feet") || strstr(text, "metres to feet") || strstr(text, "m to ft")) {
+        snprintf(out, out_size, "%.12g m = %.12g ft", x, x / 0.3048);
+        return true;
+    }
+    if(strstr(text, "miles to kilometers") || strstr(text, "mi to km")) {
+        snprintf(out, out_size, "%.12g mi = %.12g km", x, x * 1.609344);
+        return true;
+    }
+    if(strstr(text, "kilometers to miles") || strstr(text, "km to mi")) {
+        snprintf(out, out_size, "%.12g km = %.12g mi", x, x / 1.609344);
+        return true;
+    }
+    if(strstr(text, "mph to kph") || strstr(text, "mph to km/h")) {
+        snprintf(out, out_size, "%.12g mph = %.12g km/h", x, x * 1.609344);
+        return true;
+    }
+    if(strstr(text, "kph to mph") || strstr(text, "km/h to mph")) {
+        snprintf(out, out_size, "%.12g km/h = %.12g mph", x, x / 1.609344);
+        return true;
+    }
+    if(strstr(text, "days to hours") || strstr(text, "day to hours")) {
+        snprintf(out, out_size, "%.12g days = %.12g hours", x, x * 24.0);
+        return true;
+    }
+    if(strstr(text, "hours to days") || strstr(text, "hour to days")) {
+        snprintf(out, out_size, "%.12g hours = %.12g days", x, x / 24.0);
         return true;
     }
 
@@ -3608,6 +3933,10 @@ static bool qb_offline_answer_core(
         return true;
     }
 
+    if(try_language_tools(prompt, out, out_size)) {
+        return true;
+    }
+
     if(try_study_request(subject, prompt, out, out_size)) {
         return true;
     }
@@ -3666,6 +3995,14 @@ static bool qb_offline_answer_core(
     }
 
     if(try_statistics_tools(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_sequence_pattern(lowerbuf, out, out_size)) {
+        return true;
+    }
+
+    if(try_finance_tools(lowerbuf, out, out_size)) {
         return true;
     }
 
@@ -3881,6 +4218,30 @@ bool qb_offline_answer(
             "That still counts as input. Add any letter or number and I'll treat it as a topic, question, or calculation.",
             prompt);
         return true;
+    }
+
+    if(memory_valid &&
+       (starts_with(lower, "same for ") || starts_with(lower, "and ")) &&
+       strlen(prompt) > (starts_with(lower, "same for ") ? 9u : 4u)) {
+        char synthetic[220];
+        char const *new_topic = starts_with(lower, "same for ") ? prompt + 9 : prompt + 4;
+        snprintf(synthetic, sizeof(synthetic), "explain %.190s", new_topic);
+        ok = qb_offline_answer_core(
+            effective_subject,
+            mode,
+            level,
+            synthetic,
+            out,
+            out_size
+        );
+        if(ok && out[0]) {
+            copy_topic(synthetic, topic, sizeof(topic));
+            snprintf(memory_topic, sizeof(memory_topic), "%s", topic);
+            snprintf(memory_answer, sizeof(memory_answer), "%.699s", out);
+            snprintf(memory_subject, sizeof(memory_subject), "%s", effective_subject);
+            memory_valid = true;
+        }
+        return ok;
     }
 
     if(memory_valid && starts_with(lower, "what about ") &&
