@@ -687,6 +687,37 @@ int main(void)
     qb_offline_answer("auto", "answer", "school", "nato cat", out, sizeof(out));
     expect_contains("nato encode", out, "Charlie Alpha Tango");
 
+
+    qb_offline_answer("chemistry", "answer", "school", "molar mass H2O", out, sizeof(out));
+    expect_contains("molar mass water", out, "18.015");
+
+    qb_offline_answer("chemistry", "answer", "school", "moles from 36 g H2O", out, sizeof(out));
+    expect_contains("grams to moles", out, "1.998");
+
+    qb_offline_answer("chemistry", "answer", "school", "grams from 2 mol CO2", out, sizeof(out));
+    expect_contains("moles to grams", out, "88.02");
+
+    qb_offline_answer("chemistry", "answer", "school", "particles from 2 mol", out, sizeof(out));
+    expect_contains("avogadro particles", out, "1.204428152e+24");
+
+    qb_offline_answer("computer_science", "answer", "school", "binary and 1010 1100", out, sizeof(out));
+    expect_contains("binary and", out, "1000");
+
+    qb_offline_answer("computer_science", "answer", "school", "binary or 1010 1100", out, sizeof(out));
+    expect_contains("binary or", out, "1110");
+
+    qb_offline_answer("computer_science", "answer", "school", "binary xor 1010 1100", out, sizeof(out));
+    expect_contains("binary xor", out, "0110");
+
+    qb_offline_answer("computer_science", "answer", "school", "binary not 1010", out, sizeof(out));
+    expect_contains("binary not", out, "0101");
+
+    qb_offline_answer("computer_science", "answer", "school", "ascii A", out, sizeof(out));
+    expect_contains("ascii encode", out, "65");
+
+    qb_offline_answer("computer_science", "answer", "school", "char 65", out, sizeof(out));
+    expect_contains("ascii decode", out, "'A'");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
