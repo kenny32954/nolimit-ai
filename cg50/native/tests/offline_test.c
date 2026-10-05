@@ -539,6 +539,37 @@ int main(void)
     qb_offline_answer("auto", "answer", "school", "caesar 3 abc xyz", out, sizeof(out));
     expect_contains("caesar tool", out, "def abc");
 
+
+    qb_offline_answer("algebra_1", "steps", "school", "solve 2x+3<11", out, sizeof(out));
+    expect_contains("linear inequality positive", out, "x < 4");
+
+    qb_offline_answer("algebra_1", "steps", "school", "solve -3x+6>=12", out, sizeof(out));
+    expect_contains("linear inequality flip", out, "x <= -2");
+
+    qb_offline_answer("geometry", "answer", "school", "hypotenuse 3 4", out, sizeof(out));
+    expect_contains("hypotenuse solver", out, "5");
+
+    qb_offline_answer("trigonometry", "answer", "school", "sin 30 degrees", out, sizeof(out));
+    expect_contains("sin degrees", out, "0.5");
+
+    qb_offline_answer("auto", "answer", "school", "180 degrees to radians", out, sizeof(out));
+    expect_contains("degrees radians", out, "3.14159");
+
+    qb_offline_answer("chemistry", "answer", "school", "ph 0.001", out, sizeof(out));
+    expect_contains("ph solver", out, "3");
+
+    qb_offline_answer("chemistry", "answer", "school", "ideal gas pressure 2 300 10", out, sizeof(out));
+    expect_contains("ideal gas solver", out, "4.923");
+
+    qb_offline_answer("physics", "answer", "school", "potential energy mass 2 height 5", out, sizeof(out));
+    expect_contains("potential energy solver", out, "98.0665");
+
+    qb_offline_answer("biology", "answer", "school", "cross Aa x Aa", out, sizeof(out));
+    expect_contains("punnett AA", out, "AA 25%");
+    expect_contains("punnett Aa", out, "Aa 50%");
+    expect_contains("punnett aa", out, "aa 25%");
+    expect_contains("punnett phenotype", out, "Dominant phenotype 75%");
+
     puts("Standalone universal responder tests passed");
     return 0;
 }
