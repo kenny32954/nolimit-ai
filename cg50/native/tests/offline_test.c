@@ -574,6 +574,25 @@ int main(void)
     qb_offline_answer("consumer_math", "answer", "school", "3 dollars 50 cents to cents", out, sizeof(out));
     expect_contains("compound money", out, "350");
 
+
+    qb_offline_answer("composition", "answer", "school", "word frequency cat in cat dog cat bird cat", out, sizeof(out));
+    expect_contains("word frequency tool", out, "3 times");
+
+    qb_offline_answer("composition", "answer", "school", "contains moon in The moon is bright", out, sizeof(out));
+    expect_contains("contains text yes", out, "Yes");
+
+    qb_offline_answer("composition", "answer", "school", "contains sun in The moon is bright", out, sizeof(out));
+    expect_contains("contains text no", out, "No");
+
+    qb_offline_answer("composition", "answer", "school", "duplicate words red blue red green blue red", out, sizeof(out));
+    expect_contains("duplicate words red", out, "red(3)");
+    expect_contains("duplicate words blue", out, "blue(2)");
+
+    qb_offline_answer("composition", "answer", "school", "sentence check Hello hello world.", out, sizeof(out));
+    expect_contains("sentence check capital", out, "starts with capital=yes");
+    expect_contains("sentence check punctuation", out, "ends with punctuation=yes");
+    expect_contains("sentence check repeat", out, "adjacent repeated word=yes");
+
     qb_offline_answer("consumer_math", "answer", "school", "what percent is 15 of 60", out, sizeof(out));
     expect_contains("reverse percent", out, "25%");
 
